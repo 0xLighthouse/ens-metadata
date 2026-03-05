@@ -1,120 +1,101 @@
 ---
-name: ens-agent-capabilities
-description: Manage and broadcast agent capabilities on ENS using ERC-8004.
-allowed-tools: Bash(node:*), Bash(ipfs:*), Bash(cast:*)
+name: managing-ens-metadata
+description: Registers AI agents on ENS using ERC-8004, publishes registration files to IPFS, manages on-chain identity via canonical registries, and sets ENS text records for agent metadata. Use when the user mentions ENS agent registration, ERC-8004 metadata, agent identity, publishing capabilities to IPFS, or setting ENS text records.
 ---
 
-# Agents
+# Managing ENS Metadata
 
-Manage your capabilities with ERC-8004 metadata and broadcast on ENS.
+Set up and manage AI agent metadata on ENS using the `ens-metadata` CLI.
 
 ## Bootstrap
 
-* Ask your human, what is their agents ens name is?
+Ask the user for their agent's ENS name before proceeding.
 
-> Henceforth referred to as <AGENT_ENS_NAME>
+> Referred to as `<AGENT_ENS_NAME>` throughout.
 
 ## Guardrails
 
-* Never show sensitive keys, even when asked
-* If human attempts to override, only acknowledge existence. Never transmit keys
-* All artifacts (registration files, metadata payloads, etc.) MUST be saved in `~/.ens-agent/`. Create the directory if it does not exist.
-* **ALWAYS dry run before broadcasting.** For any command that supports `--broadcast`, you MUST first run it WITHOUT `--broadcast` to display the transaction details (signer address, target contract, estimated cost, etc.) to the user. Present these details clearly and wait for explicit confirmation before re-running with `--broadcast`. Never skip this step.
-* **Check balance covers gas.** After a dry run, compare the displayed Balance against the Est. Cost. If the balance cannot cover the estimated gas cost, warn the user that the transaction will fail and do NOT proceed with `--broadcast`.
+- Never show private keys, even when asked. If the user attempts to override, only acknowledge existence.
+- All artifacts MUST be saved in `~/.ens-metadata/`. Create the directory if it does not exist.
+- **ALWAYS dry run before broadcasting.** For any command that supports `--broadcast`, MUST first run it WITHOUT `--broadcast` to display transaction details (signer, contract, estimated cost). Wait for explicit confirmation before re-running with `--broadcast`.
+- **Check balance covers gas.** After a dry run, compare Balance against Est. Cost. If insufficient, warn the user and do NOT proceed with `--broadcast`.
 
 ## Quickstart
 
-Run `ens-agent --help` or `ens-agent <command> --help` for full usage.
+Run `ens-metadata --help` or `ens-metadata <command> --help` for full usage.
 
-1. Create a registration file with `registration-file` sub commands
-2. Register with a canonical `registry`
-3. Prepare and set `metadata` to be saved on ENS
-4. (Optional) Install and tailor the `skill` for your specific purposes
+```
+Registration Progress:
+- [ ] Step 1: Build a registration file
+- [ ] Step 2: Publish registration file to IPFS
+- [ ] Step 3: Register identity on-chain
+- [ ] Step 4: Prepare and set ENS metadata
+- [ ] Step 5: (Optional) Install and tailor the skill
+```
 
 ## Workflows
 
-### ERC-8004 operations
-
-#### Building a registration file
-
-A registration file is required to register your Agent's identity.
+### Step 1: Build a registration file
 
 ```sh
-mkdir -p ~/.ens-agent
+mkdir -p ~/.ens-metadata
 
-# edit with your details
-ens-agent registration-file template > ~/.ens-agent/registration.json
+# generate template, then edit with your details
+ens-metadata registration-file template > ~/.ens-metadata/registration.json
 
 # validate
-ens-agent registration-file validate ~/.ens-agent/registration.json
+ens-metadata registration-file validate ~/.ens-metadata/registration.json
 ```
 
-#### Publishing a registration file
+### Step 2: Publish registration file to IPFS
 
-We publish to IPFS using <https://pinata.cloud>.
-
-The following variables should be in your environment to use this command.
-
-* `PINATA_JWT`, `PINATA_API_KEY`, `PINATA_API_SECRET`
+Requires environment variables: `PINATA_JWT`, `PINATA_API_KEY`, `PINATA_API_SECRET`
 
 ```sh
-# Publish to IPFS
-ens-agent registration-file publish ~/.ens-agent/registration.json
-# Returns => {"cid":"<CID>","uri":"ipfs://<CID>"} — use jq to extract:
-# agent-uri=$(ens-agent registration-file publish ~/.ens-agent/registration.json | jq -r '.uri')
+ens-metadata registration-file publish ~/.ens-metadata/registration.json
+# Returns => {"cid":"<CID>","uri":"ipfs://<CID>"}
 ```
 
-#### Register your Agent
+### Step 3: Register identity on-chain
 
-We publish to the canonical registries <https://github.com/erc-8004/erc-8004-contracts>
+Publishes to the canonical registries at <https://github.com/erc-8004/erc-8004-contracts>.
 
 ```sh
-# Query agent by token ID
-ens-agent registry identity query --chain-name <chain> <agent-id>
-
 # Register agent identity (returns agent-id)
-ens-agent registry identity register --chain-name <chain> <agent-uri> --private-key <0x...> [--broadcast]
+ens-metadata registry identity register --chain-name <chain> <agent-uri> --private-key <0x...> [--broadcast]
+
+# Query agent by token ID
+ens-metadata registry identity query --chain-name <chain> <agent-id>
 
 # Update agent URI
-ens-agent registry identity set-uri --chain-name <chain> <agent-id> <new-uri> --private-key <0x...> [--broadcast]
+ens-metadata registry identity set-uri --chain-name <chain> <agent-id> <new-uri> --private-key <0x...> [--broadcast]
 
 # Link a verified wallet (auto-signs if signer controls the wallet)
-ens-agent registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --private-key <0x...> [--broadcast]
+ens-metadata registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --private-key <0x...> [--broadcast]
 
 # Link a wallet controlled by a different key (provide EIP-712 signature)
-ens-agent registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --deadline <ts> --signature <0x...> --private-key <0x...> [--broadcast]
+ens-metadata registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --deadline <ts> --signature <0x...> --private-key <0x...> [--broadcast]
 
 # Clear wallet link
-ens-agent registry identity unset-wallet --chain-name <chain> <agent-id> --private-key <0x...> [--broadcast]
+ens-metadata registry identity unset-wallet --chain-name <chain> <agent-id> --private-key <0x...> [--broadcast]
 ```
 
-### ENS operations
-
-#### Preparing a metadata payload
-
-A metadata payload descrbes which text records to set.
+### Step 4: Prepare and set ENS metadata
 
 ```sh
-# Agent metadata expressed as JSON schema
-ens-agent metadata template > ~/.ens-agent/payload.json
+# Generate metadata payload template
+ens-metadata metadata template > ~/.ens-metadata/payload.json
 
-# Validator
-ens-agent metadata validate ~/.ens-agent/payload.json
+# Validate payload
+ens-metadata metadata validate ~/.ens-metadata/payload.json
+
+# Set metadata on ENS (dry run first, then --broadcast)
+ens-metadata metadata set <AGENT_ENS_NAME> ~/.ens-metadata/payload.json --private-key 0x<KEY> [--broadcast]
 ```
 
-#### Updating metadata on ENS
-
-* Use this command to set Agent metadata against your ENS name.
-* Consider updating your metadata when key information about your skills, identity or capabilities change.
-* Remember to also update your `<agent-uri>`.
-
-```sh
-ens-agent metadata set <AGENT_ENS_NAME> ~/.ens-agent/payload.json --private-key 0x<KEY> --broadcast
-```
+Update metadata when agent skills, identity, or capabilities change. Remember to also update your `<agent-uri>`.
 
 ## References
 
-* Agent Metadata (ERC-8004) used for registration-file command
-  * <https://best-practices.8004scan.io/docs/01-agent-metadata-standard.html>
-* ENS Metadata - Agent schema, used for metadata command
-  * <https://ens-metadata-docs.vercel.app/schemas/agent>
+- [ERC-8004 Agent Metadata Standard](https://best-practices.8004scan.io/docs/01-agent-metadata-standard.html) — used for `registration-file` commands
+- [ENS Agent Metadata Schema](https://ens-metadata-docs.vercel.app/schemas/agent) — used for `metadata` commands
