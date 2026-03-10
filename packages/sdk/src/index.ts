@@ -1,6 +1,12 @@
 import { normalize } from 'viem/ens'
+import type { PublicClient } from 'viem'
 import type { Schema } from '@ens-node-metadata/schemas/types'
-import type { GetMetadataOptions, GetMetadataResult } from './types'
+import type {
+  GetSchemaOptions,
+  GetSchemaResult,
+  GetMetadataOptions,
+  GetMetadataResult,
+} from './types'
 
 export type MetadataValidationError = { key: string; message: string }
 export type MetadataValidationResult =
@@ -33,6 +39,10 @@ export function validateMetadataSchema(
   return errors.length > 0 ? { success: false, errors } : { success: true, data: record as Record<string, string> }
 }
 
+export function validate(schema: Schema, data: unknown): boolean {
+  return validateMetadataSchema(data, schema).success
+}
+
 const DEFAULT_KEYS = [
   'schema',
   'class',
@@ -42,6 +52,8 @@ const DEFAULT_KEYS = [
   'avatar',
   'url',
 ]
+
+const SCHEMA_KEYS = ['schema', 'class', 'schemaVersion', 'schemaCid']
 
 function pickFirst(
   texts: Record<string, string | null>,
@@ -64,87 +76,120 @@ function normalizeResolverAddress(resolver: unknown): string | null {
   return null
 }
 
-export async function getMetadata(options: GetMetadataOptions): Promise<GetMetadataResult> {
-  const {
-    publicClient,
-    name,
-    keys = DEFAULT_KEYS,
-    coinType = 60,
-    normalizeName = true,
-    blockNumber,
-    blockTag,
-    gatewayUrls,
-    strict,
-    universalResolverAddress,
-  } = options
-
-  if (!publicClient) {
-    throw new Error('getMetadata requires a viem publicClient')
+function buildTextOptions(opts: {
+  blockNumber?: bigint
+  blockTag?: string
+  gatewayUrls?: string[]
+  strict?: boolean
+  universalResolverAddress?: string
+}) {
+  return {
+    ...(opts.blockNumber !== undefined ? { blockNumber: opts.blockNumber } : {}),
+    ...(opts.blockTag !== undefined ? { blockTag: opts.blockTag } : {}),
+    ...(opts.gatewayUrls !== undefined ? { gatewayUrls: opts.gatewayUrls } : {}),
+    ...(opts.strict !== undefined ? { strict: opts.strict } : {}),
+    ...(opts.universalResolverAddress !== undefined ? { universalResolverAddress: opts.universalResolverAddress } : {}),
   }
+}
 
-  const normalizedName = normalizeName ? normalize(name) : name
-  const uniqueKeys = [...new Set(keys)]
+function extractSchemaFields(texts: Record<string, string | null>): Omit<GetSchemaResult, never> {
+  return {
+    schema: pickFirst(texts, ['schema', 'ens.schema', 'record.schema']),
+    class: pickFirst(texts, ['class', 'ens.class', 'record.class']),
+    version: pickFirst(texts, ['schemaVersion', 'schema-version', 'version', 'record.version']),
+    cid: pickFirst(texts, ['schemaCid', 'schema-cid', 'cid', 'record.cid']),
+  }
+}
+
+async function fetchTextRecords(
+  client: PublicClient,
+  normalizedName: string,
+  keys: string[],
+  textOptions: Record<string, unknown>,
+): Promise<Record<string, string | null>> {
+  const results = await Promise.all(
+    keys.map(async (key) => {
+      try {
+        const value = await (client as any).getEnsText({
+          name: normalizedName,
+          key,
+          ...textOptions,
+        })
+        return [key, value ?? null] as const
+      } catch {
+        return [key, null] as const
+      }
+    }),
+  )
+  return Object.fromEntries(results)
+}
+
+async function getSchemaImpl(
+  client: PublicClient,
+  opts: GetSchemaOptions,
+): Promise<GetSchemaResult> {
+  const normalizedName = normalize(opts.name)
+  const textOptions = buildTextOptions(opts)
+  const texts = await fetchTextRecords(client, normalizedName, SCHEMA_KEYS, textOptions)
+  return extractSchemaFields(texts)
+}
+
+async function getMetadataImpl(
+  client: PublicClient,
+  opts: GetMetadataOptions,
+): Promise<GetMetadataResult> {
+  const normalizedName = normalize(opts.name)
+  const coinType = opts.coinType ?? 60
+
+  // Determine which keys to fetch
+  let keys: string[]
+  if (opts.schema) {
+    const schemaKeys = Object.keys(opts.schema.properties)
+    const extraKeys = opts.keys ?? []
+    keys = [...new Set([...schemaKeys, ...extraKeys])]
+  } else if (opts.keys) {
+    keys = [...new Set(opts.keys)]
+  } else {
+    keys = DEFAULT_KEYS
+  }
 
   const commonOptions = {
-    ...(blockNumber !== undefined ? { blockNumber } : {}),
-    ...(blockTag !== undefined ? { blockTag } : {}),
+    ...(opts.blockNumber !== undefined ? { blockNumber: opts.blockNumber } : {}),
+    ...(opts.blockTag !== undefined ? { blockTag: opts.blockTag } : {}),
   }
 
-  const textOptions = {
-    ...commonOptions,
-    ...(gatewayUrls !== undefined ? { gatewayUrls } : {}),
-    ...(strict !== undefined ? { strict } : {}),
-    ...(universalResolverAddress !== undefined ? { universalResolverAddress } : {}),
-  }
+  const textOptions = buildTextOptions(opts)
 
-  const [resolverValue, addressValue, textResults] = await Promise.all([
-    publicClient.getEnsResolver({ name: normalizedName, ...commonOptions }).catch(() => null),
-    publicClient
-      .getEnsAddress({
-        name: normalizedName,
-        coinType,
-        ...commonOptions,
-      })
+  const [resolverValue, addressValue, texts] = await Promise.all([
+    (client as any).getEnsResolver({ name: normalizedName, ...commonOptions }).catch(() => null),
+    (client as any)
+      .getEnsAddress({ name: normalizedName, coinType, ...commonOptions })
       .catch(() => null),
-    Promise.all(
-      uniqueKeys.map(async (key) => {
-        try {
-          const value = await publicClient.getEnsText({
-            name: normalizedName,
-            key,
-            ...textOptions,
-          })
-          return [key, value ?? null] as const
-        } catch {
-          return [key, null] as const
-        }
-      }),
-    ),
+    fetchTextRecords(client, normalizedName, keys, textOptions),
   ])
 
-  const texts: Record<string, string | null> = Object.fromEntries(textResults)
-
-  const schema = pickFirst(texts, ['schema', 'ens.schema', 'record.schema'])
-  const cls = pickFirst(texts, ['class', 'ens.class', 'record.class'])
-  const version = pickFirst(texts, [
-    'schemaVersion',
-    'schema-version',
-    'version',
-    'record.version',
-  ])
-  const cid = pickFirst(texts, ['schemaCid', 'schema-cid', 'cid', 'record.cid'])
+  const schemaFields = extractSchemaFields(texts)
 
   return {
     name: normalizedName,
     resolver: normalizeResolverAddress(resolverValue),
     address: typeof addressValue === 'string' ? addressValue : null,
-    texts,
-    schema,
-    class: cls,
-    version,
-    cid,
+    class: schemaFields.class,
+    schema: schemaFields.schema,
+    properties: texts,
   }
 }
 
-export type { GetMetadataOptions, GetMetadataResult } from './types'
+export function ensMetadataActions() {
+  return (client: PublicClient) => ({
+    getSchema: (opts: GetSchemaOptions) => getSchemaImpl(client, opts),
+    getMetadata: (opts: GetMetadataOptions) => getMetadataImpl(client, opts),
+  })
+}
 
+export type {
+  GetSchemaOptions,
+  GetSchemaResult,
+  GetMetadataOptions,
+  GetMetadataResult,
+} from './types'
