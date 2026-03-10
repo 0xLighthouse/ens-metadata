@@ -23,6 +23,7 @@ Usage:
   ens-metadata registry identity set-wallet             --chain-name <chain> <agent-id> <wallet> --private-key <0x...> [--deadline <ts>] [--signature <0x...>] [--broadcast]
   ens-metadata registry identity unset-wallet           --chain-name <chain> <agent-id> --private-key <0x...> [--broadcast]
 
+  ens-metadata metadata view <ENS name>
   ens-metadata metadata template
   ens-metadata metadata validate <payload.json>
   ens-metadata metadata set <ens-node> <payload.json> --private-key <key> [--broadcast]
