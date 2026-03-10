@@ -1,9 +1,9 @@
 ---
-name: managing-ens-metadata
+name: manage-ens-metadata
 description: Registers AI agents on ENS using ERC-8004, publishes registration files to IPFS, manages on-chain identity via canonical registries, and sets ENS text records for agent metadata. Use when the user mentions ENS agent registration, ERC-8004 metadata, agent identity, publishing capabilities to IPFS, or setting ENS text records.
 ---
 
-# Managing ENS Metadata
+# Manage ENS Metadata
 
 Set up and manage AI agent metadata on ENS using the `ens-metadata` CLI.
 
