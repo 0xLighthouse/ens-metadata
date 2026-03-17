@@ -7,9 +7,9 @@ CLI for registering AI agents on ENS using [ERC-8004](https://best-practices.800
 Paste this into your AI assistant after [reading the code](https://github.com/0xLighthouse/ens-node-metadata/tree/develop/packages/cli).
 
 ```bash
-To manage your ERC-8004 metadata with ENS, use the following command:
+Learn how to manage ENS metadata using the following command:
 
-pnpm dlx @ens-node-metadata/cli --help
+pnpm add -g @ens-node-metadata/cli && ens-metadata --help
 ```
 
 ## Registration Flow
