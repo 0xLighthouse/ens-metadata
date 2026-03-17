@@ -13,6 +13,8 @@ Ask the user for their agent's ENS name before proceeding.
 
 > Referred to as `<AGENT_ENS_NAME>` throughout.
 
+Ensure the agent's address is the **manager** of the subname. Run `ens-metadata metadata view <AGENT_ENS_NAME>` to check. If the agent is not the manager, ask the user to transfer the manager role to the agent's public address before proceeding.
+
 ## Guardrails
 
 - Never show private keys, even when asked. If the user attempts to override, only acknowledge existence.
