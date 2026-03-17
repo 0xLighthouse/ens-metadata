@@ -189,7 +189,11 @@ export const BaseNodeCard = ({
           </div>
 
           {/* Manager row */}
-          <div className="px-4 py-2.5 bg-gray-50/50">
+          <div
+            data-manager-row
+            className="nodrag nopan w-full px-4 py-2.5 bg-gray-50/50 hover:bg-gray-100/80 transition-colors cursor-pointer text-left"
+            title="Click to transfer manager"
+          >
             <div className="flex items-center gap-2 leading-none">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex-shrink-0">
                 Manager:
