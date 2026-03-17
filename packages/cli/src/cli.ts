@@ -10,7 +10,7 @@ if (isRootHelp) {
 CLI for registering AI agents on ENS using ERC-8004 (v2.0).
 
 Usage:
-  ens-metadata skill [--install]
+  ens-metadata skill
 
   ens-metadata registration-file template
   ens-metadata registration-file validate <file.json>
