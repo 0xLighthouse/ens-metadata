@@ -6,6 +6,15 @@ const nav = new navGenerator(__dirname)
 
 export default defineConfig({
   aiCta: false,
+  head: {
+    script: [
+      {
+        src: 'https://cloud.umami.is/script.js',
+        defer: true,
+        'data-website-id': '327bc99a-c5a0-457e-8a63-ab3d476d6542',
+      },
+    ],
+  },
   title: 'ENS Organizational Registry',
   description: 'ENS-based organizational identity and metadata registry protocol',
   logoUrl: '/ens-mark-white.svg',
