@@ -25,6 +25,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={theme}>
+      <head>
+        <script defer src="https://cloud.umami.is/script.js" data-website-id="c719e983-26a5-4bf5-b57e-17a9f9ccb6f9" />
+      </head>
       <body>
         <RouteTracker />
         <ThemeProvider initialTheme={theme}>
