@@ -1,6 +1,6 @@
 {
   "name": "@ens-node-metadata/cli",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "CLI for managing AI agent metadata on ENS using ERC-8004",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,6 +22,7 @@
     "version:minor": "pnpm version minor --no-git-tag-version",
     "cli": "bun src/cli.ts",
     "build": "tsup",
+    "publish:cli": "pnpm build && pnpm publish --access public",
     "lint": "biome check .",
     "test": "vitest run"
   },

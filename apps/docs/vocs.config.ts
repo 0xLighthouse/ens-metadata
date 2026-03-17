@@ -32,5 +32,10 @@ export default defineConfig({
       collapsed: false,
       items: nav.navItems('/sdk'),
     },
+    {
+      text: 'CLI',
+      collapsed: false,
+      items: nav.navItems('/cli'),
+    },
   ],
 })
