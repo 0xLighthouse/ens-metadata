@@ -101,21 +101,28 @@ function extractSchemaFields(texts: Record<string, string | null>): Omit<GetSche
   }
 }
 
+declare function setTimeout(callback: () => void, ms: number): unknown
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+  return Promise.race([promise, timer]) as Promise<T | null>
+}
+
 async function fetchTextRecords(
   client: PublicClient,
   normalizedName: string,
   keys: string[],
   textOptions: Record<string, unknown>,
+  timeoutMs = 10_000,
 ): Promise<Record<string, string | null>> {
   const results = await Promise.all(
     keys.map(async (key) => {
       try {
-        const value = await (client as any).getEnsText({
-          name: normalizedName,
-          key,
-          ...textOptions,
-        })
-        return [key, value ?? null] as const
+        const value = await withTimeout<string | null>(
+          (client as any).getEnsText({ name: normalizedName, key, ...textOptions }),
+          timeoutMs,
+        )
+        return [key, (value ?? null) as string | null] as const
       } catch {
         return [key, null] as const
       }
@@ -161,10 +168,14 @@ async function getMetadataImpl(
   const textOptions = buildTextOptions(opts)
 
   const [resolverValue, addressValue, texts] = await Promise.all([
-    (client as any).getEnsResolver({ name: normalizedName, ...commonOptions }).catch(() => null),
-    (client as any)
-      .getEnsAddress({ name: normalizedName, coinType, ...commonOptions })
-      .catch(() => null),
+    withTimeout(
+      (client as any).getEnsResolver({ name: normalizedName, ...commonOptions }),
+      10_000,
+    ).catch(() => null),
+    withTimeout(
+      (client as any).getEnsAddress({ name: normalizedName, coinType, ...commonOptions }),
+      10_000,
+    ).catch(() => null),
     fetchTextRecords(client, normalizedName, keys, textOptions),
   ])
 
