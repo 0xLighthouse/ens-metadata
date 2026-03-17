@@ -21,8 +21,13 @@ export function useCommand(
   const [state, setState] = React.useState<CommandState>({ status: 'idle' })
 
   React.useEffect(() => {
-    if (state.status === 'done') exit()
-    else if (state.status === 'error') exit(new Error(state.message))
+    if (state.status === 'done') {
+      exit()
+      setTimeout(() => process.exit(0), 100)
+    } else if (state.status === 'error') {
+      exit(new Error(state.message))
+      setTimeout(() => process.exit(1), 100)
+    }
   }, [state, exit])
 
   React.useEffect(() => {

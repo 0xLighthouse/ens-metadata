@@ -57,7 +57,7 @@ export default function View({ args: [ensName], options }: Props) {
       transport: http(undefined, { batch: { batchSize: 128 } }),
     }).extend(ensMetadataActions())
 
-    // Try subgraph first for fast key discovery
+    // Query subgraph for fast key discovery
     const domain = await queryDomain(ensName)
 
     if (domain && !domain.resolver) {
@@ -82,7 +82,7 @@ export default function View({ args: [ensName], options }: Props) {
       return
     }
 
-    // Fetch metadata — use known keys from subgraph if available, otherwise defaults
+    // Fetch metadata using known keys from subgraph
     const metadata = await client.getMetadata({
       name: ensName,
       ...(textKeys ? { keys: textKeys } : {}),

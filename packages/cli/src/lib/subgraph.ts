@@ -1,4 +1,4 @@
-const ENSNODE_SUBGRAPH_URL = 'https://api.alpha.ensnode.io/subgraph'
+const SUBGRAPH_ENDPOINT = 'https://api.alpha.ensnode.io/subgraph'
 
 const RESOLVE_DOMAIN_QUERY = `
   query ResolveDomainByName($name: String!) {
@@ -32,7 +32,7 @@ export async function queryDomain(name: string): Promise<SubgraphDomain | null> 
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const res = await fetch(ENSNODE_SUBGRAPH_URL, {
+    const res = await fetch(SUBGRAPH_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: RESOLVE_DOMAIN_QUERY, variables: { name } }),
