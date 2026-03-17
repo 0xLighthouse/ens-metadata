@@ -16,6 +16,7 @@ import { useTreeControlsStore } from '@/stores/tree-controls'
 import { useTreeEditStore } from '@/stores/tree-edits'
 import type { TreeNode } from '@/lib/tree/types'
 import { DefaultNode, TreasuryNode, SignerNode, BaseNode } from './nodes'
+import { TransferManagerDialog } from './dialogs/TransferManagerDialog'
 import { ReferenceEdge } from './edges/ReferenceEdge'
 
 const MIN_ZOOM = 0.3
@@ -220,6 +221,7 @@ export function Tree({ data }: Props) {
   const [reactFlowInstance, setReactFlowInstance] = useState<
     ReactFlowInstance<DomainTreeNode, Edge> | null
   >(null)
+  const [transferManagerNode, setTransferManagerNode] = useState<string | null>(null)
   const [nodeSizes, setNodeSizes] = useState<Map<string, NodeDimensions>>(new Map())
 
   // Two-pass layout: measuring -> visible (for smooth transitions)
@@ -498,6 +500,7 @@ export function Tree({ data }: Props) {
   }, [layoutTrigger, reactFlowInstance, layoutPhase])
 
   return (
+    <>
     <ReactFlow<DomainTreeNode, Edge>
       nodes={nodes}
       edges={edges}
@@ -511,7 +514,12 @@ export function Tree({ data }: Props) {
       nodesConnectable={false}
       elementsSelectable={true}
       fitView={false}
-      onNodeClick={(_, node) => {
+      onNodeClick={(event, node) => {
+        const target = event.target as HTMLElement
+        if (target.closest('[data-manager-row]')) {
+          setTransferManagerNode(node.id)
+          return
+        }
         setSelectedNode(node.id)
         openEditDrawer(node.id)
       }}
@@ -528,5 +536,20 @@ export function Tree({ data }: Props) {
     >
       <Background gap={20} size={1} className="bg-white dark:bg-gray-950" />
     </ReactFlow>
+    {transferManagerNode && (() => {
+      const flowNode = nodes.find((n) => n.id === transferManagerNode)
+      const treeNode = flowNode?.data?.node
+      if (!treeNode) return null
+      return (
+        <TransferManagerDialog
+          open={true}
+          onOpenChange={(open) => { if (!open) setTransferManagerNode(null) }}
+          nodeName={treeNode.name}
+          currentOwner={treeNode.owner}
+          isWrapped={treeNode.isWrapped}
+        />
+      )
+    })()}
+  </>
   )
 }

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type TxnStatus = 'pending' | 'confirming' | 'confirmed' | 'failed'
-export type TxnType = 'createSubname' | 'setRecords'
+export type TxnType = 'createSubname' | 'setRecords' | 'transferName'
 
 export interface Txn {
   hash: `0x${string}`
