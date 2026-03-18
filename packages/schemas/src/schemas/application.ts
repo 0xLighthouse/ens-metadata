@@ -1,23 +1,30 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
+const APPLICATION_SCHEMA_VERSION = '2.0.0';
+
 export const APPLICATION_SCHEMA: Schema = {
-  $id: `${GITHUB_URL}/schemas/application/1.0.0`,
+  $id: `${GITHUB_URL}/tree/main/packages/schemas/published/application/versions/${APPLICATION_SCHEMA_VERSION}`,
   source: GITHUB_URL,
   title: 'Application',
-  version: '1.0.0',
-  description: 'An application, service, or dApp within the organization.',
+  version: APPLICATION_SCHEMA_VERSION,
+  description: 'A software application, service, or website.',
   type: 'object' as const,
   properties: {
     class: {
       type: 'string',
       default: 'Application',
-      description: 'High-level identifier of this node type',
+      description: 'Class identifier for this node',
       examples: ['Application', 'Service', 'Website'],
+    },
+    schema: {
+      type: 'string',
+      format: 'uri',
+      description: 'URI pointing to the application schema',
     },
     name: {
       type: 'string',
-      description: 'The name of the application',
+      description: 'Displayname of the application',
     },
     description: {
       type: 'string',
@@ -27,10 +34,12 @@ export const APPLICATION_SCHEMA: Schema = {
       type: 'string',
       format: 'uri',
       description: 'URL where the application is hosted or accessed',
+      examples: ['https://example.com', 'https://app.example.com'],
     },
     repository: {
       type: 'string',
-      description: 'Source code repository URL',
+      description: 'URL pointing to the source code repository',
+      examples: ['https://github.com/example/example'],
     },
     version: {
       type: 'string',
@@ -38,10 +47,10 @@ export const APPLICATION_SCHEMA: Schema = {
     },
     status: {
       type: 'string',
-      description: 'Application status',
+      description: 'The current status of the application',
       enum: ['Active', 'Development', 'Deprecated'],
     },
   },
-  required: ['class'],
-  recommended: ['name', 'description', 'url', 'status']
+  required: ['class', 'schema'],
+  recommended: ['name', 'description', 'url']
 }

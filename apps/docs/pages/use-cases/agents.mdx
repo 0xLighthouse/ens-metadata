@@ -7,11 +7,11 @@ weight: 1
 
 ## The Problem
 
-AI agents are proliferating rapidly, but they lack a universal identity layer. Standards like [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) have emerged to address this — giving agents an on-chain anchor and a standardised way to publish capability metadata. However, ERC-8004 requires agents to register with a smart contract, which pushes the discoverability issue from the agent onto the smart contract. Many different registries could exist, which results in continued fragmentation where users who want to discover an agent have no single source of truth.
+AI agents are proliferating rapidly, but they lack a universal identity layer. Standards like [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) have emerged to address this — giving agents an on-chain anchor and a standardised way to publish capability metadata. However, ERC-8004 requires agents to register with a smart contract, which pushes the discoverability problem from the agent onto the registry. Many different registries could exist across many chains, resulting in continued fragmentation: there is no single place to look up an agent.
 
 ## Proposed Solution
 
-ENS node classifications and metadata provide a canonical identity layer for AI agents. An agent that owns an ENS name can publish its `agent-uri` directly as a text record, allowing any consumer to resolve it with a standard ENS lookup. ENS becomes the single source of truth for all agents.
+ENS node classifications and metadata provide a canonical identity layer for AI agents. An agent that owns an ENS name can publish its `agent-uri` directly as a text record, allowing any consumer to resolve it with a standard ENS lookup — no registry contract required.
 
 ```
 myagent.eth
@@ -19,32 +19,120 @@ myagent.eth
   └── agent-uri  = "https://..."   # ERC-8004 registration file
 ```
 
-An agent's ENS name is now its universal on-chain identity. One update propagates everywhere.
+An agent's ENS name becomes its universal on-chain identity. One update propagates everywhere.
 
 ## Relationship to ERC-8004
 
-This is not a replacement for ERC-8004 — it is a complement to it. The `agent-uri` field points to the same JSON registration file that ERC-8004 specifies, so existing tooling built around that standard continues to work. What ENS adds is a permissionless discovery path that does not depend on a registry contract.
+This is not a replacement for ERC-8004 — it is a complement to it. The `agent-uri` field points to the same JSON registration file that ERC-8004 specifies, so existing tooling built around that standard continues to work. What ENS adds is a permissionless, registry-free discovery path.
 
-An agent registered with ENS can still register with ERC-8004 or any other on-chain registry. The `registrations` field in the agent schema is designed to hold exactly these cross-registry references, making the ENS name a single place to find all of an agent's registrations regardless of which chains or contracts they span.
+Beyond that, agents can publish their metadata directly as ENS text records using the agent schema, mirroring the fields in an ERC-8004 registration file. This means consumers can read everything they need from the ENS name alone, and only fall back to fetching the registration file if the data they need isn't present there.
+
+An agent registered with ENS can still register with ERC-8004 or any other on-chain registry. The `registrations` field is designed to hold exactly these cross-registry references, making the ENS name a single place to find all of an agent's registrations regardless of which chains or contracts they span.
+
+## Using the Agent Schema
+
+The agent schema is built around a **layering principle**: put stable, important metadata directly on the ENS name where it's always available and costs nothing to read; put frequently-changing or verbose data in the registration file pointed to by `agent-uri`.
+
+### Simple Fields
+
+Most schema fields are straightforward text records. A minimal agent registration might look like:
+
+```
+myagent.eth
+  └── class               = "Agent"
+  └── agent-uri           = "https://example.com/agent.json"
+  └── name          = "My Agent"
+  └── description   = "A natural-language description of what this agent does"
+  └── avatar         = "https://example.com/avatar.png"
+  └── active        = "true"
+  └── x402-support  = "true"
+```
+
+Any consumer can resolve these with a standard ENS text record lookup.
+
+### Service Endpoints
+
+Services can be published in two ways.
+
+**As a single URI** using the `services` field, pointing to a JSON payload that enumerates all services. This mirrors the `services` array in an ERC-8004 registration file and is convenient when services change frequently or are too verbose to publish individually:
+
+```
+myagent.eth
+  └── services = "https://example.com/services.json"
+```
+
+**As individual parameterized records** using `services[name]`, where each entry maps a service name to its endpoint. This keeps service data on-chain and directly readable without fetching an external file:
+
+```
+myagent.eth
+  └── services[web]  = "https://web.agentxyz.com/"
+  └── services[mcp]  = "https://mcp.agentxyz.com/"
+  └── services[a2a]  = "https://agent.example/.well-known/agent-card.json"
+```
+
+Each value can be a direct endpoint URI, or it can point to a JSON descriptor if the service requires more detail (authentication schemes, input/output formats, etc.). The `data:` and `cbor:` URI prefixes are also supported for embedding descriptors inline rather than hosting them externally.
+
+Both forms can coexist. Clients should treat `services` as a fallback index when they don't find a specific `services[name]` entry on the ENS name.
+
+### Cross-Registry References
+
+Agents registered with ERC-8004 or other on-chain registries can advertise those registrations on their ENS name using the `registrations` array field. Each entry follows CAIP-29 format (ERC-8004 uses ERC-721 tokens) `{namespace}:{chainId}/{tokenStandard}:{identityRegistry}/{agentId}`:
+
+```
+myagent.eth
+  └── registrations[0] = "eip155:1/erc721:0x742.../22"
+  └── registrations[1] = "eip155:8453/erc721:0x.../7"
+```
+
+### Trust Models
+
+The `supported-trust` field advertises which trust verification mechanisms the agent supports — corresponding to the `supportedTrust` field in an ERC-8004 registration file. This is also an array field:
+
+```
+myagent.eth
+  └── supported-trust[0] = "reputation"
+  └── supported-trust[1] = "tee-attestation"
+```
+
+### Wallet
+
+The `agent-wallet` field holds the agent's verified payout wallet, corresponding to the `agentWallet` reserved key in the ERC-8004 Identity Registry:
+
+```
+myagent.eth
+  └── agent-wallet = "0x..."
+```
+
+### Choosing What to Publish On-Chain
+
+Not every field needs to be on the ENS name. A reasonable strategy would be something like the following:
+
+**Publish on ENS**
+
+- `class`, `agent-uri`
+- `name`, `description`, `avatar` - These should hardly change
+- `registrations[*]` - These entries are immutable
+- `x402-support`
+- `agent-wallet`
+
+**Publish in registration file**
+
+- Full services list (if large or frequently changing)
+- Verbose service descriptors
+- Capability details that evolve rapidly
+- `active`, if the agent frequently changes its status
+
+Consumers should query the ENS name first, then fall back to the registration file only for data not found there.
 
 ## Discovering Agents
 
 Because ENS records are public and indexed, agents that publish a `class = "Agent"` record are discoverable without any central directory:
 
-1. Index `TextChanged` events on the ENS Public Resolver, filtering for records where the key is `class` and the value is `"Agent"`.
-2. For each matching node, perform a forward resolution to retrieve the associated ENS name.
-3. Read the `agent-uri` record to obtain the ERC-8004 registration file.
-4. Optionally read additional records (`name`, `description`, `active`) for a lightweight summary without fetching the registration file at all.
+1. Index `TextChanged` events on the ENS Public Resolver, filtering for records where the key is `class` and the value is `"Agent"`. Alternatively, index all nodes which set a `schema` record pointing to a recognized agent schema.
+2. For each node of interest, retrieve the text records listed in the schema — or all text records if you want the full picture.
+3. Read `agent-uri` to obtain the ERC-8004 registration file if additional data is needed beyond what is published on the ENS name.
 
 This gives any consumer a live, permissionless view of all agents that have opted in to on-chain discoverability.
-
-## 🚧 Open Questions 🚧
-
-The `agent-uri` field points to an off-chain JSON file. This means the capabilities it describes are only as reliable as the server hosting it — the URI could go stale, the file could be altered, and the content is not directly indexable on-chain.
-
-A natural extension would be publishing the registration file's contents directly as ENS text records. Fields like `services`, `x402-support`, `supported-trust`, and `active` have been added to the proposed agent schema as placeholders for the future. Done fully, an agent's ENS name would become a self-contained, on-chain source of truth for its identity and capabilities — with no external fetch required.
-
-What the right structure for those fields looks like, and how to handle the multilevel data they imply, is an open question for the community. Contributions are welcome.
 
 ## Related
 

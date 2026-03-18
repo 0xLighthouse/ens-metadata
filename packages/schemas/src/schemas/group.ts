@@ -1,20 +1,26 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
-import { ENSIP5 } from "../globals/ensip-5";
+
+const GROUP_SCHEMA_VERSION = '2.0.0';
 
 export const GROUP_SCHEMA: Schema = {
-  $id: `${GITHUB_URL}/schemas/group/0.1.4`,
+  $id: `${GITHUB_URL}/tree/main/packages/schemas/published/group/versions/${GROUP_SCHEMA_VERSION}`,
   source: GITHUB_URL,
   title: 'Group',
-  version: '0.1.4',
-  description: 'This node describes a group of individuals or entities with a shared purpose or responsibility.',
+  version: GROUP_SCHEMA_VERSION,
+  description: 'A group of individuals or entities with a shared purpose or responsibility.',
   type: 'object' as const,
   properties: {
     class: {
       type: 'string',
       default: 'Group',
-      description: 'High-level identifier of this node type',
+      description: 'Class identifier for this node',
       examples: ['Group', 'Committee', 'Council', 'Workgroup', 'Team'],
+    },
+    schema: {
+      type: 'string',
+      format: 'uri',
+      description: 'URI pointing to the group schema',
     },
     name: {
       type: 'string',
@@ -22,16 +28,17 @@ export const GROUP_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'A URL to an image used as an avatar or logo',
+      description: 'URI pointing to the group\'s avatar',
     },
     description: {
       type: 'string',
-      description: 'A description of the name',
+      description: 'Short description of the group\'s purpose and responsibility',
     },
     url: {
       type: 'string',
       format: 'uri',
-      description: 'URL of the group',
+      description: 'URL pointing to information about the group',
+      examples: ['https://www.example.com/groups/example-group'],
     },
     lead: {
       type: 'string',
@@ -48,6 +55,6 @@ export const GROUP_SCHEMA: Schema = {
       examples: ['Member', 'Steward', 'Contributor', 'Participant'],
     },
   },
-  required: ['class'],
+  required: ['class', 'schema'],
   recommended: ['name', 'lead', 'avatar', 'url', 'description']
 }

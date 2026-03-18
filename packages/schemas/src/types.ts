@@ -87,4 +87,9 @@ export interface Attribute {
   * @description An optional field specifying which type of record to request from the resolver (text() or data())
   */
   recordType?: 'text' | 'data';
+
+  /**
+   * @description An optional field specifying the type of parameter to expect when it is a parameterized key
+   */
+  parameterType?: 'map' | 'array';
 }
