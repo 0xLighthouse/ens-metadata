@@ -1,25 +1,30 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
-import { ENSIP5 } from "../globals/ensip-5";
 
+const GRANT_SCHEMA_VERSION = '2.0.0';
 
 export const GRANT_SCHEMA: Schema = {
-  $id: `${GITHUB_URL}/schemas/grantProgram/1.0.0`,
+  $id: `${GITHUB_URL}/tree/main/packages/schemas/published/grant/versions/${GRANT_SCHEMA_VERSION}`,
   source: GITHUB_URL,
   title: 'Grant',
-  version: '1.0.0',
+  version: GRANT_SCHEMA_VERSION,
   description: 'A grant issued by an organization.',
   type: 'object' as const,
   properties: {
     class: {
       type: 'string',
       default: 'Grant',
-      description: 'High-level identifier of this node type',
+      description: 'Class identifier for this node',
       examples: ['Grant', 'GrantProgram'],
+    },
+    schema: {
+      type: 'string',
+      format: 'uri',
+      description: 'URI pointing to the grant schema',
     },
     'name': {
       type: 'string',
-      description: 'The name of the grant program',
+      description: 'Display name of the grant',
     },
     description: {
       type: 'string',
@@ -28,22 +33,23 @@ export const GRANT_SCHEMA: Schema = {
     url: {
       type: 'string',
       format: 'uri',
-      description: 'URL of the grant program',
+      description: 'URL pointing to information about the grant program',
+      examples: ['https://www.example.com/grants/example-grant'],
     },
     status: {
       type: 'string',
-      description: 'Grant status',
+      description: 'The current status of the grant',
       enum: ['Active', 'Incomplete', 'Pending', 'Completed', 'Cancelled'],
     },
     budget: {
       type: 'string',
-      description: 'Total budget expressed as WEI eg. 100 USDC = 100 * 10^6',
+      description: 'Total amount of the grant in WEI',
     },
     token: {
       type: 'string',
-      description: 'Token expressed as ERC-20 token address eg. "0x0000000000000000000000000000000000000000"',
+      description: 'The address of the ERC-20 token used to fund the grant',
     }
   },
-  required: ['class'],
+  required: ['class', 'schema'],
   recommended: ['name', 'description', 'url', 'status', 'budget', 'token']
 }

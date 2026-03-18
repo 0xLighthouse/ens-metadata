@@ -1,58 +1,63 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
+const AGENT_SCHEMA_VERSION = '2.0.0';
+
 export const AGENT_SCHEMA: Schema = {
-  $id: `${GITHUB_URL}/schemas/agent/1.0.0`,
-  source: 'https://eips.ethereum.org/EIPS/eip-8004',
+  $id: `${GITHUB_URL}/tree/main/packages/schemas/published/agent/versions/${AGENT_SCHEMA_VERSION}`,
+  source: GITHUB_URL,
   title: 'Agent',
-  version: '1.0.0',
-  description: 'AI agent identity metadata aligned with ERC-8004 registration format.',
+  version: AGENT_SCHEMA_VERSION,
+  description: 'An AI agent with ERC-8004 metadata.',
   type: 'object' as const,
   properties: {
-    schema: {
-      type: 'string',
-      format: 'uri',
-      description: 'IPFS URI to the published schema version used by this node'
-    },
     class: {
       type: 'string',
       default: 'Agent',
-      description: 'High-level identifier of this node type'
+      description: 'Class identifier for this node',
+    },
+    schema: {
+      type: 'string',
+      format: 'uri',
+      description: 'URI pointing to the agent schema',
     },
     'agent-uri': {
       type: 'string',
       format: 'uri',
-      description: 'URI to the ERC-8004 registration file',
-    },
-    type: {
-      type: 'string',
-      description: 'Registration file type discriminator',
+      description: 'URI pointing to an ERC-8004 registration file',
     },
     name: {
       type: 'string',
-      description: 'Agent display name',
+      description: 'Display name of the agent',
     },
     description: {
       type: 'string',
       description: 'Natural-language description of the agent',
     },
+    avatar: {
+      type: 'string',
+      format: 'uri',
+      description: 'URI pointing to the agent\'s avatar image',
+    },
     services: {
       type: 'string',
-      description: 'Advertised service endpoints',
+      format: 'uri',
+      description: 'URI pointing to a payload containing the agent\'s services',
     },
     'x402-support': {
-      type: 'boolean',
-      description: 'Whether x402 payment flow is supported',
-
+      type: 'string',
+      format: 'boolean',
+      description: 'Indicates whether or not the agent supports x402 payments',
     },
     active: {
       type: 'string',
       format: 'boolean',
-      description: 'Whether the agent is currently active',
+      description: 'Indicates whether or not the agent is currently active',
     },
     registrations: {
       type: 'string',
-      description: 'Cross-chain identity registrations',
+      format: 'uri',
+      description: 'URI pointing to a payload containing the agent\'s cross-chain identity registrations',
     },
     'supported-trust': {
       type: 'string',
@@ -60,15 +65,30 @@ export const AGENT_SCHEMA: Schema = {
     },
     'agent-wallet': {
       type: 'string',
-      description: 'Verified payout wallet for agent operations',
+      description: 'The address where the agent receives payments',
     },
   },
   patternProperties: {
-    '^service(\[[^\]]+\])?$': {
+    '^registrations(\[[^\]]+\])?$': {
       type: 'string',
-      description: 'service[name] => endpoint, per ERC-8004 eg. service[MCP] => <ENDPOINT_URL>',
+      // format: 'caip-29', // TODO: Research adding custom `format` values, like CAIP-29
+      parameterType: 'array',
+      description: 'An array of ERC-8004 registrations belonging to the agent, following CAIP-29 format',
+      examples: ['eip155:1/erc721:0x1111111111111111111111111111111111111111/0'],
+    },
+    '^services(\[[^\]]+\])?$': {
+      type: 'string',
+      parameterType: 'map',
+      format: 'uri',
+      description: 'A map of service names to their endpoints',
+    },
+    '^supported-trust(\[[^\]]+\])?$': {
+      type: 'string',
+      parameterType: 'array',
+      description: 'An array of trust models supported by the agent',
     }
+
   },
-  required: ['class'],
+  required: ['class', 'schema'],
   recommended: ['agent-uri']
 };

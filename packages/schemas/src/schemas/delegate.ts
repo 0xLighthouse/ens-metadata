@@ -1,59 +1,67 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
+const DELEGATE_SCHEMA_VERSION = '2.0.0';
+
 export const DELEGATE_SCHEMA: Schema = {
-  $id: `${GITHUB_URL}/schemas/delegate/1.0.0`,
+  $id: `${GITHUB_URL}/tree/main/packages/schemas/published/delegate/versions/${DELEGATE_SCHEMA_VERSION}`,
   source: GITHUB_URL,
   title: 'Delegate',
-  version: '1.0.1',
-  description: 'A delegate.',
+  version: DELEGATE_SCHEMA_VERSION,
+  description: 'A voter who has been delegated voting power.',
   type: 'object' as const,
   properties: {
     class: {
       type: 'string',
       default: 'Delegate',
-      description: 'High-level identifier of this node type'
+      description: 'Class identifier for this node',
     },
-    'address': {
+    schema: {
       type: 'string',
-      format: 'address',
-      description: 'The address of the delegate',
+      format: 'uri',
+      description: 'URI pointing to the delegate schema',
     },
     'legal-name': {
       type: 'string',
-      description: 'The full legal or preferred name of the delegate (e.g. "John Doe")',
+      description: 'The full name of the delegate',
+      examples: ['John Doe'],
     },
     'display-name': {
       type: 'string',
-      description: 'A canonical display name for the delegate',
+      description: 'Display name or username of the delegate',
+      examples: ['JDoe'],
     },
     statement: {
       type: 'string',
-      description: 'Generic delegate statement ',
+      description: 'The delegate\'s general-purpose delegate statement',
     },
     'conflict-of-interest': {
       type: 'string',
-      description: 'Generic conflict of interest declaration ',
+      description: 'The delegate\'s general-purpose conflict of interest declaration',
     },
     'forum-handle': {
       type: 'string',
-      description: 'Default forum handle (e.g. "johndoe")',
+      description: 'The delegate\'s default forum handle',
+      examples: ['johndoe'],
     },
   },
   patternProperties: {
     '^statement(\\[[^\\]]+\\])?$': {
       type: 'string',
-      description: 'Delegate statement per organization (e.g. statement[dao.eth])',
+      description: 'Delegate statements written for specific organizations, labeled by the organization\'s ENS name',
+      examples: ['statement[dao.eth] = "I am a delegate for the DAO"'],
     },
     '^conflict-of-interest(\\[[^\\]]+\\])?$': {
       type: 'string',
-      description: 'Conflict of interest declaration per organization (e.g. conflict-of-interest[dao.eth])',
+      description: 'Conflict of interest declarations written for specific organizations, labeled by the organization\'s ENS name',
+      examples: ['conflict-of-interest[dao.eth] = "I have no conflicts of interest"'],
     },
     '^forum-handle(\\[[^\\]]+\\])?$': {
       type: 'string',
-      description: 'Forum handle per organization (e.g. forum-handle[dao.eth])',
+      description: 'Specific forum handles the delegate uses for each organization, labeled by the organization\'s ENS name',
+      examples: ['forum-handle[dao.eth] = "johndoe"'],
     },
   },
-  required: ['class'],
-  recommended: ['address', 'display-name', 'statement', 'conflict-of-interest', 'forum-handle']
+  required: ['class', 'schema'],
+  recommended: ['display-name', 'statement', 'conflict-of-interest', 'forum-handle']
 }
