@@ -73,7 +73,7 @@ export const AGENT_SCHEMA: Schema = {
       type: 'string',
       // format: 'caip-29', // TODO: Research adding custom `format` values, like CAIP-29
       parameterType: 'array',
-      description: 'An array of ERC-8004 registrations belonging to the agent, following CAIP-29 format',
+      description: 'An array of ERC-8004 registrations belonging to the agent, following CAIP-19 format',
       examples: ['eip155:1/erc721:0x1111111111111111111111111111111111111111/0'],
     },
     '^services(\[[^\]]+\])?$': {
