@@ -76,7 +76,7 @@ Both forms can coexist. Clients should treat `services` as a fallback index when
 
 ### Cross-Registry References
 
-Agents registered with ERC-8004 or other on-chain registries can advertise those registrations on their ENS name using the `registrations` array field. Each entry follows CAIP-29 format (ERC-8004 uses ERC-721 tokens) `{namespace}:{chainId}/{tokenStandard}:{identityRegistry}/{agentId}`:
+Agents registered with ERC-8004 or other on-chain registries can advertise those registrations on their ENS name using the `registrations` array field. Each entry follows [CAIP-19 format](https://github.com/ChainAgnostic/CAIPs/blob/main/CAIPs/caip-19.md), as ERC-8004 is designed after ERC-721 tokens (`{namespace}:{chainId}/{tokenStandard}:{identityRegistry}/{agentId}`):
 
 ```
 myagent.eth
