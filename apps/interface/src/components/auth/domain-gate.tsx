@@ -10,12 +10,28 @@ interface Props {
 
 const SELECT_DOMAIN_PATH = '/select-name'
 
+const getDomainFromPath = (pathname: string): string | null => {
+  const first = pathname.split('/').filter(Boolean)[0]
+  if (!first || first === 'select-name') return null
+  return decodeURIComponent(first)
+}
+
 export function DomainGate({ children }: Props) {
-  const { activeDomain, isInitialized, status } = useAppStore()
+  const { activeDomain, isInitialized, status, setActiveDomain } = useAppStore()
   const router = useRouter()
   const pathname = usePathname()
 
-  // Redirect to space selection if no active space and app is ready
+  const urlDomain = getDomainFromPath(pathname)
+
+  // Sync activeDomain when URL domain changes
+  useEffect(() => {
+    if (!isInitialized || status !== 'ready') return
+    if (!urlDomain || activeDomain?.name === urlDomain) return
+
+    setActiveDomain({ name: urlDomain } as any)
+  }, [isInitialized, status, urlDomain, activeDomain?.name, setActiveDomain])
+
+  // Redirect to domain selection if no active domain and app is ready
   useEffect(() => {
     if (
       isInitialized &&
@@ -27,13 +43,11 @@ export function DomainGate({ children }: Props) {
     }
   }, [isInitialized, status, activeDomain, pathname, router])
 
-  // Allow onboarding pages to bypass space requirement
   if (pathname.includes(SELECT_DOMAIN_PATH)) {
     return <>{children}</>
   }
 
   if (!activeDomain) {
-    // Show loading or return null while redirecting
     return null
   }
 
