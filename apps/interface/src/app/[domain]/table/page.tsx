@@ -1,35 +1,31 @@
 'use client'
 
-import { useMemo, useState, useEffect, useCallback } from 'react'
-import { ExternalLink, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { ApplyChangesDialog } from '@/app/components/tree/ApplyChangesDialog'
+import { EditNodeDrawer } from '@/app/components/tree/drawers/EditNodeDrawer'
+import { DiscardChangesDialog } from '@/components/dialogs/discard-changes-dialog'
+import { NotAuthorizedDialog } from '@/components/dialogs/not-authorized-dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useWeb3 } from '@/contexts/Web3Provider'
 import { useTreeData } from '@/hooks/useTreeData'
+import { getAvatarFallback } from '@/lib/getAvatarFallback'
+import { shortAddress } from '@/lib/shortAddress'
+import type { TreeNode } from '@/lib/tree/types'
+import { useMutationsStore } from '@/stores/mutations'
 import { useSchemaStore } from '@/stores/schemas'
 import { useTreeEditStore } from '@/stores/tree-edits'
-import { useMutationsStore } from '@/stores/mutations'
-import { useWeb3 } from '@/contexts/Web3Provider'
-import type { TreeNode } from '@/lib/tree/types'
-import { shortAddress } from '@/lib/shortAddress'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getAvatarFallback } from '@/lib/getAvatarFallback'
-import { EditNodeDrawer } from '@/app/components/tree/drawers/EditNodeDrawer'
-import { ApplyChangesDialog } from '@/app/components/tree/ApplyChangesDialog'
-import { NotAuthorizedDialog } from '@/components/dialogs/not-authorized-dialog'
-import { DiscardChangesDialog } from '@/components/dialogs/discard-changes-dialog'
 import {
   DndContext,
-  closestCenter,
+  DragEndEvent,
   KeyboardSensor,
   PointerSensor,
+  closestCenter,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { ChevronDown, ChevronUp, ChevronsUpDown, ExternalLink, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -239,7 +235,7 @@ function ResizeHandle({
       }`}
       style={{
         zIndex: 10,
-        marginRight: '-4px',  // Extend clickable area beyond column edge
+        marginRight: '-4px', // Extend clickable area beyond column edge
       }}
     />
   )
@@ -260,14 +256,9 @@ function DraggableColHeader({
   onResize: (delta: number) => void
   width: number
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: column.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column.id,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -294,9 +285,7 @@ function DraggableColHeader({
     >
       <span className="inline-flex items-center gap-1">
         {column.label}
-        {column.sortKey && (
-          <SortIcon col={column.sortKey} sortKey={sortKey} dir={sortDir} />
-        )}
+        {column.sortKey && <SortIcon col={column.sortKey} sortKey={sortKey} dir={sortDir} />}
       </span>
       {column.resizable && (
         <ResizeHandle
@@ -316,7 +305,8 @@ function DraggableColHeader({
 export default function TablePage() {
   const { sourceTree, isLoading, hasHydrated, loadTree } = useTreeData()
   const { schemas, fetchSchemas } = useSchemaStore()
-  const { pendingMutations, openEditDrawer, clearPendingMutations, hasPendingEdit } = useTreeEditStore()
+  const { pendingMutations, openEditDrawer, clearPendingMutations, hasPendingEdit } =
+    useTreeEditStore()
   const { submitMutations, submitCreation, status: mutationsStatus } = useMutationsStore()
   const { walletClient, publicClient } = useWeb3()
   const [search, setSearch] = useState('')
@@ -326,11 +316,9 @@ export default function TablePage() {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
 
   // Column customization state (session-based, resets on page reload)
-  const [columnOrder, setColumnOrder] = useState<string[]>(
-    DEFAULT_COLUMNS.map(c => c.id)
-  )
+  const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_COLUMNS.map((c) => c.id))
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
-    Object.fromEntries(DEFAULT_COLUMNS.map(c => [c.id, c.defaultWidth]))
+    Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.id, c.defaultWidth])),
   )
 
   // Trigger tree and schema loading on mount
@@ -348,16 +336,16 @@ export default function TablePage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,  // Require 8px movement to activate drag
+        distance: 8, // Require 8px movement to activate drag
       },
     }),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor),
   )
 
   // Get ordered columns
   const orderedColumns = useMemo(
-    () => columnOrder.map(id => DEFAULT_COLUMNS.find(c => c.id === id)!),
-    [columnOrder]
+    () => columnOrder.map((id) => DEFAULT_COLUMNS.find((c) => c.id === id)!),
+    [columnOrder],
   )
 
   // Helper to find a node in the tree
@@ -416,11 +404,11 @@ export default function TablePage() {
 
   const handleResize = (columnId: string, delta: number) => {
     setColumnWidths((prev) => {
-      const column = DEFAULT_COLUMNS.find(c => c.id === columnId)!
+      const column = DEFAULT_COLUMNS.find((c) => c.id === columnId)!
       const currentWidth = prev[columnId]
       const newWidth = Math.max(
         column.minWidth,
-        Math.min(column.maxWidth ?? Infinity, currentWidth + delta)
+        Math.min(column.maxWidth ?? Number.POSITIVE_INFINITY, currentWidth + delta),
       )
       return { ...prev, [columnId]: newWidth }
     })
@@ -435,6 +423,7 @@ export default function TablePage() {
     if (!search.trim()) return rows
     const q = search.toLowerCase()
     return rows.filter(({ node }) => {
+      // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
       const currentClass = ((node as any).class || node.texts?.class) as string | undefined
       const mutation = pendingMutations.get(node.name)
       const pendingClass = mutation?.changes?.class as string | undefined
@@ -466,7 +455,9 @@ export default function TablePage() {
           return dir * compareByNamespaceHierarchy(parentA, parentB)
         }
         case 'class': {
+          // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
           const currentClassA = ((a as any).class || a.texts?.class) ?? ''
+          // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
           const currentClassB = ((b as any).class || b.texts?.class) ?? ''
           const mutation = pendingMutations.get(a.name)
           const pendingClassA = mutation?.changes?.class as string | undefined
@@ -477,17 +468,14 @@ export default function TablePage() {
           return dir * ca.localeCompare(cb)
         }
         case 'address':
-          return dir * ((a.address ?? '').localeCompare(b.address ?? ''))
+          return dir * (a.address ?? '').localeCompare(b.address ?? '')
         default:
           return 0
       }
     })
   }, [filtered, sortKey, sortDir, pendingMutations])
 
-  const schemaById = useMemo(
-    () => new Map(schemas.map((s) => [s.id, s])),
-    [schemas],
-  )
+  const schemaById = useMemo(() => new Map(schemas.map((s) => [s.id, s])), [schemas])
 
   // Helper to get pending class value if it exists
   const getPendingClassChange = (nodeName: string): string | null => {
@@ -503,9 +491,7 @@ export default function TablePage() {
 
   const renderCell = (column: TableColumn, node: TreeNode) => {
     const ensUrl = `https://app.ens.domains/${node.name}`
-    const addressUrl = node.address
-      ? `https://etherscan.io/address/${node.address}`
-      : null
+    const addressUrl = node.address ? `https://etherscan.io/address/${node.address}` : null
     const ownerUrl = `https://etherscan.io/address/${node.owner}`
     const displayName = node.name.split('.')[0]
     const parentPath = node.name.split('.').slice(1).join('.') || '—'
@@ -532,12 +518,11 @@ export default function TablePage() {
 
       case 'parent':
         return (
-          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-            {parentPath}
-          </span>
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{parentPath}</span>
         )
 
       case 'class': {
+        // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
         const currentClass = ((node as any).class || node.texts?.class) as string | undefined
         const pendingClass = getPendingClassChange(node.name)
         const displayClass = pendingClass || currentClass
@@ -561,7 +546,10 @@ export default function TablePage() {
               </div>
             </div>
             {hasPendingClassChange && (
-              <div className="flex-shrink-0 w-2 h-2 rounded-full bg-orange-500 dark:bg-orange-400" title="Pending change" />
+              <div
+                className="flex-shrink-0 w-2 h-2 rounded-full bg-orange-500 dark:bg-orange-400"
+                title="Pending change"
+              />
             )}
           </div>
         )
@@ -591,9 +579,7 @@ export default function TablePage() {
             className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             <Avatar className="size-4 flex-shrink-0">
-              <AvatarImage
-                src={node.ownerEnsAvatar || `https://avatar.vercel.sh/${node.owner}`}
-              />
+              <AvatarImage src={node.ownerEnsAvatar || `https://avatar.vercel.sh/${node.owner}`} />
               <AvatarFallback className="text-[8px] font-medium bg-gradient-to-br from-purple-400 to-pink-500 text-white">
                 {getAvatarFallback(node.owner)}
               </AvatarFallback>
@@ -700,17 +686,10 @@ export default function TablePage() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto rounded-xl border border-gray-200 dark:border-gray-700">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800/60 sticky top-0 z-10">
-              <SortableContext
-                items={columnOrder}
-                strategy={horizontalListSortingStrategy}
-              >
+              <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
                 <tr>
                   {orderedColumns.map((column) => (
                     <DraggableColHeader
@@ -741,6 +720,9 @@ export default function TablePage() {
                   <tr
                     key={node.name}
                     onClick={() => openEditDrawer(node.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') openEditDrawer(node.name)
+                    }}
                     className={`transition-colors cursor-pointer ${
                       hasPendingEdit(node.name)
                         ? 'bg-orange-100 dark:bg-orange-900/20 hover:bg-orange-200 dark:hover:bg-orange-900/30 border-l-4 border-orange-400 dark:border-orange-500'

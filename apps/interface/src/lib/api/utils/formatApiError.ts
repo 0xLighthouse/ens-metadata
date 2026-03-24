@@ -94,7 +94,6 @@ export function formatApiError(code: ErrorCode): FormattedError {
         message: 'The signature verification failed. Please try signing again.',
       }
 
-    case ErrorCode.UNKNOWN_ERROR:
     default:
       return {
         title: 'Unexpected Error',

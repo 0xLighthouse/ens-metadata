@@ -1,7 +1,7 @@
 'use client'
 
-import { NotAuthorizedDialog } from '@/components/dialogs/not-authorized-dialog'
 import { DiscardChangesDialog } from '@/components/dialogs/discard-changes-dialog'
+import { NotAuthorizedDialog } from '@/components/dialogs/not-authorized-dialog'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { useTreeData } from '@/hooks/useTreeData'
 import type { TreeNode } from '@/lib/tree/types'

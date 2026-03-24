@@ -67,6 +67,7 @@ export async function fetchTextRecords(
     keys.map(async (key) => {
       try {
         const value = await withTimeout<string | null>(
+          // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText
           (client as any).getEnsText({ name: normalizedName, key, ...textOptions }),
           timeoutMs,
         )

@@ -1,8 +1,8 @@
 'use client'
 
-import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
 import type { TreeNode } from '@/lib/tree/types'
+import type { Node, NodeProps } from '@xyflow/react'
+import { memo } from 'react'
 import { BaseNodeCard } from './BaseNode'
 
 interface DomainTreeNodeData {

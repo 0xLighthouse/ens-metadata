@@ -69,6 +69,7 @@ export interface NormalizedTreeNode {
   // Inspection metadata from on-chain detection
   inspectionData?: {
     detectedType?: string
+    // biome-ignore lint/suspicious/noExplicitAny: inspection metadata is dynamic
     metadata?: Record<string, any>
     inspectedAt?: string
     isInspecting?: boolean

@@ -1,5 +1,4 @@
-
-import { createPublicClient, GetEnsNameReturnType, http } from 'viem'
+import { http, GetEnsNameReturnType, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 
 const client = createPublicClient({
@@ -16,9 +15,7 @@ type Address = `0x${string}`
 export type ENSDataByAddress = Map<Address, { name: GetEnsNameReturnType; avatar: string | null }>
 
 export async function mapNamesByAddress(addresses: Address[]): Promise<ENSDataByAddress> {
-  const names = await Promise.all(
-    addresses.map((address) => client.getEnsName({ address }))
-  )
+  const names = await Promise.all(addresses.map((address) => client.getEnsName({ address })))
 
   const avatars = await Promise.all(
     names.map(async (name) => {
@@ -29,13 +26,10 @@ export async function mapNamesByAddress(addresses: Address[]): Promise<ENSDataBy
         console.log(`Failed to fetch avatar for ${name}:`, err)
         return null
       }
-    })
+    }),
   )
 
   return new Map(
-    addresses.map((address, index) => [
-      address,
-      { name: names[index], avatar: avatars[index] },
-    ])
+    addresses.map((address, index) => [address, { name: names[index], avatar: avatars[index] }]),
   )
 }

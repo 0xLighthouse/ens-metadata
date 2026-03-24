@@ -3,10 +3,10 @@
 import { UITheme } from '@/config/theme'
 import React from 'react'
 
-import Image from 'next/image'
+import { useTheme } from '@/contexts/ThemeContext'
 import logoDark from '@/public/images/dark-logo.png'
 import logoOrange from '@/public/images/orange-logo.png'
-import { useTheme } from '@/contexts/ThemeContext'
+import Image from 'next/image'
 
 export const HomeLogo: React.FC = (props) => {
   const { theme } = useTheme()

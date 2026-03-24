@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { usePathname } from 'next/navigation'
 import { useUiStore } from '@/stores/ui'
+import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
 
 /**
  * Tracks route changes and stores them in the UI store.

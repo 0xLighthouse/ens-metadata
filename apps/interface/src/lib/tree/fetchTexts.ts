@@ -1,5 +1,5 @@
-import { createPublicClient, http } from "viem"
-import { mainnet } from "viem/chains"
+import { http, createPublicClient } from 'viem'
+import { mainnet } from 'viem/chains'
 
 const client = createPublicClient({
   chain: mainnet,
@@ -16,7 +16,7 @@ export async function fetchTexts(ensName: string, keys: string[]) {
     client.getEnsText({
       name: ensName,
       key,
-    })
+    }),
   )
   const results = await Promise.all(calls)
   return Object.fromEntries(keys.map((k, i) => [k, results[i]]))

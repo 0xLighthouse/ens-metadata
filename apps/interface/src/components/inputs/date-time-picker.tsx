@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 
 interface DateTimePickerProps {
   date: Date | undefined
@@ -22,19 +22,19 @@ export function DateTimePicker({
   time,
   onDateChange,
   onTimeChange,
-  label = "Maturity Date & Time",
-  description = "Select the exact date and time when the bond will mature"
+  label = 'Maturity Date & Time',
+  description = 'Select the exact date and time when the bond will mature',
 }: DateTimePickerProps) {
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [selectedDateOption, setSelectedDateOption] = useState<string>('Custom')
 
   const handleDateOptionSelect = (option: string) => {
     setSelectedDateOption(option)
-    
+
     if (option !== 'Custom') {
       const now = new Date()
-      let newDate = new Date(now)
-      
+      const newDate = new Date(now)
+
       switch (option) {
         case '+6M':
           newDate.setMonth(newDate.getMonth() + 6)
@@ -49,7 +49,7 @@ export function DateTimePicker({
           newDate.setDate(newDate.getDate() + 1)
           break
       }
-      
+
       onDateChange(newDate)
       // Keep the current time when using quick date options
     }
@@ -69,7 +69,7 @@ export function DateTimePicker({
   return (
     <div className="space-y-3">
       <Label className="text-sm font-medium">{label}</Label>
-      
+
       <div className="flex gap-3">
         {/* Date Picker */}
         <div className="flex-1">
@@ -115,7 +115,7 @@ export function DateTimePicker({
           />
         </div>
       </div>
-      
+
       <div className="space-y-2">
         <p className="text-sm text-gray-600">Quick maturity options</p>
         <div className="grid grid-cols-4 gap-2">
@@ -126,8 +126,8 @@ export function DateTimePicker({
               variant={selectedDateOption === option ? 'default' : 'outline'}
               size="sm"
               className={`text-sm transition-colors ${
-                selectedDateOption === option 
-                  ? 'bg-black text-white hover:bg-gray-800' 
+                selectedDateOption === option
+                  ? 'bg-black text-white hover:bg-gray-800'
                   : 'bg-white text-black hover:bg-gray-50 border-gray-300'
               }`}
               onClick={() => handleDateOptionSelect(option)}
@@ -137,10 +137,8 @@ export function DateTimePicker({
           ))}
         </div>
       </div>
-      
-      <p className="text-xs text-gray-500">
-        {description}
-      </p>
+
+      <p className="text-xs text-gray-500">{description}</p>
     </div>
   )
 }

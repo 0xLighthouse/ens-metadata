@@ -1,6 +1,6 @@
-import { memo } from 'react'
-import { Position, Handle } from '@xyflow/react'
 import { useTreeControlsStore } from '@/stores/tree-controls'
+import { Handle, Position } from '@xyflow/react'
+import { memo } from 'react'
 
 interface NodeContainerProps extends React.PropsWithChildren {
   // Node state
@@ -102,26 +102,27 @@ const getRingStyle = (
   return {}
 }
 
-export const NodeContainer = memo(({
-  children,
-  isSelected,
-  isPendingCreation,
-  hasPendingEdits,
-  isSuggested,
-  isCollapsed,
-  hasChildren,
-  accentColor,
-  className,
-  style,
-  width = '256px',
-  overflow = 'hidden',
-}: NodeContainerProps) => {
-  const { orientation } = useTreeControlsStore()
-  const isVertical = orientation === 'vertical'
-  const targetPosition = isVertical ? Position.Top : Position.Left
-  const sourcePosition = isVertical ? Position.Bottom : Position.Right
+export const NodeContainer = memo(
+  ({
+    children,
+    isSelected,
+    isPendingCreation,
+    hasPendingEdits,
+    isSuggested,
+    isCollapsed,
+    hasChildren,
+    accentColor,
+    className,
+    style,
+    width = '256px',
+    overflow = 'hidden',
+  }: NodeContainerProps) => {
+    const { orientation } = useTreeControlsStore()
+    const isVertical = orientation === 'vertical'
+    const targetPosition = isVertical ? Position.Top : Position.Left
+    const sourcePosition = isVertical ? Position.Bottom : Position.Right
 
-  const baseClasses = `
+    const baseClasses = `
     relative
     cursor-pointer
     transition-all
@@ -130,26 +131,41 @@ export const NodeContainer = memo(({
     focus:outline-none
     ${isSuggested ? 'opacity-50' : ''}
     ${className || ''}
-  `.trim().replace(/\s+/g, ' ')
+  `
+      .trim()
+      .replace(/\s+/g, ' ')
 
-  const ringStyle = getRingStyle(isSelected, isCollapsed, hasChildren, hasPendingEdits, isPendingCreation, accentColor)
+    const ringStyle = getRingStyle(
+      isSelected,
+      isCollapsed,
+      hasChildren,
+      hasPendingEdits,
+      isPendingCreation,
+      accentColor,
+    )
 
-  const baseStyle: React.CSSProperties = {
-    width,
-    backgroundColor: getBackgroundColor(isSuggested, isPendingCreation, hasPendingEdits, accentColor),
-    border: getBorderStyle(isSuggested, isPendingCreation, hasPendingEdits, accentColor),
-    borderRadius: '12px',
-    overflow,
-    boxShadow: getBoxShadow(isSelected, isPendingCreation, hasPendingEdits, accentColor),
-    ...ringStyle,
-    ...style,
-  }
+    const baseStyle: React.CSSProperties = {
+      width,
+      backgroundColor: getBackgroundColor(
+        isSuggested,
+        isPendingCreation,
+        hasPendingEdits,
+        accentColor,
+      ),
+      border: getBorderStyle(isSuggested, isPendingCreation, hasPendingEdits, accentColor),
+      borderRadius: '12px',
+      overflow,
+      boxShadow: getBoxShadow(isSelected, isPendingCreation, hasPendingEdits, accentColor),
+      ...ringStyle,
+      ...style,
+    }
 
-  return (
-    <div className={baseClasses} style={baseStyle}>
-      {children}
-      <Handle type="target" position={targetPosition} className="pointer-events-none opacity-0" />
-      <Handle type="source" position={sourcePosition} className="pointer-events-none opacity-0" />
-    </div>
-  )
-})
+    return (
+      <div className={baseClasses} style={baseStyle}>
+        {children}
+        <Handle type="target" position={targetPosition} className="pointer-events-none opacity-0" />
+        <Handle type="source" position={sourcePosition} className="pointer-events-none opacity-0" />
+      </div>
+    )
+  },
+)

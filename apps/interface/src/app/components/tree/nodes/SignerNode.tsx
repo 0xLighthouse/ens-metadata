@@ -1,14 +1,14 @@
 'use client'
 
-import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
-import type { TreeNode } from '@/lib/tree/types'
-import { NodeContainer } from './NodeContainer'
-import { UserCheck, Sparkles } from 'lucide-react'
-import { shortAddress } from '@/lib/shortAddress'
 import { resolveLink } from '@/lib/links'
-import { NodeIcon } from './NodeIcon'
+import { shortAddress } from '@/lib/shortAddress'
+import type { TreeNode } from '@/lib/tree/types'
+import type { Node, NodeProps } from '@xyflow/react'
+import { Sparkles, UserCheck } from 'lucide-react'
+import { memo } from 'react'
 import { ExternalActionButton } from './ExternalActionButton'
+import { NodeContainer } from './NodeContainer'
+import { NodeIcon } from './NodeIcon'
 
 interface DomainTreeNodeData {
   [key: string]: unknown
@@ -44,7 +44,9 @@ const SignerNodeCard = ({
   childrenCount = 0,
 }: SignerNodeProps) => {
   const displayName = node.name.split('.')[0]
+  // biome-ignore lint/suspicious/noExplicitAny: ensName added by inspection computed nodes
   const ensName = (node as any).ensName
+  // biome-ignore lint/suspicious/noExplicitAny: ensAvatar added by inspection computed nodes
   const ensAvatar = (node as any).ensAvatar
 
   const accentColor = '#6366f1' // indigo for signers
@@ -98,8 +100,11 @@ const SignerNodeCard = ({
               SIGNER
             </span>
           </div>
-          <div className="text-xs text-gray-500 truncate mt-0.5">{shortAddress(node.address ?? '')}</div>
+          <div className="text-xs text-gray-500 truncate mt-0.5">
+            {shortAddress(node.address ?? '')}
+          </div>
         </div>
+        {/* biome-ignore lint/suspicious/noExplicitAny: isComputed added dynamically by inspection */}
         {(node as any).isComputed && (
           <div className="absolute top-4 right-4" title="Auto-detected signer">
             <Sparkles size={16} className="text-indigo-400" />

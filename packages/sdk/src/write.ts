@@ -41,6 +41,7 @@ function deltaToRecords(delta: MetadataDelta): {
 }
 
 async function resolveResolver(publicClient: PublicClient, name: string): Promise<`0x${string}`> {
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
   const resolver = await (publicClient as any).getEnsResolver({ name })
   if (!resolver) throw new MetadataWriteError(`No resolver found for ${name}`, [])
   const address = typeof resolver === 'string' ? resolver : resolver.address
@@ -73,6 +74,7 @@ async function setMetadataImpl(
   }
 
   const { setRecords } = await import('@ensdomains/ensjs/wallet')
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
   const txHash = await setRecords(walletClient as any, {
     name,
     texts,
@@ -97,6 +99,7 @@ async function applyDeltaImpl(
   }
 
   const { setRecords } = await import('@ensdomains/ensjs/wallet')
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
   const txHash = await setRecords(walletClient as any, {
     name,
     texts,

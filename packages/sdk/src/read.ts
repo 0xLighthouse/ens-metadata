@@ -63,10 +63,12 @@ async function getMetadataImpl(
 
   const [resolverValue, addressValue, texts] = await Promise.all([
     withTimeout(
+      // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
       (client as any).getEnsResolver({ name: normalizedName, ...commonOptions }),
       10_000,
     ).catch(() => null),
     withTimeout(
+      // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsAddress
       (client as any).getEnsAddress({ name: normalizedName, coinType, ...commonOptions }),
       10_000,
     ).catch(() => null),

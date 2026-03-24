@@ -1,4 +1,4 @@
-import { createPublicClient, http, erc20Abi, Abi } from 'viem'
+import { http, Abi, createPublicClient, erc20Abi } from 'viem'
 import { arbitrumSepolia, hardhat } from 'viem/chains'
 
 // Default public client for server components or initial loading

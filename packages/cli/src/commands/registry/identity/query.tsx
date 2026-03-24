@@ -34,10 +34,7 @@ type State =
   | { status: 'done'; identity: QueryResult }
   | { status: 'error'; message: string }
 
-export default function Query({
-  options: { chainName },
-  args: [agentId],
-}: Props) {
+export default function Query({ options: { chainName }, args: [agentId] }: Props) {
   const { exit } = useApp()
   const [state, setState] = React.useState<State>({ status: 'loading' })
 

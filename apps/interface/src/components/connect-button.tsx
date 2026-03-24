@@ -3,9 +3,9 @@
 import React from 'react'
 
 import { colorSystem, typography } from '@/config/theme'
+import { shortAddress } from '@/lib/shortAddress'
 import { cn } from '@/lib/utils'
 import { resolveAvatar } from '@/lib/utils'
-import { shortAddress } from '@/lib/shortAddress'
 import { useAppStore } from '@/stores/app'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { Button } from './ui/button'

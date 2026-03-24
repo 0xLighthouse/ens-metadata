@@ -1,14 +1,14 @@
 'use client'
 
+import { useTreeData } from '@/hooks/useTreeData'
+import { useNodeEditorStore } from '@/stores/node-editor'
+import { useSchemaStore } from '@/stores/schemas'
+import { useTreeEditStore } from '@/stores/tree-edits'
+import { ExternalLink, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
-import { X, ExternalLink, Trash2 } from 'lucide-react'
 import { AddressField } from './AddressField'
 import { SchemaEditor } from './SchemaEditor'
-import { useTreeEditStore } from '@/stores/tree-edits'
-import { useTreeData } from '@/hooks/useTreeData'
-import { useEffect, useState } from 'react'
-import { useSchemaStore } from '@/stores/schemas'
-import { useNodeEditorStore } from '@/stores/node-editor'
 
 export function EditNodeDrawer() {
   const { sourceTree, previewTree } = useTreeData()
@@ -44,6 +44,7 @@ export function EditNodeDrawer() {
   } = useNodeEditorStore()
 
   // Find the node data in base tree
+  // biome-ignore lint/suspicious/noExplicitAny: recursive tree search returns dynamic node
   const findNode = (name: string, node = sourceTree): any => {
     if (!node) return null
     if (node.name === name) return node
@@ -57,6 +58,7 @@ export function EditNodeDrawer() {
   }
 
   // Find the node in full tree (including pending creations with edits)
+  // biome-ignore lint/suspicious/noExplicitAny: recursive tree search returns dynamic node
   const findNodeInTree = (name: string, node = previewTree): any => {
     if (!node) return null
     if (node.name === name) return node
@@ -193,12 +195,14 @@ export function EditNodeDrawer() {
         <Drawer.Content
           className="right-4 top-20 bottom-4 fixed z-50 outline-none w-[500px] flex"
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // biome-ignore lint/suspicious/noExplicitAny: CSS custom property not in React CSSProperties
           style={{ '--initial-transform': 'calc(100% + 16px)' } as any}
         >
           <div className="h-full w-full grow p-6 flex flex-col rounded-[16px] border-l border-white bg-[rgb(247,247,248)] dark:bg-neutral-900">
             {/* Header */}
             <div className="mb-4 relative">
               <button
+                type="button"
                 onClick={handleCloseWithConfirmation}
                 className="absolute -top-2 -right-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
                 aria-label="Close drawer"
@@ -239,11 +243,11 @@ export function EditNodeDrawer() {
                     const extraKeys: string[] = []
 
                     if (nodeWithEdits.texts && typeof nodeWithEdits.texts === 'object') {
-                      Object.keys(nodeWithEdits.texts).forEach((key) => {
+                      for (const key of Object.keys(nodeWithEdits.texts)) {
                         if (!schemaKeys.has(key)) {
                           extraKeys.push(key)
                         }
-                      })
+                      }
                     }
 
                     return (
@@ -289,6 +293,7 @@ export function EditNodeDrawer() {
                             {/* Existing custom attributes */}
                             {extraKeys.map((key) => {
                               const isMarkedForDeletion = formData[key] === null
+                              // biome-ignore lint/suspicious/noExplicitAny: texts record values are dynamic
                               const originalValue = (nodeWithEdits.texts as any)?.[key] ?? ''
                               const currentValue = formData[key] ?? originalValue
 
@@ -299,6 +304,7 @@ export function EditNodeDrawer() {
                                     className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-lg p-3"
                                   >
                                     <div className="flex items-center justify-between gap-2 mb-2">
+                                      {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
                                       <label className="block text-sm font-medium text-red-500 dark:text-red-400 line-through">
                                         {key}
                                       </label>
@@ -323,6 +329,7 @@ export function EditNodeDrawer() {
                                   className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3"
                                 >
                                   <div className="flex items-center justify-between gap-2 mb-2">
+                                    {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                       {key}
                                     </label>
@@ -354,6 +361,7 @@ export function EditNodeDrawer() {
                                     onChange={(e) => setNewAttributeKey(e.target.value)}
                                     placeholder="Attribute key (e.g., com.twitter)"
                                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    // biome-ignore lint/a11y/noAutofocus: intentional UX
                                     autoFocus
                                   />
                                   <button
@@ -403,12 +411,14 @@ export function EditNodeDrawer() {
             <div className="flex flex-col gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={handleCloseWithConfirmation}
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={!hasChanges || nodeWithEdits?.isSuggested}
                   className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
@@ -418,6 +428,7 @@ export function EditNodeDrawer() {
               </div>
               {hasPendingEdits && (
                 <button
+                  type="button"
                   onClick={handleDiscard}
                   className="w-full px-4 py-2 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
@@ -433,6 +444,7 @@ export function EditNodeDrawer() {
       {/* Discard Changes Confirmation Dialog */}
       {showDiscardDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismissal only needs click */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={handleCancelDiscard}
@@ -444,12 +456,14 @@ export function EditNodeDrawer() {
             </h3>
             <div className="flex gap-3">
               <button
+                type="button"
                 onClick={handleCancelDiscard}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 No, continue editing
               </button>
               <button
+                type="button"
                 onClick={handleConfirmDiscard}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors cursor-pointer"
               >

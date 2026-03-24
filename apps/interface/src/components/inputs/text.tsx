@@ -1,20 +1,20 @@
-import React from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
+import React from 'react'
 
 interface FormInputProps {
-  id: string;
-  label: string;
-  placeholder?: string;
-  value?: string;
-  defaultValue?: string;
-  onChange?: (value: string) => void;
-  description?: string;
-  tooltip?: string;
-  required?: boolean;
-  className?: string;
+  id: string
+  label: string
+  placeholder?: string
+  value?: string
+  defaultValue?: string
+  onChange?: (value: string) => void
+  description?: string
+  tooltip?: string
+  required?: boolean
+  className?: string
 }
 
 export function TextInput({
@@ -59,5 +59,5 @@ export function TextInput({
       />
       {description && <p className="text-xs text-zinc-500">{description}</p>}
     </div>
-  );
+  )
 }

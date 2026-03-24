@@ -1,16 +1,16 @@
 'use client'
 
+import { useOutsideClick } from '@/hooks/useOutsideClick'
+import { useTreeData } from '@/hooks/useTreeData'
+import { type TreeNode } from '@/lib/tree/types'
+import { useNodeEditorStore } from '@/stores/node-editor'
+import { useSchemaStore } from '@/stores/schemas'
+import { useTreeEditStore } from '@/stores/tree-edits'
+import { ChevronDown, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Drawer } from 'vaul'
-import { X, Search, ChevronDown } from 'lucide-react'
 import { AddressField } from './AddressField'
 import { SchemaEditor } from './SchemaEditor'
-import { useTreeEditStore } from '@/stores/tree-edits'
-import { useTreeData } from '@/hooks/useTreeData'
-import { useOutsideClick } from '@/hooks/useOutsideClick'
-import { type TreeNode } from '@/lib/tree/types'
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { useSchemaStore } from '@/stores/schemas'
-import { useNodeEditorStore } from '@/stores/node-editor'
 
 interface Props {
   isOpen: boolean
@@ -109,6 +109,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
 
   const handleCreate = () => {
     // Collect non-empty form values to merge into the primary node
+    // biome-ignore lint/suspicious/noExplicitAny: form data values are dynamic
     const schemaChanges: Record<string, any> = {}
     for (const [key, value] of Object.entries(formData)) {
       if (value !== '' && value !== null && value !== undefined) {
@@ -117,9 +118,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
     }
 
     // Merge schema fields only into the first (primary) node
-    const augmentedNodes = nodes.map((node, i) =>
-      i === 0 ? { ...node, ...schemaChanges } : node,
-    )
+    const augmentedNodes = nodes.map((node, i) => (i === 0 ? { ...node, ...schemaChanges } : node))
 
     queueCreation(selectedParent, augmentedNodes)
     handleClose()
@@ -157,18 +156,25 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
   }
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={(open) => !open && handleClose()} direction="right" handleOnly={true}>
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={(open) => !open && handleClose()}
+      direction="right"
+      handleOnly={true}
+    >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content
           className="right-4 top-20 bottom-4 fixed z-50 outline-none w-[500px] flex"
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // biome-ignore lint/suspicious/noExplicitAny: CSS custom property not in React CSSProperties
           style={{ '--initial-transform': 'calc(100% + 16px)' } as any}
         >
           <div className="h-full w-full grow p-6 flex flex-col rounded-[16px] border-l border-white bg-[rgb(247,247,248)] dark:bg-neutral-900">
             {/* Header */}
             <div className="mb-6 relative">
               <button
+                type="button"
                 onClick={handleCloseWithConfirmation}
                 className="absolute -top-2 -right-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
                 aria-label="Close drawer"
@@ -187,6 +193,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
             <div className="flex-1 overflow-y-auto space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {/* Parent Node Combobox */}
               <div ref={parentDropdownRef} className="relative">
+                {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Parent Node
                 </label>
@@ -198,7 +205,10 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
                   <span className="text-gray-900 dark:text-white font-mono text-xs truncate">
                     {selectedParent || 'Select parent…'}
                   </span>
-                  <ChevronDown size={16} className="text-gray-500 dark:text-gray-400 shrink-0 ml-2" />
+                  <ChevronDown
+                    size={16}
+                    className="text-gray-500 dark:text-gray-400 shrink-0 ml-2"
+                  />
                 </button>
 
                 {isParentDropdownOpen && (
@@ -215,6 +225,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
                           value={parentSearch}
                           onChange={(e) => setParentSearch(e.target.value)}
                           className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          // biome-ignore lint/a11y/noAutofocus: intentional UX
                           autoFocus
                         />
                       </div>
@@ -282,12 +293,14 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
             {/* Actions */}
             <div className="flex gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
+                type="button"
                 onClick={handleCloseWithConfirmation}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleCreate}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer"
               >
@@ -301,6 +314,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
       {/* Discard Changes Confirmation Dialog */}
       {showDiscardDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismissal only needs click */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={handleCancelDiscard}
@@ -312,12 +326,14 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
             </h3>
             <div className="flex gap-3">
               <button
+                type="button"
                 onClick={handleCancelDiscard}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 No, continue editing
               </button>
               <button
+                type="button"
                 onClick={handleConfirmDiscard}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors cursor-pointer"
               >

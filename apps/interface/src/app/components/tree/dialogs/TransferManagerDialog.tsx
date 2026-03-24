@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { useTxnsStore } from '@/stores/txns'
-import { transferName } from '@ensdomains/ensjs/wallet'
 import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
+import { transferName } from '@ensdomains/ensjs/wallet'
 import { useState } from 'react'
 import type { WalletClient } from 'viem'
 import { isAddress } from 'viem'
@@ -69,6 +69,7 @@ export function TransferManagerDialog({
         setNewAddress('')
         setStatus('idle')
       }, 1500)
+      // biome-ignore lint/suspicious/noExplicitAny: catch block error shape
     } catch (err: any) {
       const message = err?.shortMessage || err?.message || 'Transaction failed'
       setError(message)
@@ -121,9 +122,7 @@ export function TransferManagerDialog({
               <p className="mt-1.5 text-xs text-red-500">Please enter a valid Ethereum address</p>
             )}
             {isSameAddress && isValidAddress && (
-              <p className="mt-1.5 text-xs text-amber-500">
-                This is already the current manager
-              </p>
+              <p className="mt-1.5 text-xs text-amber-500">This is already the current manager</p>
             )}
           </div>
 
@@ -154,7 +153,9 @@ export function TransferManagerDialog({
           <button
             type="button"
             onClick={handleTransfer}
-            disabled={!isValidAddress || isSameAddress || status === 'signing' || status === 'submitted'}
+            disabled={
+              !isValidAddress || isSameAddress || status === 'signing' || status === 'submitted'
+            }
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'signing' ? 'Confirm in wallet...' : 'Transfer'}

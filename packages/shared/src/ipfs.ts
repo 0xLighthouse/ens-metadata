@@ -1,6 +1,6 @@
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
 
 function publishToIpfs(cmd: string, filePath: string): string {
   const output = execSync(`${cmd} ${filePath}`, { encoding: 'utf8' }).trim()

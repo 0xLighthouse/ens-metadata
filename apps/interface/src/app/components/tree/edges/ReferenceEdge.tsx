@@ -1,9 +1,9 @@
 import {
+  BaseEdge,
   type Edge,
+  EdgeLabelRenderer,
   type EdgeProps,
   getStraightPath,
-  EdgeLabelRenderer,
-  BaseEdge,
 } from '@xyflow/react'
 
 interface ReferenceEdgeData {

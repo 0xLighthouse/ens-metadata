@@ -19,7 +19,12 @@ interface TxnsState {
   txns: Txn[]
   addTxn: (txn: Pick<Txn, 'hash' | 'type' | 'label'>) => void
   updateTxn: (hash: `0x${string}`, update: Partial<Txn>) => void
-  watchTxn: (hash: `0x${string}`, publicClient: any, requiredConfirmations?: number) => Promise<void>
+  watchTxn: (
+    hash: `0x${string}`,
+    // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
+    publicClient: any,
+    requiredConfirmations?: number,
+  ) => Promise<void>
   getByLabel: (label: string) => Txn | undefined
 }
 
@@ -78,6 +83,7 @@ export const useTxnsStore = create<TxnsState>()(
             confirmations: requiredConfirmations,
             confirmedAt: Date.now(),
           })
+          // biome-ignore lint/suspicious/noExplicitAny: catch block error shape
         } catch (err: any) {
           updateTxn(hash, { status: 'failed', error: err?.message ?? 'Transaction failed' })
         }

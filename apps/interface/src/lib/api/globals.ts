@@ -1,5 +1,5 @@
-import type { Schema as BaseSchema } from '@ens-node-metadata/schemas/types'
 import { getPublishedRegistry } from '@ens-node-metadata/schemas/published'
+import type { Schema as BaseSchema } from '@ens-node-metadata/schemas/types'
 
 /**
  * Fetch all global sub-schemas (e.g. ENSIP-5) from the published globals bundle

@@ -9,28 +9,19 @@ describe('computeDelta', () => {
   })
 
   it('detects changed fields', () => {
-    const delta = computeDelta(
-      { description: 'old' },
-      { description: 'new' },
-    )
+    const delta = computeDelta({ description: 'old' }, { description: 'new' })
     expect(delta.changes).toEqual({ description: 'new' })
     expect(delta.deleted).toEqual([])
   })
 
   it('detects deleted fields (value emptied)', () => {
-    const delta = computeDelta(
-      { description: 'old' },
-      { description: '' },
-    )
+    const delta = computeDelta({ description: 'old' }, { description: '' })
     expect(delta.changes).toEqual({})
     expect(delta.deleted).toEqual(['description'])
   })
 
   it('detects deleted fields (value nulled)', () => {
-    const delta = computeDelta(
-      { description: 'old' },
-      { description: null },
-    )
+    const delta = computeDelta({ description: 'old' }, { description: null })
     expect(delta.changes).toEqual({})
     expect(delta.deleted).toEqual(['description'])
   })
@@ -45,19 +36,13 @@ describe('computeDelta', () => {
   })
 
   it('ignores both-empty fields', () => {
-    const delta = computeDelta(
-      { description: '' },
-      { description: '' },
-    )
+    const delta = computeDelta({ description: '' }, { description: '' })
     expect(delta.changes).toEqual({})
     expect(delta.deleted).toEqual([])
   })
 
   it('ignores null-to-empty transitions', () => {
-    const delta = computeDelta(
-      { description: null },
-      { description: '' },
-    )
+    const delta = computeDelta({ description: null }, { description: '' })
     expect(delta.changes).toEqual({})
     expect(delta.deleted).toEqual([])
   })

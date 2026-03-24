@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from 'react'
-import { useTreeLoaderStore } from '@/stores/tree-loader'
-import { useTreeEditStore } from '@/stores/tree-edits'
-import { useAppStore } from '@/stores/app'
 import type { TreeNode } from '@/lib/tree/types'
+import { useAppStore } from '@/stores/app'
+import { useTreeEditStore } from '@/stores/tree-edits'
+import { useTreeLoaderStore } from '@/stores/tree-loader'
+import { useCallback, useMemo } from 'react'
 
 export const useTreeData = () => {
   const {
@@ -68,8 +68,9 @@ export const useTreeData = () => {
 
     // Build a created subtree by recursively finding children among flattened creations
     const buildCreatedSubtree = (createdNode: TreeNode): TreeNode => {
-      const childCreations = Array.from(pendingMutations.entries())
-        .filter(([_, m]) => m.createNode && m.parentName === createdNode.name)
+      const childCreations = Array.from(pendingMutations.entries()).filter(
+        ([_, m]) => m.createNode && m.parentName === createdNode.name,
+      )
 
       const children: TreeNode[] = []
       for (const [nodeName, creation] of childCreations) {
@@ -89,9 +90,10 @@ export const useTreeData = () => {
 
       return {
         ...createdNode,
-        children: children.length > 0
-          ? [...(createdNode.children ?? []), ...children]
-          : createdNode.children,
+        children:
+          children.length > 0
+            ? [...(createdNode.children ?? []), ...children]
+            : createdNode.children,
       }
     }
 
@@ -107,6 +109,7 @@ export const useTreeData = () => {
           const newTexts = { ...(mergedNode.texts ?? {}) }
           for (const key of mutation.deleted) {
             delete newTexts[key]
+            // biome-ignore lint/suspicious/noExplicitAny: dynamic tree node property deletion
             delete (mergedNode as any)[key]
           }
           mergedNode = { ...mergedNode, texts: newTexts }
@@ -114,8 +117,9 @@ export const useTreeData = () => {
       }
 
       // Find any pending creations whose parent is this node
-      const creationsForNode = Array.from(pendingMutations.entries())
-        .filter(([_, m]) => m.createNode && m.parentName === node.name)
+      const creationsForNode = Array.from(pendingMutations.entries()).filter(
+        ([_, m]) => m.createNode && m.parentName === node.name,
+      )
 
       const nodesToAdd: TreeNode[] = []
       for (const [nodeName, creation] of creationsForNode) {
@@ -160,6 +164,6 @@ export const useTreeData = () => {
     hasHydrated,
     loadTree: loadTreeForRoot,
     refreshTree: refreshTreeForRoot,
-    addNodesToParent
+    addNodesToParent,
   }
 }

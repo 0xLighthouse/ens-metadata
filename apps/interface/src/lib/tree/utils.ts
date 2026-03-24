@@ -25,6 +25,7 @@ export function findNodeByAddress(
       return tree
     }
     // Check if type matches
+    // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
     const nodeType = (tree as any).class || tree.texts?.class
     if (nodeType === type) {
       return tree
@@ -45,10 +46,7 @@ export function findNodeByAddress(
 /**
  * Find all nodes with the same address (regardless of type)
  */
-export function findAllNodesByAddress(
-  tree: TreeNode | null,
-  address: `0x${string}`,
-): TreeNode[] {
+export function findAllNodesByAddress(tree: TreeNode | null, address: `0x${string}`): TreeNode[] {
   const matches: TreeNode[] = []
 
   if (!tree) return matches
@@ -72,10 +70,6 @@ export function findAllNodesByAddress(
 /**
  * Check if a node with the given address and type exists in the tree
  */
-export function nodeExists(
-  tree: TreeNode | null,
-  address: `0x${string}`,
-  type?: string,
-): boolean {
+export function nodeExists(tree: TreeNode | null, address: `0x${string}`, type?: string): boolean {
   return findNodeByAddress(tree, address, type) !== null
 }

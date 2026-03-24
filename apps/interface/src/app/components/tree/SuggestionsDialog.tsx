@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,8 +9,9 @@ import {
 } from '@/components/ui/dialog'
 import { useTreeData } from '@/hooks/useTreeData'
 import { type TreeNode } from '@/lib/tree/types'
-import { Sparkles, Vault, HandCoins, UserCheck } from 'lucide-react'
+import { HandCoins, Sparkles, UserCheck, Vault } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useState } from 'react'
 import { CreateNodeDrawer } from './drawers/CreateNodeDrawer'
 
 interface Suggestion {
@@ -102,9 +102,7 @@ export function SuggestionsDialog({ open, onOpenChange }: SuggestionsDialogProps
               <Sparkles className="w-5 h-5 text-indigo-600" />
               Add a node
             </DialogTitle>
-            <DialogDescription>
-              Add a node to fulfill one of these roles
-            </DialogDescription>
+            <DialogDescription>Add a node to fulfill one of these roles</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
@@ -112,6 +110,7 @@ export function SuggestionsDialog({ open, onOpenChange }: SuggestionsDialogProps
               const Icon = suggestion.icon
               return (
                 <button
+                  type="button"
                   key={suggestion.id}
                   onClick={() => handleSelectSuggestion(suggestion)}
                   className="group relative flex flex-col items-start gap-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all text-left cursor-pointer"
@@ -133,6 +132,7 @@ export function SuggestionsDialog({ open, onOpenChange }: SuggestionsDialogProps
 
                   {/* Hover indicator */}
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative */}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"

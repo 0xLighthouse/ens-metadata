@@ -1,6 +1,7 @@
-import { create } from 'zustand'
 import { computeDelta, hasChanges as sdkHasChanges } from '@ens-node-metadata/sdk'
+import { create } from 'zustand'
 
+// biome-ignore lint/suspicious/noExplicitAny: form data values are dynamic
 type NodeEditFormData = Record<string, any>
 
 interface NodeEditorState {
@@ -25,13 +26,12 @@ interface NodeEditorState {
   isClassFieldLocked: boolean
 
   // Actions
-  initializeEditor: (
-    nodeData: any,
-    existingEdit: any,
-    schemas: any[]
-  ) => void
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic node/edit/schema shapes
+  initializeEditor: (nodeData: any, existingEdit: any, schemas: any[]) => void
   resetEditor: () => void
+  // biome-ignore lint/suspicious/noExplicitAny: form field values are dynamic
   updateField: (key: string, value: any) => void
+  // biome-ignore lint/suspicious/noExplicitAny: schema shape from external registry
   setCurrentSchema: (schemaId: string, schema: any, nodeData?: any) => void
   addOptionalField: (fieldKey: string) => void
   removeOptionalField: (fieldKey: string) => void
@@ -45,11 +45,19 @@ interface NodeEditorState {
   removeCustomAttribute: (key: string) => void
   toggleClassFieldLock: () => void
   getFormData: () => NodeEditFormData
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic node/schema shapes
   hasChanges: (originalNode: any, activeSchema: any) => boolean
-  getChangedFields: (originalNode: any, activeSchema: any) => { changes: Record<string, any>; deleted: string[] }
+  getChangedFields: (
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic node/schema shapes
+    originalNode: any,
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic node/schema shapes
+    activeSchema: any,
+    // biome-ignore lint/suspicious/noExplicitAny: delta values are dynamic
+  ) => { changes: Record<string, any>; deleted: string[] }
 }
 
 // Resolve a value: check top-level first (pending edit merges), then node.texts
+// biome-ignore lint/suspicious/noExplicitAny: dynamic tree node shape
 const resolveNodeValue = (node: any, key: string) =>
   node?.[key] !== undefined ? node[key] : node?.texts?.[key]
 
@@ -75,9 +83,8 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
 
     // Look up the active schema based on the node's schema property
     const nodeSchemaId = resolveNodeValue(nodeData, 'schema')
-    const activeSchema = nodeSchemaId
-      ? schemas.find((s: any) => s.id === nodeSchemaId)
-      : null
+    // biome-ignore lint/suspicious/noExplicitAny: schema shape from external registry
+    const activeSchema = nodeSchemaId ? schemas.find((s: any) => s.id === nodeSchemaId) : null
 
     // Add schema and type to form data ONLY if the node already has a schema
     if (nodeSchemaId && activeSchema) {
@@ -87,7 +94,8 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
 
     // Initialize from node data and schema properties ONLY if node has a schema
     if (nodeSchemaId && activeSchema?.properties) {
-      Object.entries(activeSchema.properties).forEach(([key, prop]: [string, any]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: schema property shape from external registry
+      for (const [key, prop] of Object.entries(activeSchema.properties) as [string, any][]) {
         const value = resolveNodeValue(nodeData, key) ?? ''
         nextFormData[key] = value
 
@@ -96,7 +104,7 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
         if (!activeSchema.required?.includes(key) && (value || isRecommended)) {
           optionalFieldsWithValues.add(key)
         }
-      })
+      }
     }
 
     // Apply any pending edits
@@ -140,7 +148,8 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
       const optionalFieldsWithValues = new Set<string>()
 
       // Initialize schema properties
-      Object.entries(schema.properties ?? {}).forEach(([key, prop]: [string, any]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: schema property shape from external registry
+      for (const [key, prop] of Object.entries(schema.properties ?? {}) as [string, any][]) {
         if (!(key in nextFormData)) {
           const value = resolveNodeValue(nodeData, key) ?? ''
           nextFormData[key] = value
@@ -151,7 +160,7 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
             optionalFieldsWithValues.add(key)
           }
         }
-      })
+      }
 
       return {
         currentSchemaId: schemaId,
@@ -196,7 +205,10 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
     })),
 
   setIsAddingCustomAttribute: (isAdding) =>
-    set({ isAddingCustomAttribute: isAdding, newAttributeKey: isAdding ? '' : get().newAttributeKey }),
+    set({
+      isAddingCustomAttribute: isAdding,
+      newAttributeKey: isAdding ? '' : get().newAttributeKey,
+    }),
 
   setNewAttributeKey: (key) => set({ newAttributeKey: key }),
 

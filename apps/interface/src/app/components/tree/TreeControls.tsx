@@ -28,9 +28,9 @@ export function TreeControls() {
     const names: string[] = []
     if (node.children && node.children.length > 0) {
       names.push(node.name)
-      node.children.forEach((child) => {
+      for (const child of node.children) {
         names.push(...getAllNodesWithChildren(child))
-      })
+      }
     }
     return names
   }
@@ -55,6 +55,7 @@ export function TreeControls() {
       {/* Suggestions + refresh - top left */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
         <button
+          type="button"
           onClick={() => setIsSuggestionsOpen(true)}
           disabled={controlsDisabled}
           className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -64,6 +65,7 @@ export function TreeControls() {
         </button>
 
         <button
+          type="button"
           onClick={() => setIsCreateSubnameOpen(true)}
           disabled={controlsDisabled}
           className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -74,6 +76,7 @@ export function TreeControls() {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => void refreshTree()}
             disabled={isLoading || isRefreshing}
             title={refreshTitle}
@@ -92,6 +95,7 @@ export function TreeControls() {
       {/* Main controls - bottom left */}
       <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2">
         <button
+          type="button"
           onClick={() => setOrientation(orientation === 'vertical' ? 'horizontal' : 'vertical')}
           disabled={controlsDisabled}
           className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -100,6 +104,7 @@ export function TreeControls() {
         </button>
 
         <button
+          type="button"
           onClick={triggerLayout}
           disabled={controlsDisabled}
           className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
@@ -110,6 +115,7 @@ export function TreeControls() {
         </button>
 
         <button
+          type="button"
           onClick={hasCollapsedNodes ? expandAll : handleCollapseAll}
           disabled={controlsDisabled}
           className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -119,6 +125,7 @@ export function TreeControls() {
 
         {nodePositions.size > 0 && (
           <button
+            type="button"
             onClick={clearNodePositions}
             disabled={controlsDisabled}
             className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"

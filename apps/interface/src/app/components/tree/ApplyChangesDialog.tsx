@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ExternalLink, Loader2, XCircle, Receipt } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -9,12 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { useTreeEditStore } from '@/stores/tree-edits'
 import { useTreeData } from '@/hooks/useTreeData'
+import { useTreeEditStore } from '@/stores/tree-edits'
 import { useTxnsStore } from '@/stores/txns'
+import { ExternalLink, Loader2, Receipt, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface ApplyChangesDialogProps {
   open: boolean
@@ -46,6 +46,7 @@ export function ApplyChangesDialog({
   }, [open, changesArray])
 
   const findNode = useCallback(
+    // biome-ignore lint/suspicious/noExplicitAny: recursive tree search returns dynamic node
     (name: string, node = sourceTree): any => {
       if (!node) return null
       if (node.name === name) return node
@@ -89,6 +90,7 @@ export function ApplyChangesDialog({
   }
 
   // Get key/value rows for a created node from its mutation changes
+  // biome-ignore lint/suspicious/noExplicitAny: mutation change values are dynamic
   const getCreationRows = (changes: Record<string, any>): { key: string; value: string }[] => {
     const rows: { key: string; value: string }[] = []
     for (const [key, value] of Object.entries(changes)) {
@@ -267,6 +269,7 @@ export function ApplyChangesDialog({
 
                   // Resolve original value: check node.texts first, then top-level
                   const resolveOriginal = (key: string) =>
+                    // biome-ignore lint/suspicious/noExplicitAny: dynamic tree node shape for text record resolution
                     (originalNode as any)?.texts?.[key] ?? (originalNode as any)?.[key]
 
                   const entries = change.changes

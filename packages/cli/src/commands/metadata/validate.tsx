@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
+import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
+import { type MetadataValidationResult, validateMetadataSchema } from '@ens-node-metadata/sdk'
 import { Box, Text, useApp } from 'ink'
 import React from 'react'
 import { z } from 'zod'
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
-import { validateMetadataSchema, type MetadataValidationResult } from '@ens-node-metadata/sdk'
 
 export const description = 'Validate ENS metadata payload against agent schema'
 

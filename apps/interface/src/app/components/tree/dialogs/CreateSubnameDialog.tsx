@@ -88,7 +88,8 @@ export function CreateSubnameDialog({ open, onOpenChange }: Props) {
   const isConfirming = txn?.status === 'confirming'
   const isPending = txn?.status === 'pending'
   const isFailed = txn?.status === 'failed'
-  const inFlight = txState.status === 'simulating' || txState.status === 'signing' || isPending || isConfirming
+  const inFlight =
+    txState.status === 'simulating' || txState.status === 'signing' || isPending || isConfirming
 
   const availableParents = previewTree ? collectAllNodes(previewTree) : []
   const filteredParents = availableParents.filter((p) =>
