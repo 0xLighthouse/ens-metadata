@@ -108,7 +108,7 @@ async function applyDeltaImpl(
   return { txHash, texts, coins }
 }
 
-export function ensMetadataWalletActions(config: { publicClient: PublicClient }) {
+export function metadataWriter(config: { publicClient: PublicClient }) {
   return (walletClient: WalletClient) => ({
     setMetadata: (opts: SetMetadataOptions) =>
       setMetadataImpl(walletClient, config.publicClient, opts),

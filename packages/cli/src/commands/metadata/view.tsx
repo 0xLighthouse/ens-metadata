@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
-import { ensMetadataActions, type GetMetadataResult } from '@ens-node-metadata/sdk'
+import { metadataReader, type GetMetadataResult } from '@ens-node-metadata/sdk'
 import { queryDomain } from '../../lib/subgraph.js'
 import { useCommand, CommandStatus } from '../../lib/use-command.js'
 
@@ -55,7 +55,7 @@ export default function View({ args: [ensName], options }: Props) {
     const client = createPublicClient({
       chain: mainnet,
       transport: http(undefined, { batch: { batchSize: 128 } }),
-    }).extend(ensMetadataActions())
+    }).extend(metadataReader())
 
     // Query subgraph for fast key discovery
     const domain = await queryDomain(ensName)

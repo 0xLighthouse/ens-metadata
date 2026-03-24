@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createSubname } from '@ensdomains/ensjs/wallet'
 import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
 import type { PublicClient, WalletClient } from 'viem'
-import { ensMetadataWalletActions } from '@ens-node-metadata/sdk'
+import { metadataWriter } from '@ens-node-metadata/sdk'
 import type { TreeNode } from '@/lib/tree/types'
 import { useTreeEditStore, type TreeMutation } from './tree-edits'
 import { useTxnsStore } from './txns'
@@ -122,7 +122,7 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
     set({ jobs, status: 'executing' })
 
     // Create SDK wallet extension for writes
-    const writer = ensMetadataWalletActions({ publicClient: publicClient as PublicClient })(walletClient)
+    const writer = metadataWriter({ publicClient: publicClient as PublicClient })(walletClient)
 
     // Submit one applyDelta call per ensName
     for (const [ensName, { resolverAddress, delta, mutationIds: mIds }] of editsByName) {

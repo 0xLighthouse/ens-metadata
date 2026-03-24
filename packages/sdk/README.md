@@ -10,37 +10,50 @@ pnpm add @ens-node-metadata/sdk viem @ensdomains/ensjs
 
 ## Read
 
-Extend any viem public client with `ensMetadataActions()` to read node metadata.
-
 ```ts
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { ensMetadataActions } from '@ens-node-metadata/sdk'
+import { metadataReader } from '@ens-node-metadata/sdk'
 
-const client = createPublicClient({
+const publicClient = createPublicClient({
   chain: addEnsContracts(mainnet),
   transport: http(),
-}).extend(ensMetadataActions())
+})
 
-// Get schema info (class, version, CID)
-const schema = await client.getSchema({ name: 'mynode.eth' })
-// { schema: 'ipfs://Qm...', class: 'Agent', version: '1.0', cid: 'Qm...' }
+// Standalone
+const reader = metadataReader()(publicClient)
+const metadata = await reader.getMetadata({ name: 'mynode.eth' })
+const schema = await reader.getSchema({ name: 'mynode.eth' })
 
-// Get all metadata (resolver, address, text records)
+// Or via viem's .extend() pattern
+const client = publicClient.extend(metadataReader())
 const metadata = await client.getMetadata({ name: 'mynode.eth' })
-// { name, resolver, address, class, schema, properties: { description: '...', ... } }
+```
 
-// Fetch only specific keys
-const partial = await client.getMetadata({
+`getMetadata` returns:
+
+```ts
+{
+  name: 'mynode.eth',
+  resolver: '0x...',
+  address: '0x...',
+  class: 'Agent',
+  schema: 'ipfs://Qm...',
+  properties: { description: '...', url: '...', ... }
+}
+```
+
+Fetch specific keys only:
+
+```ts
+await reader.getMetadata({
   name: 'mynode.eth',
   keys: ['description', 'avatar', 'url'],
 })
 ```
 
 ## Validate
-
-Validate metadata against a JSON Schema before writing.
 
 ```ts
 import { validateMetadataSchema } from '@ens-node-metadata/sdk'
@@ -52,7 +65,7 @@ const result = validateMetadataSchema(
 )
 
 if (result.success) {
-  console.log(result.data) // typed Record<string, string>
+  console.log(result.data) // Record<string, string>
 } else {
   result.errors.forEach((e) => console.log(`[${e.key}] ${e.message}`))
 }
@@ -76,13 +89,11 @@ hasChanges(original, desired) // true
 
 ## Write
 
-Extend a viem wallet client with `ensMetadataWalletActions()` to write metadata.
-
 ```ts
 import { createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { ensMetadataWalletActions } from '@ens-node-metadata/sdk'
+import { metadataWriter } from '@ens-node-metadata/sdk'
 
 const walletClient = createWalletClient({
   chain: addEnsContracts(mainnet),
@@ -90,7 +101,11 @@ const walletClient = createWalletClient({
   account: '0x...',
 })
 
-const writer = ensMetadataWalletActions({ publicClient })(walletClient)
+// Standalone
+const writer = metadataWriter({ publicClient })(walletClient)
+
+// Or via viem's .extend() pattern
+const client = walletClient.extend(metadataWriter({ publicClient }))
 
 // Write full records
 const result = await writer.setMetadata({
@@ -99,8 +114,8 @@ const result = await writer.setMetadata({
 })
 // { txHash: '0x...', texts: [...], coins: [...] }
 
-// Or apply a delta (when you already have the resolver address)
-const result = await writer.applyDelta({
+// Apply a delta (when you already have the resolver address)
+await writer.applyDelta({
   name: 'mynode.eth',
   delta: { changes: { description: 'Updated' }, deleted: ['old-key'] },
   resolverAddress: '0x...',
@@ -117,27 +132,27 @@ import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
 await writer.setMetadata({
   name: 'mynode.eth',
   records: { description: 'My agent' },
-  schema: SCHEMA_MAP.Agent, // validates before writing
+  schema: SCHEMA_MAP.Agent,
 })
 ```
 
 ## API
 
-### Read (via `ensMetadataActions()`)
+### Read — `metadataReader()`
 
 | Method | Description |
 |---|---|
 | `getSchema({ name })` | Fetch schema, class, version, and CID text records |
 | `getMetadata({ name, schema?, keys? })` | Fetch resolver, address, and text records |
 
-### Write (via `ensMetadataWalletActions({ publicClient })`)
+### Write — `metadataWriter({ publicClient })`
 
 | Method | Description |
 |---|---|
 | `setMetadata({ name, records, deleted?, schema? })` | Write text records, optionally validate first |
 | `applyDelta({ name, delta, resolverAddress })` | Apply a `{ changes, deleted }` delta |
 
-### Standalone
+### Standalone functions
 
 | Function | Description |
 |---|---|
