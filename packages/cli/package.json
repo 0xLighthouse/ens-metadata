@@ -23,6 +23,7 @@
     "cli": "bun src/cli.ts",
     "build": "tsup",
     "publish:cli": "pnpm build && pnpm publish --access public",
+    "prepublishOnly": "pnpm build && pnpm test && pnpm lint",
     "lint": "biome check .",
     "test": "vitest run"
   },

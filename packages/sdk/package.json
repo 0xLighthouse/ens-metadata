@@ -14,7 +14,9 @@
   },
   "scripts": {
     "build": "tsup",
-    "lint": "biome check ."
+    "test": "vitest run",
+    "lint": "biome check .",
+    "prepublishOnly": "pnpm build && pnpm test && pnpm lint"
   },
   "dependencies": {
     "@ensdomains/ensjs": "^4.0.2",
@@ -23,6 +25,7 @@
   "devDependencies": {
     "@ens-node-metadata/schemas": "workspace:*",
     "tsup": "^8.5.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.1"
   }
 }
