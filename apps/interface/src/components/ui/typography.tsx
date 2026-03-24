@@ -1,6 +1,6 @@
-import React from 'react'
-import { cn } from '@/lib/utils'
 import { TypographyVariant, TypographyWeights, typography as typographyFn } from '@/config/theme'
+import { cn } from '@/lib/utils'
+import React from 'react'
 
 interface TypographyProps {
   variant: TypographyVariant
@@ -19,10 +19,7 @@ export const Typography = ({
   ...props
 }: TypographyProps & React.HTMLAttributes<HTMLElement>) => {
   return (
-    <Component
-      className={cn(typographyFn(variant, weight), className)}
-      {...props}
-    >
+    <Component className={cn(typographyFn(variant, weight), className)} {...props}>
       {children}
     </Component>
   )

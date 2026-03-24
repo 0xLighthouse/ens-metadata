@@ -1,12 +1,12 @@
 'use client'
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { useTreeData } from '@/hooks/useTreeData'
 import { useEffect } from 'react'
+import { ChangesBar } from './ChangesBar'
 import { Tree } from './Tree'
 import { TreeControls } from './TreeControls'
 import { EditNodeDrawer } from './drawers/EditNodeDrawer'
-import { ChangesBar } from './ChangesBar'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useTreeData } from '@/hooks/useTreeData'
 
 export function TreeContainer() {
   const { previewTree, isLoading, hasHydrated, loadTree } = useTreeData()

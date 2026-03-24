@@ -1,4 +1,4 @@
-import { encodeFunctionData, formatEther, http, createPublicClient, createWalletClient } from 'viem'
+import { http, createPublicClient, createWalletClient, encodeFunctionData, formatEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import IdentityRegistryABI from './abis/IdentityRegistry.json' with { type: 'json' }
 import { estimateCost, formatCost, validateCost } from './estimate-cost.js'
@@ -34,7 +34,17 @@ export async function executeRegistryCall(
   params: RegistryCallParams,
   onWorking?: (message: string) => void,
 ): Promise<RegistryCallResult> {
-  const { chainName, privateKey, broadcast, functionName, contractArgs, dryRunDetails, successMessage, successDetails, errorPrefix } = params
+  const {
+    chainName,
+    privateKey,
+    broadcast,
+    functionName,
+    contractArgs,
+    dryRunDetails,
+    successMessage,
+    successDetails,
+    errorPrefix,
+  } = params
   const { chain, registryAddress } = resolveChain(chainName)
   const account = privateKeyToAccount(privateKey as `0x${string}`)
 

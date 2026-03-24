@@ -1,17 +1,18 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import Cookies from 'js-cookie'
 import { AUTH_TOKEN_COOKIE } from '@/config/constants'
-import { useApiStore } from './api'
-import { QUERY_DOMAINS_OWNED } from '@/graphql/query.domains-owned'
 import { QUERY_DOMAIN_BY_NAME } from '@/graphql/query.domain-by-name'
+import { QUERY_DOMAINS_OWNED } from '@/graphql/query.domains-owned'
 import { ENSRootDomain } from '@/types'
 import { User } from '@privy-io/react-auth'
+import Cookies from 'js-cookie'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { useApiStore } from './api'
 
 type AppStatus = 'idle' | 'initializing' | 'loading-domains' | 'ready' | 'error'
 
 const normalizeDomainName = (input: string) => input.trim().toLowerCase()
 
+// biome-ignore lint/suspicious/noExplicitAny: subgraph response shape is dynamic
 const toENSRootDomain = (item: any, fallbackName?: string): ENSRootDomain => {
   const name = item.name ?? fallbackName ?? item.id
   return {
@@ -36,7 +37,6 @@ interface AppState {
   // App state
   status: AppStatus
   error: string | null
-
 
   initialize: (user: User) => Promise<void>
   setActiveDomain: (domain: ENSRootDomain) => void
@@ -63,7 +63,7 @@ export const useAppStore = create<AppState>()(
 
         try {
           set({
-            status: 'loading-domains'
+            status: 'loading-domains',
           })
           await get().fetchDomains(user.wallet?.address ?? '')
           set({ status: 'ready', isInitialized: true })
@@ -71,7 +71,7 @@ export const useAppStore = create<AppState>()(
           console.error('AppStore initialization error:', error)
           set({
             status: 'error',
-            error: error instanceof Error ? error.message : 'Initialization failed'
+            error: error instanceof Error ? error.message : 'Initialization failed',
           })
         }
       },
@@ -87,7 +87,10 @@ export const useAppStore = create<AppState>()(
       fetchDomains: async (userAddress: string) => {
         try {
           const apiStore = useApiStore.getState()
-          const resp = await apiStore.ensRequest<{ domains: any[] }>(QUERY_DOMAINS_OWNED, { address: userAddress })
+          // biome-ignore lint/suspicious/noExplicitAny: subgraph response shape is dynamic
+          const resp = await apiStore.ensRequest<{ domains: any[] }>(QUERY_DOMAINS_OWNED, {
+            address: userAddress,
+          })
 
           // Transform shitty subgraph response to our types
           const domains: ENSRootDomain[] = []
@@ -114,6 +117,7 @@ export const useAppStore = create<AppState>()(
         }
 
         const apiStore = useApiStore.getState()
+        // biome-ignore lint/suspicious/noExplicitAny: subgraph response shape is dynamic
         const resp = await apiStore.ensRequest<{ domains: any[] }>(QUERY_DOMAIN_BY_NAME, { name })
         const domain = resp.domains?.[0]
         if (!domain) {

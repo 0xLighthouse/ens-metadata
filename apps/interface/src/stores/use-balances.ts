@@ -1,7 +1,7 @@
-import { create } from 'zustand'
 import { context } from '@/config/web3'
-import { createPublicClient, http, getContract, formatUnits } from 'viem'
+import { http, createPublicClient, formatUnits, getContract } from 'viem'
 import { baseSepolia } from 'viem/chains'
+import { create } from 'zustand'
 
 interface Balance {
   raw: string

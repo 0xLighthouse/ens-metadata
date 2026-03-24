@@ -1,4 +1,3 @@
-
 export interface ENSRootDomain {
   /**
    * The ID of the domain

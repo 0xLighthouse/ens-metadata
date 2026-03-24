@@ -1,7 +1,6 @@
-import { formatEther, type EstimateGasParameters, type PublicClient } from 'viem'
+import { type EstimateGasParameters, type PublicClient, formatEther } from 'viem'
 
-const COINGECKO_URL =
-  'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
+const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
 
 /** Cached ETH/USD price with a 60-second TTL. */
 let priceCache: { usd: number; ts: number } | null = null

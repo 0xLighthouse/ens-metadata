@@ -1,9 +1,9 @@
 'use client'
 
 import { usePrivy } from '@privy-io/react-auth'
-import { PageInset } from './components/containers'
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { PageInset } from './components/containers'
 
 export default function HomePage() {
   const { user } = usePrivy()

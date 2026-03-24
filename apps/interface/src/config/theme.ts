@@ -5,22 +5,22 @@ export enum UITheme {
 
 /**
  * Typography system
- * 
+ *
  * This system provides consistent typography sizes and styles throughout the application.
  * Use these utilities with the `typography` function:
- * 
+ *
  * Example: typography('h1')
  */
 
-export type TypographyVariant = 
-  | 'h1' 
-  | 'h2' 
-  | 'h3' 
-  | 'h4' 
-  | 'body-lg' 
-  | 'body' 
-  | 'body-sm' 
-  | 'caption' 
+export type TypographyVariant =
+  | 'h1'
+  | 'h2'
+  | 'h3'
+  | 'h4'
+  | 'body-lg'
+  | 'body'
+  | 'body-sm'
+  | 'caption'
   | 'mono'
   | 'display'
 
@@ -100,36 +100,33 @@ export const fontWeights: Record<TypographyWeights, string> = {
 
 /**
  * Helper function to get typography classes
- * 
+ *
  * @param variant The typography variant
  * @param weight Optional custom weight to override the default
  * @returns A string of Tailwind classes
  */
-export function typography(
-  variant: TypographyVariant, 
-  weight?: TypographyWeights
-): string {
+export function typography(variant: TypographyVariant, weight?: TypographyWeights): string {
   const definition = typographyDefinitions[variant]
   const classes = [
     definition.fontSize,
     definition.lineHeight,
     weight ? fontWeights[weight] : definition.fontWeight,
   ]
-  
+
   if (definition.letterSpacing) {
     classes.push(definition.letterSpacing)
   }
-  
+
   if (definition.fontFamily) {
     classes.push(definition.fontFamily)
   }
-  
+
   return classes.join(' ')
 }
 
 /**
  * Color system
- * 
+ *
  * This system provides consistent colors throughout the application.
  */
 export const colorSystem = {
@@ -152,5 +149,5 @@ export const colorSystem = {
     danger: 'bg-red-500 dark:bg-red-600',
     success: 'bg-green-500 dark:bg-green-600',
     warning: 'bg-yellow-500 dark:bg-yellow-600',
-  }
+  },
 }

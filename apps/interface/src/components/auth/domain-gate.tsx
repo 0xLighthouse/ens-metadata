@@ -1,8 +1,8 @@
 'use client'
 
 import { useAppStore } from '@/stores/app'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
 
 interface Props {
   children: React.ReactNode
@@ -28,6 +28,7 @@ export function DomainGate({ children }: Props) {
     if (!isInitialized || status !== 'ready') return
     if (!urlDomain || activeDomain?.name === urlDomain) return
 
+    // biome-ignore lint/suspicious/noExplicitAny: partial domain object for URL-based activation
     setActiveDomain({ name: urlDomain } as any)
   }, [isInitialized, status, urlDomain, activeDomain?.name, setActiveDomain])
 

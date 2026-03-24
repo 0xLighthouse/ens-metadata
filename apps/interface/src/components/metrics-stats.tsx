@@ -17,6 +17,7 @@ export function MetricsStats() {
         <div className="flex flex-wrap justify-center gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders have no unique id
               key={i}
               className="h-20 w-28 rounded-lg border border-[hsl(var(--line))] bg-muted animate-pulse"
             />

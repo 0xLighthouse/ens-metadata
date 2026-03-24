@@ -1,5 +1,5 @@
-import { create } from 'zustand'
 import type { TreeNode } from '@/lib/tree/types'
+import { create } from 'zustand'
 
 export interface TreeMutation {
   createNode: boolean
@@ -22,7 +22,12 @@ interface TreeEditState {
   isEditDrawerOpen: boolean
 
   // Actions
-  upsertEdit: (nodeName: string, texts: Record<string, string | null>, changes: Record<string, string | null>, deleted?: string[]) => void
+  upsertEdit: (
+    nodeName: string,
+    texts: Record<string, string | null>,
+    changes: Record<string, string | null>,
+    deleted?: string[],
+  ) => void
   queueCreation: (parentName: string, nodes: TreeNode[]) => void
   discardPendingMutation: (id: string) => void
   clearPendingMutations: () => void
@@ -62,6 +67,7 @@ export const useTreeEditStore = create<TreeEditState>((set, get) => ({
 
       const flatten = (nodes: TreeNode[], parent: string) => {
         for (const node of nodes) {
+          // biome-ignore lint/suspicious/noExplicitAny: node property values are dynamic
           const changes: Record<string, any> = {}
           for (const [key, value] of Object.entries(node)) {
             if (key === 'children' || key === 'name') continue
@@ -93,8 +99,7 @@ export const useTreeEditStore = create<TreeEditState>((set, get) => ({
 
   setSelectedNode: (nodeName) => set({ selectedNode: nodeName }),
 
-  openEditDrawer: (nodeName) =>
-    set({ isEditDrawerOpen: true, selectedNode: nodeName }),
+  openEditDrawer: (nodeName) => set({ isEditDrawerOpen: true, selectedNode: nodeName }),
 
   closeEditDrawer: () => set({ isEditDrawerOpen: false, selectedNode: null }),
 

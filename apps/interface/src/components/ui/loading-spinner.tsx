@@ -1,6 +1,6 @@
-import { PuffLoader } from 'react-spinners'
 import { UITheme } from '@/config/theme'
 import { useTheme } from '@/contexts/ThemeContext'
+import { PuffLoader } from 'react-spinners'
 
 type LoadingSpinnerProps = {
   size?: number

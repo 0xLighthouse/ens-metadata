@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import type { InitializeStoreProps } from '@/lib/contexts/types'
-import { formatApiError } from '@/lib/api/utils/formatApiError'
 import { ErrorCode } from '@/lib/api/utils/ErrorCode'
+import { formatApiError } from '@/lib/api/utils/formatApiError'
+import type { InitializeStoreProps } from '@/lib/contexts/types'
 
 interface AppRouteHistory {
   currentPath?: string
@@ -131,6 +131,6 @@ export const useUiStore = create<UiState>()(
         isMobile: state.isMobile,
         routeHistory: state.routeHistory,
       }),
-    }
-  )
+    },
+  ),
 )

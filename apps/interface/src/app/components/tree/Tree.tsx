@@ -1,23 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { TreeNode } from '@/lib/tree/types'
+import { useTreeControlsStore } from '@/stores/tree-controls'
+import { useTreeEditStore } from '@/stores/tree-edits'
+import dagre from '@dagrejs/dagre'
 import {
-  ReactFlow,
+  Background,
   type Edge,
   type Node,
   type NodeChange,
+  ReactFlow,
   type ReactFlowInstance,
-  Background,
-  useNodesState,
   useEdgesState,
+  useNodesState,
 } from '@xyflow/react'
-import dagre from '@dagrejs/dagre'
-import { useTreeControlsStore } from '@/stores/tree-controls'
-import { useTreeEditStore } from '@/stores/tree-edits'
-import type { TreeNode } from '@/lib/tree/types'
-import { DefaultNode, TreasuryNode, SignerNode, BaseNode } from './nodes'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TransferManagerDialog } from './dialogs/TransferManagerDialog'
 import { ReferenceEdge } from './edges/ReferenceEdge'
+import { BaseNode, DefaultNode, SignerNode, TreasuryNode } from './nodes'
 
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 2
@@ -49,6 +49,7 @@ const FALLBACK_NODE_SIZES: Record<string, NodeDimensions> = {
 }
 
 const getFlowNodeType = (node: TreeNode): string => {
+  // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
   const explicitType = (node as any).class || node.texts?.class
   if (explicitType) {
     // Treasury and Signer keep their dedicated components
@@ -107,6 +108,7 @@ const layoutTree = (
 
     if (parentId) {
       const parentNode = nodeById.get(parentId)
+      // biome-ignore lint/suspicious/noExplicitAny: isComputed added dynamically by inspection
       const isComputedChild = (node as any).isComputed
       const isTreasuryToSigner =
         parentNode &&
@@ -130,6 +132,7 @@ const layoutTree = (
     }
 
     // Add edges for computed references (existing nodes)
+    // biome-ignore lint/suspicious/noExplicitAny: inspectionData added dynamically
     const computedRefs = (node as any).inspectionData?.computedReferences
     if (computedRefs && Array.isArray(computedRefs)) {
       for (const refNodeName of computedRefs) {
@@ -218,9 +221,10 @@ export function Tree({ data }: Props) {
   } = useTreeControlsStore()
   const { openEditDrawer, hasPendingEdit } = useTreeEditStore()
   const pendingMutationCount = useTreeEditStore((state) => state.pendingMutations.size)
-  const [reactFlowInstance, setReactFlowInstance] = useState<
-    ReactFlowInstance<DomainTreeNode, Edge> | null
-  >(null)
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
+    DomainTreeNode,
+    Edge
+  > | null>(null)
   const [transferManagerNode, setTransferManagerNode] = useState<string | null>(null)
   const [nodeSizes, setNodeSizes] = useState<Map<string, NodeDimensions>>(new Map())
 
@@ -301,11 +305,11 @@ export function Tree({ data }: Props) {
       onNodesChangeInternal(changes)
 
       // Save position changes to store
-      changes.forEach((change) => {
+      for (const change of changes) {
         if (change.type === 'position' && change.position && change.dragging === false) {
           setNodePosition(change.id, change.position)
         }
-      })
+      }
     },
     [onNodesChangeInternal, setNodePosition],
   )
@@ -437,15 +441,15 @@ export function Tree({ data }: Props) {
       if (cancelled) return
 
       const nextSizes = new Map<string, NodeDimensions>()
-      nodes.forEach((node) => {
+      for (const node of nodes) {
         const selector = `.react-flow__node[data-id="${escapeSelector(node.id)}"]`
         const element = document.querySelector(selector)
-        if (!element) return
+        if (!element) continue
         const rect = element.getBoundingClientRect()
-        if (!rect.width || !rect.height) return
+        if (!rect.width || !rect.height) continue
         const zoom = reactFlowInstance.getZoom()
         nextSizes.set(node.id, { width: rect.width / zoom, height: rect.height / zoom })
-      })
+      }
 
       if (nextSizes.size > 0 && !areNodeSizesEqual(nextSizes)) {
         setNodeSizes(nextSizes)
@@ -501,55 +505,58 @@ export function Tree({ data }: Props) {
 
   return (
     <>
-    <ReactFlow<DomainTreeNode, Edge>
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      minZoom={MIN_ZOOM}
-      maxZoom={MAX_ZOOM}
-      nodesDraggable={true}
-      nodesConnectable={false}
-      elementsSelectable={true}
-      fitView={false}
-      onNodeClick={(event, node) => {
-        const target = event.target as HTMLElement
-        if (target.closest('[data-manager-row]')) {
-          setTransferManagerNode(node.id)
-          return
-        }
-        setSelectedNode(node.id)
-        openEditDrawer(node.id)
-      }}
-      onNodeDragStart={onNodeDragStart}
-      onNodeDrag={onNodeDrag}
-      onNodeDragStop={onNodeDragStop}
-      defaultEdgeOptions={{
-        type: 'smoothstep',
-        style: { stroke: '#cbd5e1', strokeWidth: 2, opacity: 0.6 },
-      }}
-      className="h-full w-full"
-      onInit={setReactFlowInstance}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background gap={20} size={1} className="bg-white dark:bg-gray-950" />
-    </ReactFlow>
-    {transferManagerNode && (() => {
-      const flowNode = nodes.find((n) => n.id === transferManagerNode)
-      const treeNode = flowNode?.data?.node
-      if (!treeNode) return null
-      return (
-        <TransferManagerDialog
-          open={true}
-          onOpenChange={(open) => { if (!open) setTransferManagerNode(null) }}
-          nodeName={treeNode.name}
-          currentOwner={treeNode.owner}
-          isWrapped={treeNode.isWrapped}
-        />
-      )
-    })()}
-  </>
+      <ReactFlow<DomainTreeNode, Edge>
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        fitView={false}
+        onNodeClick={(event, node) => {
+          const target = event.target as HTMLElement
+          if (target.closest('[data-manager-row]')) {
+            setTransferManagerNode(node.id)
+            return
+          }
+          setSelectedNode(node.id)
+          openEditDrawer(node.id)
+        }}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          style: { stroke: '#cbd5e1', strokeWidth: 2, opacity: 0.6 },
+        }}
+        className="h-full w-full"
+        onInit={setReactFlowInstance}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background gap={20} size={1} className="bg-white dark:bg-gray-950" />
+      </ReactFlow>
+      {transferManagerNode &&
+        (() => {
+          const flowNode = nodes.find((n) => n.id === transferManagerNode)
+          const treeNode = flowNode?.data?.node
+          if (!treeNode) return null
+          return (
+            <TransferManagerDialog
+              open={true}
+              onOpenChange={(open) => {
+                if (!open) setTransferManagerNode(null)
+              }}
+              nodeName={treeNode.name}
+              currentOwner={treeNode.owner}
+              isWrapped={treeNode.isWrapped}
+            />
+          )
+        })()}
+    </>
   )
 }

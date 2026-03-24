@@ -1,6 +1,6 @@
-import { ReactNode } from 'react'
 import { Card } from '@/components/ui/card'
 import { Typography } from '@/components/ui/typography'
+import { ReactNode } from 'react'
 
 type PageSectionProps = {
   children: ReactNode

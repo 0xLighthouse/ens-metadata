@@ -1,10 +1,10 @@
-import { create } from 'zustand'
-import { createSubname } from '@ensdomains/ensjs/wallet'
-import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
-import type { PublicClient, WalletClient } from 'viem'
-import { metadataWriter } from '@ens-node-metadata/sdk'
 import type { TreeNode } from '@/lib/tree/types'
-import { useTreeEditStore, type TreeMutation } from './tree-edits'
+import { metadataWriter } from '@ens-node-metadata/sdk'
+import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
+import { createSubname } from '@ensdomains/ensjs/wallet'
+import type { PublicClient, WalletClient } from 'viem'
+import { create } from 'zustand'
+import { type TreeMutation, useTreeEditStore } from './tree-edits'
 import { useTxnsStore } from './txns'
 
 const asEnsWalletClient = (walletClient: WalletClient): ClientWithAccount =>
@@ -26,12 +26,14 @@ interface MutationsState {
     mutationIds: string[]
     findNode: (name: string) => TreeNode | null
     walletClient: WalletClient
+    // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
     publicClient: any
   }) => Promise<void>
   submitCreation: (params: {
     nodeName: string
     parentNode: TreeNode
     walletClient: WalletClient
+    // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
     publicClient: any
   }) => Promise<`0x${string}`>
   reset: () => void
@@ -74,7 +76,11 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
     // Group edits by ensName
     const editsByName = new Map<
       string,
-      { resolverAddress: string; delta: { changes: Record<string, string>; deleted: string[] }; mutationIds: string[] }
+      {
+        resolverAddress: string
+        delta: { changes: Record<string, string>; deleted: string[] }
+        mutationIds: string[]
+      }
     >()
 
     for (const [ensName, edit] of edits) {
@@ -162,6 +168,7 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
               : j,
           ),
         })
+        // biome-ignore lint/suspicious/noExplicitAny: catch block error shape
       } catch (err: any) {
         const errorMessage = err?.message ?? 'Transaction failed'
         set({

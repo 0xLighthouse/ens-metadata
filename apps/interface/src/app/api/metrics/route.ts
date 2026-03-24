@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
 import { DuneClient } from '@duneanalytics/client-sdk'
+import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {

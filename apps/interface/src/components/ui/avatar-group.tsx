@@ -17,6 +17,7 @@ export const AvatarGroup: FC<AvatarGroupProps> = ({ avatars, max = 4 }) => {
   return (
     <div className="flex -space-x-1">
       {displayedAvatars.map((src, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: avatar URLs may not be unique
         <Avatar key={index} className="h-5 w-5">
           <AvatarImage src={src} alt={`Avatar ${index + 1}`} />
           <AvatarFallback>{src ? null : 'User'}</AvatarFallback>

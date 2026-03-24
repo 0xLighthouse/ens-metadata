@@ -1,12 +1,12 @@
 'use client'
 
-import { useRef } from 'react'
-import { Search, ChevronDown, RefreshCw, Info, Lock, Unlock } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useOutsideClick } from '@/hooks/useOutsideClick'
 import { useNodeEditorStore } from '@/stores/node-editor'
 import { useSchemaStore } from '@/stores/schemas'
-import { useOutsideClick } from '@/hooks/useOutsideClick'
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 import type { Schema } from '@/stores/schemas'
+import { ChevronDown, Info, Lock, RefreshCw, Search, Unlock } from 'lucide-react'
+import { useRef } from 'react'
 
 /** Fields managed automatically (set when a schema is selected) — hidden from the manual editor */
 const MANAGED_FIELDS = new Set(['schema'])
@@ -48,12 +48,16 @@ export function SchemaEditor({
 
   useOutsideClick(
     schemaDropdownRef,
-    () => { if (isSchemaDropdownOpen) toggleSchemaDropdown() },
+    () => {
+      if (isSchemaDropdownOpen) toggleSchemaDropdown()
+    },
     isSchemaDropdownOpen,
   )
   useOutsideClick(
     optionalFieldDropdownRef,
-    () => { if (isOptionalFieldDropdownOpen) toggleOptionalFieldDropdown() },
+    () => {
+      if (isOptionalFieldDropdownOpen) toggleOptionalFieldDropdown()
+    },
     isOptionalFieldDropdownOpen,
   )
 
@@ -61,11 +65,11 @@ export function SchemaEditor({
     .filter((s) => s.isLatest && s.class != null)
     .filter((s) => s.class.toLowerCase().includes(schemaSearchQuery.toLowerCase()))
 
-  const isHiddenField = (key: string) => addressFieldKeys.has(key) || key === 'schema' || key === 'class'
+  const isHiddenField = (key: string) =>
+    addressFieldKeys.has(key) || key === 'schema' || key === 'class'
 
   const hasNonAddressFields =
-    activeSchema?.properties &&
-    Object.keys(activeSchema.properties).some((k) => !isHiddenField(k))
+    activeSchema?.properties && Object.keys(activeSchema.properties).some((k) => !isHiddenField(k))
 
   const hasOptionalToAdd =
     activeSchema?.properties &&
@@ -103,18 +107,23 @@ export function SchemaEditor({
             <div className="p-2 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                  <Search
+                    size={14}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                  />
                   <input
                     type="text"
                     placeholder="Search schemas…"
                     value={schemaSearchQuery}
                     onChange={(e) => setSchemaSearchQuery(e.target.value)}
                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    // biome-ignore lint/a11y/noAutofocus: intentional UX
                     autoFocus
                   />
                 </div>
                 {onRefreshSchemas && (
                   <button
+                    type="button"
                     onClick={onRefreshSchemas}
                     disabled={isLoadingSchemas}
                     className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -137,6 +146,7 @@ export function SchemaEditor({
               ) : (
                 filteredSchemas.map((schema) => (
                   <button
+                    type="button"
                     key={schema.id}
                     onClick={() => onSelectSchema(schema.id)}
                     className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
@@ -163,8 +173,9 @@ export function SchemaEditor({
       {hasNonAddressFields ? (
         <div className="space-y-4">
           {/* Class Field - Always shown at top when schema is selected */}
-          {activeSchema && activeSchema.properties?.class && (
+          {activeSchema?.properties?.class && (
             <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+              {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 class
                 <span className="text-red-500 ml-1">*</span>
@@ -202,9 +213,9 @@ export function SchemaEditor({
             .filter(
               ([key]) =>
                 !isHiddenField(key) &&
-                (activeSchema!.required?.includes(key) ||
-                  activeSchema!.recommended?.includes(key)),
+                (activeSchema!.required?.includes(key) || activeSchema!.recommended?.includes(key)),
             )
+            // biome-ignore lint/suspicious/noExplicitAny: schema attribute shape from external registry
             .map(([key, attribute]: [string, any]) => {
               const isRequired = activeSchema!.required?.includes(key)
               const isTextArea = attribute.type === 'text' || key === 'description'
@@ -213,22 +224,24 @@ export function SchemaEditor({
                   ? 'url'
                   : attribute.type === 'string'
                     ? 'text'
-                    : attribute.type ?? 'text'
+                    : (attribute.type ?? 'text')
 
               return (
                 <div key={key}>
                   <div className="flex items-start justify-between mb-1">
                     <div>
-                      <label
-                        className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
+                      {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
+                      <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {key}
                         {isRequired && <span className="text-red-500 ml-0.5">*</span>}
                         {attribute.description && (
                           <TooltipProvider delayDuration={200}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button type="button" className="inline-flex text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-help">
+                                <button
+                                  type="button"
+                                  className="inline-flex text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
+                                >
                                   <Info size={14} />
                                 </button>
                               </TooltipTrigger>
@@ -280,6 +293,7 @@ export function SchemaEditor({
                 !activeSchema!.recommended?.includes(key) &&
                 visibleOptionalFields.has(key),
             )
+            // biome-ignore lint/suspicious/noExplicitAny: schema attribute shape from external registry
             .map(([key, attribute]: [string, any]) => {
               const isTextArea = attribute.type === 'text' || key === 'description'
               const inputType =
@@ -287,21 +301,23 @@ export function SchemaEditor({
                   ? 'url'
                   : attribute.type === 'string'
                     ? 'text'
-                    : attribute.type ?? 'text'
+                    : (attribute.type ?? 'text')
 
               return (
                 <div key={key}>
                   <div className="flex items-start justify-between mb-1">
                     <div>
-                      <label
-                        className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
+                      {/* biome-ignore lint/a11y/noLabelWithoutControl: controlled externally */}
+                      <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {key}
                         {attribute.description && (
                           <TooltipProvider delayDuration={200}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button type="button" className="inline-flex text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-help">
+                                <button
+                                  type="button"
+                                  className="inline-flex text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
+                                >
                                   <Info size={14} />
                                 </button>
                               </TooltipTrigger>
@@ -344,7 +360,10 @@ export function SchemaEditor({
 
           {/* Add optional field */}
           {hasOptionalToAdd && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 relative" ref={optionalFieldDropdownRef}>
+            <div
+              className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 relative"
+              ref={optionalFieldDropdownRef}
+            >
               <button
                 type="button"
                 onClick={toggleOptionalFieldDropdown}
@@ -363,6 +382,7 @@ export function SchemaEditor({
                         !activeSchema!.recommended?.includes(key) &&
                         !visibleOptionalFields.has(key),
                     )
+                    // biome-ignore lint/suspicious/noExplicitAny: schema attribute shape from external registry
                     .map(([key, attribute]: [string, any]) => (
                       <button
                         key={key}

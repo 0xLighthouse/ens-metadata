@@ -1,8 +1,8 @@
 import type { Hex } from 'viem'
-import { encodeFunctionData, formatEther, http, createPublicClient } from 'viem'
+import { http, createPublicClient, encodeFunctionData, formatEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
-import { estimateCost, formatCost, validateCost, type CostEstimate } from './estimate-cost.js'
+import { type CostEstimate, estimateCost, formatCost, validateCost } from './estimate-cost.js'
 
 export type TextRecord = { key: string; value: string }
 
@@ -14,6 +14,7 @@ async function ensSetup(privateKey: string) {
   return { account, chain, publicClient }
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
 async function resolveEns(publicClient: any, ensName: string) {
   const { getResolver } = await import('@ensdomains/ensjs/public')
   const resolverAddress = await getResolver(publicClient, { name: ensName })
@@ -23,11 +24,7 @@ async function resolveEns(publicClient: any, ensName: string) {
   return resolverAddress
 }
 
-async function encodeEnsTextRecords(
-  ensName: string,
-  texts: TextRecord[],
-  privateKey: string,
-) {
+async function encodeEnsTextRecords(ensName: string, texts: TextRecord[], privateKey: string) {
   const { account, publicClient } = await ensSetup(privateKey)
   const { namehash, generateRecordCallArray } = await import('@ensdomains/ensjs/utils')
   const resolverAddress = await resolveEns(publicClient, ensName)
@@ -39,13 +36,21 @@ async function encodeEnsTextRecords(
     coins: [],
   })
 
-  const data = calls.length === 1
-    ? calls[0]!
-    : encodeFunctionData({
-        abi: [{ name: 'multicall', type: 'function', inputs: [{ name: 'data', type: 'bytes[]' }], outputs: [{ name: '', type: 'bytes[]' }] }] as const,
-        functionName: 'multicall',
-        args: [calls as Hex[]],
-      })
+  const data =
+    calls.length === 1
+      ? calls[0]!
+      : encodeFunctionData({
+          abi: [
+            {
+              name: 'multicall',
+              type: 'function',
+              inputs: [{ name: 'data', type: 'bytes[]' }],
+              outputs: [{ name: '', type: 'bytes[]' }],
+            },
+          ] as const,
+          functionName: 'multicall',
+          args: [calls as Hex[]],
+        })
 
   return { account, publicClient, resolverAddress, data }
 }
@@ -55,7 +60,11 @@ export async function estimateEnsTextRecordsCost(
   texts: TextRecord[],
   privateKey: string,
 ): Promise<CostEstimate & { balance: string }> {
-  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(ensName, texts, privateKey)
+  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
+    ensName,
+    texts,
+    privateKey,
+  )
   const [est, balance] = await Promise.all([
     estimateCost(publicClient, { account: account.address, to: resolverAddress, data }),
     publicClient.getBalance({ address: account.address }),
@@ -70,8 +79,10 @@ export async function validateEnsTextRecordsCost(
   texts: TextRecord[],
   privateKey: string,
 ): Promise<CostEstimate> {
-  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(ensName, texts, privateKey)
+  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
+    ensName,
+    texts,
+    privateKey,
+  )
   return validateCost(publicClient, { account: account.address, to: resolverAddress, data })
 }
-
-

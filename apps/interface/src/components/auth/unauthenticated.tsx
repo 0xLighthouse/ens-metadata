@@ -1,7 +1,7 @@
 'use client'
 
-import { APP_NAME } from '@/config/constants'
 import { MetricsStats } from '@/components/metrics-stats'
+import { APP_NAME } from '@/config/constants'
 
 export function Unauthenticated() {
   return (
@@ -10,7 +10,8 @@ export function Unauthenticated() {
         <div className="space-y-4">
           <h1 className="text-3xl font-bold">{APP_NAME}</h1>
           <p className="text-muted-foreground text-lg">
-            View, edit, and publish metadata attached to ENS names.<br/>
+            View, edit, and publish metadata attached to ENS names.
+            <br />
             Connect your wallet to get started.
           </p>
         </div>

@@ -1,8 +1,8 @@
 'use client'
 
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react'
-import { ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ExternalLink } from 'lucide-react'
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react'
 
 interface ExternalActionButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'onClick'> {

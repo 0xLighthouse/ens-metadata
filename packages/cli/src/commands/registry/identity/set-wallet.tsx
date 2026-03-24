@@ -1,11 +1,18 @@
 import React from 'react'
-import { encodeFunctionData, formatEther, http, createPublicClient, createWalletClient, verifyTypedData } from 'viem'
+import {
+  http,
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  formatEther,
+  verifyTypedData,
+} from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { z } from 'zod'
 import IdentityRegistryABI from '../../../lib/abis/IdentityRegistry.json' with { type: 'json' }
 import { estimateCost, formatCost, validateCost } from '../../../lib/estimate-cost.js'
 import { SUPPORTED_CHAINS, resolveChain } from '../../../lib/registry.js'
-import { useCommand, CommandStatus } from '../../../lib/use-command.js'
+import { CommandStatus, useCommand } from '../../../lib/use-command.js'
 
 export const description = 'Link a verified wallet to an agent via EIP-712 signature'
 
@@ -14,17 +21,12 @@ export const options = z.object({
     .enum(SUPPORTED_CHAINS)
     .default('mainnet')
     .describe('Chain name (e.g. mainnet, base, arbitrum, optimism)'),
-  privateKey: z
-    .string()
-    .describe('Private key for signing (hex, prefixed with 0x)'),
+  privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
   broadcast: z
     .boolean()
     .default(false)
     .describe('Broadcast the transaction on-chain (default: dry run)'),
-  deadline: z
-    .string()
-    .optional()
-    .describe('Deadline unix timestamp (auto-generated if omitted)'),
+  deadline: z.string().optional().describe('Deadline unix timestamp (auto-generated if omitted)'),
   signature: z
     .string()
     .optional()
@@ -92,7 +94,10 @@ export default function SetWallet({
         })
 
         if (!valid) {
-          setState({ status: 'error', message: `Signature does not recover to wallet ${walletAddress}` })
+          setState({
+            status: 'error',
+            message: `Signature does not recover to wallet ${walletAddress}`,
+          })
           return
         }
       } else {
@@ -114,7 +119,12 @@ export default function SetWallet({
         })
       }
 
-      const contractArgs = [tokenId, walletAddress as `0x${string}`, finalDeadline, finalSignature] as const
+      const contractArgs = [
+        tokenId,
+        walletAddress as `0x${string}`,
+        finalDeadline,
+        finalSignature,
+      ] as const
 
       if (!broadcast) {
         const data = encodeFunctionData({
@@ -153,17 +163,17 @@ export default function SetWallet({
             'If the wallet is controlled by a different key, have them sign:',
             '',
             '  EIP-712 Domain:',
-            `    name:              ERC8004IdentityRegistry`,
-            `    version:           1`,
+            '    name:              ERC8004IdentityRegistry',
+            '    version:           1',
             `    chainId:           ${chainId}`,
             `    verifyingContract: ${registryAddress}`,
             '',
             '  Primary Type: AgentWalletSet',
             '  Message:',
             `    agentId:   ${tokenId.toString()}`,
-            `    newWallet: <wallet-address>`,
+            '    newWallet: <wallet-address>',
             `    owner:     ${account.address}`,
-            `    deadline:  <unix-timestamp>`,
+            '    deadline:  <unix-timestamp>',
             '',
             'Then pass --signature <0x...> --deadline <timestamp>',
           )
@@ -184,7 +194,11 @@ export default function SetWallet({
           functionName: 'setAgentWallet',
           args: [...contractArgs],
         })
-        await validateCost(publicClient, { account: account.address, to: registryAddress, data: txData })
+        await validateCost(publicClient, {
+          account: account.address,
+          to: registryAddress,
+          data: txData,
+        })
 
         const { request } = await publicClient.simulateContract({
           account,

@@ -1,11 +1,11 @@
-import React from 'react'
-import { z } from 'zod'
-import { createPublicClient, http } from 'viem'
-import { mainnet } from 'viem/chains'
 import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
-import { metadataReader, type GetMetadataResult } from '@ens-node-metadata/sdk'
+import { type GetMetadataResult, metadataReader } from '@ens-node-metadata/sdk'
+import React from 'react'
+import { http, createPublicClient } from 'viem'
+import { mainnet } from 'viem/chains'
+import { z } from 'zod'
 import { queryDomain } from '../../lib/subgraph.js'
-import { useCommand, CommandStatus } from '../../lib/use-command.js'
+import { CommandStatus, useCommand } from '../../lib/use-command.js'
 
 export const description = 'View ENS node metadata'
 

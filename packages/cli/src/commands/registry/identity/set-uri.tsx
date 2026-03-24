@@ -2,7 +2,7 @@ import React from 'react'
 import { z } from 'zod'
 import { executeRegistryCall } from '../../../lib/registry-tx.js'
 import { SUPPORTED_CHAINS } from '../../../lib/registry.js'
-import { useCommand, CommandStatus } from '../../../lib/use-command.js'
+import { CommandStatus, useCommand } from '../../../lib/use-command.js'
 
 export const description = 'Update agent URI on the ERC-8004 registry'
 
@@ -11,9 +11,7 @@ export const options = z.object({
     .enum(SUPPORTED_CHAINS)
     .default('mainnet')
     .describe('Chain name (e.g. mainnet, base, arbitrum, optimism)'),
-  privateKey: z
-    .string()
-    .describe('Private key for signing (hex, prefixed with 0x)'),
+  privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
   broadcast: z
     .boolean()
     .default(false)
@@ -46,15 +44,9 @@ export default function SetUri({
           broadcast,
           functionName: 'setAgentURI',
           contractArgs: [tokenId, newUri],
-          dryRunDetails: [
-            `  Agent ID:  ${tokenId.toString()}`,
-            `  New URI:   ${newUri}`,
-          ],
+          dryRunDetails: [`  Agent ID:  ${tokenId.toString()}`, `  New URI:   ${newUri}`],
           successMessage: `✅ Agent URI updated on ${chainName}`,
-          successDetails: [
-            `   Agent ID: ${tokenId.toString()}`,
-            `   New URI:  ${newUri}`,
-          ],
+          successDetails: [`   Agent ID: ${tokenId.toString()}`, `   New URI:  ${newUri}`],
           errorPrefix: 'setAgentURI',
         },
         (msg) => setState({ status: 'working', message: msg }),

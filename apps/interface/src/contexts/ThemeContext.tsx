@@ -2,7 +2,7 @@
 
 import { UITheme } from '@/config/theme'
 import { setThemeCookie } from '@/lib/nextjs/setThemeCookie'
-import { createContext, useContext, useState, type ReactNode, type FC, useCallback } from 'react'
+import { type FC, type ReactNode, createContext, useCallback, useContext, useState } from 'react'
 
 interface ThemeContextType {
   theme: UITheme

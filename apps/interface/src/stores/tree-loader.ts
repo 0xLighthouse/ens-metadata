@@ -1,7 +1,7 @@
+import { buildRawTree } from '@/lib/tree/buildRawTree'
+import type { TreeNode } from '@/lib/tree/types'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { TreeNode } from '@/lib/tree/types'
-import { buildRawTree } from '@/lib/tree/buildRawTree'
 
 interface TreeLoaderState {
   /**
@@ -19,8 +19,6 @@ interface TreeLoaderState {
   refreshTree: (rootName: string) => Promise<void>
   setTree: (tree: TreeNode | null) => void
 }
-
-
 
 export const useTreeLoaderStore = create<TreeLoaderState>()(
   persist(

@@ -6,6 +6,7 @@ interface ResolvedError {
 export function resolveApiError(error: unknown): ResolvedError {
   // Handle GraphQL errors
   if (error && typeof error === 'object' && 'response' in error) {
+    // biome-ignore lint/suspicious/noExplicitAny: GraphQL error shape is dynamic
     const gqlError = error as any
     if (gqlError.response?.errors?.[0]?.message) {
       return {

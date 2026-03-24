@@ -1,7 +1,7 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { fetchSchemas as fetchSchemasAPI } from '@/lib/api/schemas'
 import type { Schema as BaseSchema } from '@ens-node-metadata/schemas/types'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export interface Schema extends BaseSchema {
   id: string

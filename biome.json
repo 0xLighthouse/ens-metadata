@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": []
+    "ignore": ["**/node_modules/**", "**/dist/**", "**/.next/**"]
   },
   "formatter": {
     "enabled": true,
@@ -15,10 +15,7 @@
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 100,
-    "ignore": [
-      "node_modules/**",
-      "dist/**"
-    ]
+    "ignore": []
   },
   "organizeImports": {
     "enabled": true
@@ -35,10 +32,7 @@
         "useImportType": "off"
       }
     },
-    "ignore": [
-      "node_modules/**",
-      "dist/**"
-    ]
+    "ignore": []
   },
   "javascript": {
     "formatter": {

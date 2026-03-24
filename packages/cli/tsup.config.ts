@@ -5,7 +5,7 @@ const commandEntries = Object.fromEntries(
   globSync('src/commands/**/*.tsx').map((file) => [
     file.replace(/^src\//, '').replace(/\.tsx$/, ''),
     file,
-  ])
+  ]),
 )
 
 export default defineConfig({

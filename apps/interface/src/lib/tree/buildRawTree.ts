@@ -1,8 +1,7 @@
-import { GraphQLClient, type RequestDocument, gql } from 'graphql-request'
 import type { NormalizedTreeNode, TreeNode } from '@/lib/tree/types'
+import { GraphQLClient, type RequestDocument, gql } from 'graphql-request'
 import { fetchTexts } from './fetchTexts'
-import { mapNamesByAddress, type ENSDataByAddress } from './mapNamesByAddress'
-
+import { type ENSDataByAddress, mapNamesByAddress } from './mapNamesByAddress'
 
 const ENS_SUBGRAPH_URL = 'https://api.alpha.ensnode.io/subgraph'
 
@@ -23,10 +22,7 @@ type ENSRecord = {
   }
 }
 
-type RequestFn = <T>(
-  query: RequestDocument,
-  variables?: Record<string, unknown>,
-) => Promise<T>
+type RequestFn = <T>(query: RequestDocument, variables?: Record<string, unknown>) => Promise<T>
 
 export type BuildTreeOptions = {
   endpoint?: string
@@ -96,10 +92,7 @@ function collectOwnerAddresses(node: NormalizedTreeNode): Set<`0x${string}`> {
 }
 
 // Helper to assign ENS names and avatars to nodes
-function assignEnsData(
-  node: NormalizedTreeNode,
-  ensMap: ENSDataByAddress,
-): void {
+function assignEnsData(node: NormalizedTreeNode, ensMap: ENSDataByAddress): void {
   const data = ensMap.get(node.owner)
   node.ownerEnsName = data?.name ?? null
   node.ownerEnsAvatar = data?.avatar ?? null
@@ -111,7 +104,7 @@ function assignEnsData(
   }
 }
 
-export async function buildRawTree(rootName: string,): Promise<TreeNode | undefined> {
+export async function buildRawTree(rootName: string): Promise<TreeNode | undefined> {
   const endpoint = ENS_SUBGRAPH_URL
   const request = withRetry(createGraphRequest(endpoint))
   const pageSize = 1000

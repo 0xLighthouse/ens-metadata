@@ -1,13 +1,15 @@
-import { create } from 'zustand'
 import { GraphQLClient } from 'graphql-request'
 import { toast } from 'sonner'
+import { create } from 'zustand'
 
 import { resolveApiError } from '@/lib/api/utils/resolveApiError'
 
 interface ApiState {
   client: GraphQLClient
   ensSubgraph: GraphQLClient
+  // biome-ignore lint/suspicious/noExplicitAny: GraphQL variables are dynamic
   publicRequest: <T>(query: string, variables?: any) => Promise<T>
+  // biome-ignore lint/suspicious/noExplicitAny: GraphQL variables are dynamic
   ensRequest: <T>(query: string, variables?: any) => Promise<T>
   handleServerError: (error: unknown) => void
   handleRequestError: (error: unknown) => void
@@ -26,10 +28,10 @@ export const useApiStore = create<ApiState>((set, get) => ({
     } catch (error) {
       console.error(error)
       get().handleRequestError(error)
+      // biome-ignore lint/suspicious/noExplicitAny: GraphQL error shape is dynamic
       throw (error as any)?.response?.errors || error
     }
   },
-
 
   publicRequest: async <T>(query: string, variables = {}): Promise<T> => {
     try {
@@ -37,6 +39,7 @@ export const useApiStore = create<ApiState>((set, get) => ({
     } catch (error) {
       console.error(error)
       get().handleRequestError(error)
+      // biome-ignore lint/suspicious/noExplicitAny: GraphQL error shape is dynamic
       throw (error as any)?.response?.errors || error
     }
   },
@@ -55,6 +58,7 @@ export const useApiStore = create<ApiState>((set, get) => ({
   },
 
   handleRequestError: (error: unknown) => {
+    // biome-ignore lint/suspicious/noExplicitAny: error type is unknown
     const errStr = (error as any)?.toString().toLowerCase()
     if (errStr?.includes('network request failed')) {
       toast.error('Unable to contact server')
@@ -67,10 +71,10 @@ export const useApiStore = create<ApiState>((set, get) => ({
   },
 
   isRequestError: (error?: unknown): boolean => {
+    // biome-ignore lint/suspicious/noExplicitAny: error type is unknown
     const errStr = (error as any)?.toString().toLowerCase()
     return (
-      errStr?.includes('network request failed') ||
-      errStr?.includes('invalid or expired token')
+      errStr?.includes('network request failed') || errStr?.includes('invalid or expired token')
     )
   },
 

@@ -1,13 +1,13 @@
 'use client'
 
-import { memo, useState } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
-import type { TreeNode } from '@/lib/tree/types'
-import { useTreeEditStore } from '@/stores/tree-edits'
-import { useTreeControlsStore } from '@/stores/tree-controls'
 import { useTreeData } from '@/hooks/useTreeData'
+import type { TreeNode } from '@/lib/tree/types'
 import { findAllNodesByAddress } from '@/lib/tree/utils'
-import { Search, Loader2 } from 'lucide-react'
+import { useTreeControlsStore } from '@/stores/tree-controls'
+import { useTreeEditStore } from '@/stores/tree-edits'
+import type { Node, NodeProps } from '@xyflow/react'
+import { Loader2, Search } from 'lucide-react'
+import { memo, useState } from 'react'
 import { BaseNodeCard } from './BaseNode'
 
 interface DomainTreeNodeData {
@@ -48,17 +48,22 @@ const TreasuryNodeWrapper = ({ data }: NodeProps<DomainTreeNode>) => {
 
       const result = await response.json()
 
+      // biome-ignore lint/suspicious/noExplicitAny: computed children shape is dynamic
       let computedChildren: any[] | undefined
       let computedReferences: string[] | undefined
 
       if (result.detectedType === 'Safe Multisig' && result.metadata?.signers) {
+        // biome-ignore lint/suspicious/noExplicitAny: computed child shape is dynamic
         const newChildren: any[] = []
         const existingRefs: string[] = []
 
         for (const [index, signer] of result.metadata.signers.entries()) {
           const signerAddress = signer.address as `0x${string}`
           const existingNodes = findAllNodesByAddress(previewTree, signerAddress)
-          const existingSignerNode = existingNodes.find((n) => ((n as any).class || n.texts?.class) === 'Signer')
+          const existingSignerNode = existingNodes.find(
+            // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
+            (n) => ((n as any).class || n.texts?.class) === 'Signer',
+          )
 
           if (existingSignerNode) {
             existingRefs.push(existingSignerNode.name)
@@ -82,17 +87,26 @@ const TreasuryNodeWrapper = ({ data }: NodeProps<DomainTreeNode>) => {
         computedReferences = existingRefs.length > 0 ? existingRefs : undefined
       }
 
-      upsertEdit(node.name, {}, {
-        inspectionData: {
-          detectedType: result.detectedType,
-          metadata: result.metadata,
-          inspectedAt: new Date().toISOString(),
-          computedChildren,
-          computedReferences,
-        },
-      } as any, [])
+      upsertEdit(
+        node.name,
+        {},
+        {
+          inspectionData: {
+            detectedType: result.detectedType,
+            metadata: result.metadata,
+            inspectedAt: new Date().toISOString(),
+            computedChildren,
+            computedReferences,
+          },
+          // biome-ignore lint/suspicious/noExplicitAny: inspectionData is a dynamic extension
+        } as any,
+        [],
+      )
 
-      if ((computedChildren && computedChildren.length > 0) || (computedReferences && computedReferences.length > 0)) {
+      if (
+        (computedChildren && computedChildren.length > 0) ||
+        (computedReferences && computedReferences.length > 0)
+      ) {
         setTimeout(() => {
           triggerLayout()
         }, 100)

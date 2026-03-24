@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { validateMetadataSchema, validate } from '../validate'
 import type { Schema } from '@ens-node-metadata/schemas/types'
+import { describe, expect, it } from 'vitest'
+import { validate, validateMetadataSchema } from '../validate'
 
 const testSchema: Schema = {
   $id: 'test',
@@ -41,10 +41,7 @@ describe('validateMetadataSchema', () => {
   })
 
   it('fails on missing required fields', () => {
-    const result = validateMetadataSchema(
-      { description: 'no schema or class' },
-      testSchema,
-    )
+    const result = validateMetadataSchema({ description: 'no schema or class' }, testSchema)
     expect(result.success).toBe(false)
     if (!result.success) {
       const keys = result.errors.map((e) => e.key)
@@ -72,10 +69,7 @@ describe('validateMetadataSchema', () => {
   })
 
   it('fails on empty required fields', () => {
-    const result = validateMetadataSchema(
-      { schema: '', class: '' },
-      testSchema,
-    )
+    const result = validateMetadataSchema({ schema: '', class: '' }, testSchema)
     expect(result.success).toBe(false)
   })
 })

@@ -47,11 +47,7 @@ export function NodeIcon({
         backgroundColor: isSuggested ? '#e2e8f0' : accentColor,
       }}
     >
-      {isSuggested ? (
-        <Plus size={iconSize} color="#64748b" strokeWidth={2} />
-      ) : (
-        fallback
-      )}
+      {isSuggested ? <Plus size={iconSize} color="#64748b" strokeWidth={2} /> : fallback}
     </div>
   )
 }

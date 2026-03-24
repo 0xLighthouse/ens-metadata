@@ -2,8 +2,6 @@
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { useAppStore } from '@/stores/app'
-import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,8 +10,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useTreeData } from '@/hooks/useTreeData'
-import { useRouter, usePathname } from 'next/navigation'
-import { Network, Table, Braces } from 'lucide-react'
+import { useAppStore } from '@/stores/app'
+import { Braces, Network, Table } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 export const TreeButtonGroup = () => {
   const { activeDomain } = useAppStore()
@@ -27,7 +27,8 @@ export const TreeButtonGroup = () => {
     return null
   }
 
-  const isTreeView = pathname === `/${activeDomain?.name}/tree` || pathname === `/${activeDomain?.name}`
+  const isTreeView =
+    pathname === `/${activeDomain?.name}/tree` || pathname === `/${activeDomain?.name}`
   const isTableView = pathname === `/${activeDomain?.name}/table`
 
   const handleTreeClick = () => {

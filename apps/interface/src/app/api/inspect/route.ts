@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
+import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 
 const SAFE_ABI = [
@@ -25,10 +25,7 @@ export async function POST(request: NextRequest) {
     const { node } = body
 
     if (!node?.address) {
-      return NextResponse.json(
-        { error: 'Node address is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Node address is required' }, { status: 400 })
     }
 
     // Create viem client with fallback to public RPC
@@ -41,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     const nodeClass = node.class || node.texts?.class
 
+    // biome-ignore lint/suspicious/noExplicitAny: inspection result shape is built dynamically
     const result: any = {
       address: node.address,
       class: nodeClass,
@@ -91,7 +89,7 @@ export async function POST(request: NextRequest) {
                 ensAvatar: null,
               }
             }
-          })
+          }),
         )
 
         result.detectedType = 'Safe Multisig'
@@ -132,7 +130,7 @@ export async function POST(request: NextRequest) {
     console.error('Error inspecting node:', error)
     return NextResponse.json(
       { error: 'Failed to inspect node', details: (error as Error).message },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

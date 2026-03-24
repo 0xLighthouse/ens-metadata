@@ -1,11 +1,11 @@
 'use client'
 
-import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth'
-import { mainnet } from 'viem/chains'
-import { addEnsContracts } from '@ensdomains/ensjs'
-import { createContext, useContext, useEffect, useState } from 'react'
-import { createPublicClient, http, WalletClient, createWalletClient, custom } from 'viem'
 import { useAppStore } from '@/stores/app'
+import { addEnsContracts } from '@ensdomains/ensjs'
+import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { http, WalletClient, createPublicClient, createWalletClient, custom } from 'viem'
+import { mainnet } from 'viem/chains'
 
 const chain = addEnsContracts(mainnet)
 
@@ -25,6 +25,7 @@ export const useWeb3 = () => useContext(Web3Context)
 
 interface IWeb3Context {
   isInitialized: boolean
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
   publicClient: any
   walletClient: WalletClient | null
 }

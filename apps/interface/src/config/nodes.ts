@@ -1,19 +1,19 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Layers,
-  DollarSign,
-  Users,
-  FolderOpen,
-  User,
-  Landmark,
-  Crown,
-  Bot,
   AppWindow,
-  FileCode,
-  Wallet,
-  Vote,
-  HandCoins,
+  Bot,
   Building2,
+  Crown,
+  DollarSign,
+  FileCode,
+  FolderOpen,
+  HandCoins,
+  Landmark,
+  Layers,
+  User,
+  Users,
+  Vote,
+  Wallet,
 } from 'lucide-react'
 
 export interface NodeTypeConfig {
