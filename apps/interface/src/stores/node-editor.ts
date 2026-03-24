@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { computeDelta, hasChanges as sdkHasChanges } from '@ens-node-metadata/sdk'
 
 type NodeEditFormData = Record<string, any>
 
@@ -217,55 +218,21 @@ export const useNodeEditorStore = create<NodeEditorState>((set, get) => ({
 
   getFormData: () => get().formData,
 
-  hasChanges: (originalNode, activeSchema) => {
+  hasChanges: (originalNode, _activeSchema) => {
     const { formData } = get()
-
-    // Check schema and type changes
-    const schemaTypeChanges =
-      formData.schema !== resolveNodeValue(originalNode, 'schema') ||
-      formData.class !== resolveNodeValue(originalNode, 'class')
-
-    // Check schema properties for changes
-    const schemaChanges = Object.entries(activeSchema?.properties ?? {}).some(([key]) => {
-      const currentValue = formData[key] ?? ''
-      const originalValue = resolveNodeValue(originalNode, key) ?? ''
-      return currentValue !== originalValue
-    })
-
-    // Check extra text records for changes (including cleared ones)
-    const extraChanges = Object.keys(formData).some((key) => {
-      // Skip schema and type as we already checked them
-      if (key === 'schema' || key === 'class') return false
-
-      const schemaKeys = new Set(Object.keys(activeSchema?.properties ?? {}))
-      if (schemaKeys.has(key)) return false // Already checked above
-
-      const currentValue = formData[key]
-      const originalValue = resolveNodeValue(originalNode, key)
-      return currentValue !== originalValue
-    })
-
-    return schemaTypeChanges || schemaChanges || extraChanges
+    const original: Record<string, string | null | undefined> = {}
+    for (const key of Object.keys(formData)) {
+      original[key] = resolveNodeValue(originalNode, key) ?? ''
+    }
+    return sdkHasChanges(original, formData)
   },
 
-  getChangedFields: (originalNode, activeSchema) => {
+  getChangedFields: (originalNode, _activeSchema) => {
     const { formData } = get()
-    const changes: Record<string, any> = {}
-    const deleted: string[] = []
-    const isEmpty = (v: any) => v === '' || v === null || v === undefined
-
-    for (const [key, value] of Object.entries(formData)) {
-      const original = resolveNodeValue(originalNode, key)
-      if (isEmpty(value) && isEmpty(original)) continue
-      if (value === original) continue
-
-      if (isEmpty(value) && !isEmpty(original)) {
-        deleted.push(key)
-      } else {
-        changes[key] = value
-      }
+    const original: Record<string, string | null | undefined> = {}
+    for (const key of Object.keys(formData)) {
+      original[key] = resolveNodeValue(originalNode, key)
     }
-
-    return { changes, deleted }
+    return computeDelta(original, formData)
   },
 }))
