@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { RefreshCcw, Sparkles, Maximize2 } from 'lucide-react'
-import { useTreeControlsStore } from '@/stores/tree-controls'
 import { useTreeData } from '@/hooks/useTreeData'
 import { type TreeNode } from '@/lib/tree/types'
+import { useTreeControlsStore } from '@/stores/tree-controls'
+import { Maximize2, Plus, RefreshCcw, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 import { SuggestionsDialog } from './SuggestionsDialog'
+import { CreateSubnameDialog } from './dialogs/CreateSubnameDialog'
 
 export function TreeControls() {
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
+  const [isCreateSubnameOpen, setIsCreateSubnameOpen] = useState(false)
   const { previewTree, isLoading, isRefreshing, refreshTree, lastFetchedAt } = useTreeData()
   const {
     orientation,
@@ -59,6 +61,15 @@ export function TreeControls() {
         >
           <Sparkles className="w-4 h-4" />
           Add a Node
+        </button>
+
+        <button
+          onClick={() => setIsCreateSubnameOpen(true)}
+          disabled={controlsDisabled}
+          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors shadow-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          Create Subname
         </button>
 
         <div className="flex items-center gap-2">
@@ -119,6 +130,7 @@ export function TreeControls() {
       </div>
 
       <SuggestionsDialog open={isSuggestionsOpen} onOpenChange={setIsSuggestionsOpen} />
+      <CreateSubnameDialog open={isCreateSubnameOpen} onOpenChange={setIsCreateSubnameOpen} />
     </>
   )
 }
