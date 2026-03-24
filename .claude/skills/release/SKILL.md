@@ -18,6 +18,13 @@ Target bump: **$ARGUMENTS** (default: patch)
 
 ## Pre-flight
 
+0. Check if there are meaningful changes since the last release. Compare the current HEAD against the last release commit for each package:
+   ```
+   git log --oneline $(git log --all --oneline --grep="Release sdk@" -1 --format=%H)..HEAD -- packages/sdk/src
+   git log --oneline $(git log --all --oneline --grep="Release cli@" -1 --format=%H)..HEAD -- packages/cli/src
+   ```
+   If a package has no source changes, skip it entirely — do not bump or publish. If neither package has changes, stop and tell the user there is nothing to release.
+
 1. Confirm you are on the correct branch with a clean working tree:
    ```
    git status
