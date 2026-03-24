@@ -1,5 +1,7 @@
 import type { Schema } from '@ens-node-metadata/schemas/types'
 
+// --- Read types ---
+
 export interface GetSchemaOptions {
   name: string
   blockNumber?: bigint
@@ -35,4 +37,44 @@ export interface GetMetadataResult {
   class: string | null
   schema: string | null
   properties: Record<string, string | null>
+}
+
+// --- Validation types ---
+
+export type MetadataValidationError = { key: string; message: string }
+export type MetadataValidationResult =
+  | { success: true; data: Record<string, string> }
+  | { success: false; errors: MetadataValidationError[] }
+
+// --- Delta types ---
+
+export interface MetadataDelta {
+  changes: Record<string, string>
+  deleted: string[]
+}
+
+export interface ComputeDeltaOptions {
+  ignoreKeys?: Set<string>
+}
+
+// --- Write types ---
+
+export interface SetMetadataOptions {
+  name: string
+  records: Record<string, string>
+  deleted?: string[]
+  schema?: Schema
+  resolverAddress?: `0x${string}`
+}
+
+export interface ApplyDeltaOptions {
+  name: string
+  delta: MetadataDelta
+  resolverAddress: `0x${string}`
+}
+
+export interface SetMetadataResult {
+  txHash: `0x${string}`
+  texts: { key: string; value: string }[]
+  coins: { coin: string; value: string }[]
 }

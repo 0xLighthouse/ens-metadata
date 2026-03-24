@@ -1,33 +1,14 @@
 import { create } from 'zustand'
-import { setRecords, createSubname } from '@ensdomains/ensjs/wallet'
+import { createSubname } from '@ensdomains/ensjs/wallet'
 import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
-import type { WalletClient } from 'viem'
+import type { PublicClient, WalletClient } from 'viem'
+import { ensMetadataWalletActions } from '@ens-node-metadata/sdk'
 import type { TreeNode } from '@/lib/tree/types'
 import { useTreeEditStore, type TreeMutation } from './tree-edits'
 import { useTxnsStore } from './txns'
 
 const asEnsWalletClient = (walletClient: WalletClient): ClientWithAccount =>
   walletClient as unknown as ClientWithAccount
-
-const NON_TEXT_RECORD_KEYS = new Set([
-  'inspectionData',
-  'isSuggested',
-  'isPendingCreation',
-  'isComputed',
-  'address',
-  'owner',
-  'children',
-  'id',
-  'name',
-  'subdomainCount',
-  'resolverId',
-  'resolverAddress',
-  'parentId',
-  'ownerEnsName',
-  'ownerEnsAvatar',
-  'ttl',
-  'texts',
-])
 
 export interface MutationJob {
   mutationId: string
@@ -90,10 +71,10 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
       )
     }
 
-    // Group edits by ensName (setRecords works per-name)
+    // Group edits by ensName
     const editsByName = new Map<
       string,
-      { resolverAddress: string; texts: { key: string; value: string }[]; coins: { coin: string; value: string }[]; mutationIds: string[] }
+      { resolverAddress: string; delta: { changes: Record<string, string>; deleted: string[] }; mutationIds: string[] }
     >()
 
     for (const [ensName, edit] of edits) {
@@ -104,39 +85,25 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
         continue
       }
 
-      // Filter to only text record keys
-      const texts: { key: string; value: string }[] = []
+      const changes: Record<string, string> = {}
       if (edit.changes) {
         for (const [key, value] of Object.entries(edit.changes)) {
-          if (NON_TEXT_RECORD_KEYS.has(key)) continue
           if (value === null || value === undefined) continue
-          texts.push({ key, value: String(value) })
+          changes[key] = String(value)
         }
       }
-
-      // Add deletions as empty-string writes (ENS convention for removing text records)
-      if (edit.deleted) {
-        for (const key of edit.deleted) {
-          if (NON_TEXT_RECORD_KEYS.has(key)) continue
-          texts.push({ key, value: '' })
-        }
-      }
-
-      // Extract address change as a coin record (batched into the same setRecords call)
-      const coins: { coin: string; value: string }[] = []
-      if (edit.changes?.address) {
-        coins.push({ coin: 'ETH', value: edit.changes.address })
-      }
-
-      if (texts.length === 0 && coins.length === 0) continue
 
       const existing = editsByName.get(ensName)
       if (existing) {
-        existing.texts.push(...texts)
-        existing.coins.push(...coins)
+        Object.assign(existing.delta.changes, changes)
+        existing.delta.deleted.push(...(edit.deleted ?? []))
         existing.mutationIds.push(ensName)
       } else {
-        editsByName.set(ensName, { resolverAddress, texts, coins, mutationIds: [ensName] })
+        editsByName.set(ensName, {
+          resolverAddress,
+          delta: { changes, deleted: edit.deleted ?? [] },
+          mutationIds: [ensName],
+        })
       }
     }
 
@@ -154,8 +121,11 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
 
     set({ jobs, status: 'executing' })
 
-    // Submit one setRecords call per ensName
-    for (const [ensName, { resolverAddress, texts, coins, mutationIds: mIds }] of editsByName) {
+    // Create SDK wallet extension for writes
+    const writer = ensMetadataWalletActions({ publicClient: publicClient as PublicClient })(walletClient)
+
+    // Submit one applyDelta call per ensName
+    for (const [ensName, { resolverAddress, delta, mutationIds: mIds }] of editsByName) {
       // Update jobs to signing
       set({
         jobs: get().jobs.map((j) =>
@@ -164,20 +134,18 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
       })
 
       try {
-        const txHash = await setRecords(asEnsWalletClient(walletClient), {
+        const result = await writer.applyDelta({
           name: ensName,
-          texts,
-          coins,
+          delta,
           resolverAddress: resolverAddress as `0x${string}`,
-          account: walletClient.account,
         })
 
         // Track in txns store; discard mutation only after on-chain confirmation
         const { addTxn, watchTxn } = useTxnsStore.getState()
-        addTxn({ hash: txHash, type: 'setRecords', label: ensName })
-        watchTxn(txHash, publicClient).then(() => {
+        addTxn({ hash: result.txHash, type: 'setRecords', label: ensName })
+        watchTxn(result.txHash, publicClient).then(() => {
           const { txns } = useTxnsStore.getState()
-          const txn = txns.find((t) => t.hash === txHash)
+          const txn = txns.find((t) => t.hash === result.txHash)
           if (txn?.status === 'confirmed') {
             const { discardPendingMutation } = useTreeEditStore.getState()
             for (const id of mIds) {
@@ -190,7 +158,7 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
         set({
           jobs: get().jobs.map((j) =>
             mIds.includes(j.mutationId)
-              ? { ...j, status: 'submitted' as const, txHash }
+              ? { ...j, status: 'submitted' as const, txHash: result.txHash }
               : j,
           ),
         })

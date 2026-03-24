@@ -9,13 +9,15 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./types": "./dist/types.js"
+    "./types": "./dist/types.js",
+    "./delta": "./dist/delta.js"
   },
   "scripts": {
     "build": "tsup",
     "lint": "biome check ."
   },
   "dependencies": {
+    "@ensdomains/ensjs": "^4.0.2",
     "viem": "2.23.15"
   },
   "devDependencies": {
