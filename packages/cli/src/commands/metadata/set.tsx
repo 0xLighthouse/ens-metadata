@@ -1,10 +1,13 @@
 import { readFileSync } from 'node:fs'
 import React from 'react'
 import { z } from 'zod'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { mainnet } from 'viem/chains'
 import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
 import { getPublishedRegistry } from '@ens-node-metadata/schemas/published'
-import { validateMetadataSchema } from '@ens-node-metadata/sdk'
-import { setEnsTextRecords, estimateEnsTextRecordsCost, formatCost, validateEnsTextRecordsCost } from '../../lib/ens-write.js'
+import { validateMetadataSchema, metadataWriter } from '@ens-node-metadata/sdk'
+import { estimateEnsTextRecordsCost, formatCost, validateEnsTextRecordsCost } from '../../lib/ens-write.js'
 import { useCommand, CommandStatus } from '../../lib/use-command.js'
 
 export const description = 'Set ENS metadata text records from a payload file'
@@ -87,8 +90,17 @@ export default function Set({ args: [ensName, payloadFile], options }: Props) {
       setState({ status: 'working', message: `Setting ${texts.length} text records on ${ensName}…` })
       try {
         await validateEnsTextRecordsCost(ensName, texts, options.privateKey)
-        const hash = await setEnsTextRecords(ensName, texts, options.privateKey)
-        setState({ status: 'done', message: `✅ Transaction submitted: https://etherscan.io/tx/${hash}` })
+
+        const { addEnsContracts } = await import('@ensdomains/ensjs')
+        const account = privateKeyToAccount(options.privateKey as `0x${string}`)
+        const chain = addEnsContracts(mainnet)
+        const publicClient = createPublicClient({ chain, transport: http() })
+        const walletClient = createWalletClient({ account, chain, transport: http() })
+
+        const writer = metadataWriter({ publicClient })(walletClient)
+        const result = await writer.setMetadata({ name: ensName, records: payload })
+
+        setState({ status: 'done', message: `Transaction submitted: https://etherscan.io/tx/${result.txHash}` })
       } catch (err) {
         setState({ status: 'error', message: `Transaction failed: ${(err as Error).message}` })
       }

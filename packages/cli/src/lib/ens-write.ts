@@ -1,5 +1,5 @@
-import type { Hex, PublicClient } from 'viem'
-import { encodeFunctionData, formatEther, http, createPublicClient, createWalletClient } from 'viem'
+import type { Hex } from 'viem'
+import { encodeFunctionData, formatEther, http, createPublicClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { estimateCost, formatCost, validateCost, type CostEstimate } from './estimate-cost.js'
@@ -11,8 +11,7 @@ async function ensSetup(privateKey: string) {
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const chain = addEnsContracts(mainnet)
   const publicClient = createPublicClient({ chain, transport: http() })
-  const walletClient = createWalletClient({ account, chain, transport: http() })
-  return { account, chain, publicClient, walletClient }
+  return { account, chain, publicClient }
 }
 
 async function resolveEns(publicClient: any, ensName: string) {
@@ -75,21 +74,4 @@ export async function validateEnsTextRecordsCost(
   return validateCost(publicClient, { account: account.address, to: resolverAddress, data })
 }
 
-export async function setEnsTextRecords(
-  ensName: string,
-  texts: TextRecord[],
-  privateKey: string,
-): Promise<string> {
-  const { publicClient, walletClient } = await ensSetup(privateKey)
-  const { setRecords } = await import('@ensdomains/ensjs/wallet')
-  const resolverAddress = await resolveEns(publicClient, ensName)
 
-  const hash = await setRecords(walletClient, {
-    name: ensName,
-    texts,
-    coins: [],
-    resolverAddress,
-  })
-
-  return hash
-}
