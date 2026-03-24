@@ -1,6 +1,6 @@
 {
   "schemaId": "delegate",
-  "latest": "1.0.1",
+  "latest": "2.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -15,6 +15,13 @@
       "checksum": "sha256:4208b2eec2ddf8d4ded2df34999070a21779af793d3b09b95f0a5cede999adf7",
       "timestamp": 1771433406,
       "schemaPath": "packages/schemas/published/delegate/versions/1.0.1/schema.json"
+    },
+    {
+      "version": "2.0.0",
+      "cid": "Qmer3XYrtsTawrVdgpk1RwkancBR6rBxnkBn4rM7f2ShRz",
+      "checksum": "sha256:dd9252d2e7f11211d5a113bb5f7c48412d315b7bdc94311500bf4e79c3897016",
+      "timestamp": 1774383642,
+      "schemaPath": "packages/schemas/published/delegate/versions/2.0.0/schema.json"
     }
   ]
 }

@@ -1,0 +1,82 @@
+{
+  "$id": "https://github.com/0xLighthouse/ens-node-metadata/tree/main/packages/schemas/published/group/versions/2.0.0",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "title": "Group",
+  "version": "2.0.0",
+  "description": "A group of individuals or entities with a shared purpose or responsibility.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Group",
+      "description": "Class identifier for this node",
+      "examples": [
+        "Group",
+        "Committee",
+        "Council",
+        "Workgroup",
+        "Team"
+      ]
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the group schema"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name of the group"
+    },
+    "avatar": {
+      "type": "string",
+      "description": "URI pointing to the group's avatar"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the group's purpose and responsibility"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL pointing to information about the group",
+      "examples": [
+        "https://www.example.com/groups/example-group"
+      ]
+    },
+    "lead": {
+      "type": "string",
+      "description": "ENS name or address of the group leader"
+    },
+    "lead-title": {
+      "type": "string",
+      "description": "Title or role of the group leader",
+      "examples": [
+        "Lead Steward",
+        "Chair",
+        "Manager",
+        "Owner"
+      ]
+    },
+    "members-title": {
+      "type": "string",
+      "description": "Title or role of the group members",
+      "examples": [
+        "Member",
+        "Steward",
+        "Contributor",
+        "Participant"
+      ]
+    }
+  },
+  "required": [
+    "class",
+    "schema"
+  ],
+  "recommended": [
+    "name",
+    "lead",
+    "avatar",
+    "url",
+    "description"
+  ]
+}

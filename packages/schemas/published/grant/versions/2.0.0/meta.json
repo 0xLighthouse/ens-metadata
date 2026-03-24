@@ -1,0 +1,67 @@
+{
+  "schemaId": "grant",
+  "version": "2.0.0",
+  "title": "Grant",
+  "description": "A grant issued by an organization.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmbWE66HnZytqtumkiTVt4VAsjzFkvBKosbxFJULthG5bN",
+  "checksum": "sha256:d1a8367ccd156e4bfa600ee7a8b578a4d7a5f3a9a2f195c8c423a3d02ea96619",
+  "timestamp": 1774383644,
+  "schemaPath": "packages/schemas/published/grant/versions/2.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x4496963b57909b82b788149319721ac47dacd3280f9b4d20399928e58bcf638c2959947e451565f468cd69f9f872ad0bdf31ee1b80d6aab345f05d4138cba8e91c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "grant",
+      "version": "2.0.0",
+      "cid": "QmbWE66HnZytqtumkiTVt4VAsjzFkvBKosbxFJULthG5bN",
+      "checksum": "sha256:d1a8367ccd156e4bfa600ee7a8b578a4d7a5f3a9a2f195c8c423a3d02ea96619",
+      "timestamp": 1774383644,
+      "schemaPath": "packages/schemas/published/grant/versions/2.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

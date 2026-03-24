@@ -96,7 +96,8 @@ if (!fs.existsSync(schemaFile)) {
 }
 
 const fileText = fs.readFileSync(schemaFile, "utf8");
-const versionMatch = fileText.match(/version:\s*['"](\d+\.\d+\.\d+)['"]/);
+const versionMatch = fileText.match(/version:\s*['"](\d+\.\d+\.\d+)['"]/) ??
+  fileText.match(/_VERSION\s*=\s*['"](\d+\.\d+\.\d+)['"]/);
 if (!versionMatch) {
   console.error(`Could not find version in ${schemaFile}`);
   process.exit(1);

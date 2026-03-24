@@ -122,7 +122,7 @@ const nodeConfigs: Record<string, NodeTypeConfig> = {
     icon: HandCoins,
     suggestedCta: 'Click to add grant',
   },
-  'Organizational Unit': {
+  Organization: {
     badgeLabel: 'ORG',
     badgeBg: 'bg-indigo-100',
     badgeText: 'text-indigo-800',

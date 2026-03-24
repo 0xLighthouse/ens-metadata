@@ -1,0 +1,40 @@
+{
+  "$id": "https://github.com/0xLighthouse/ens-node-metadata/tree/main/packages/schemas/published/wallet/versions/2.0.0",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "title": "Wallet",
+  "version": "2.0.0",
+  "description": "A wallet for holding or managing assets.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Wallet",
+      "description": "Class identifier for this node",
+      "examples": [
+        "Wallet",
+        "Account"
+      ]
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the wallet schema"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name of the wallet"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the wallet's purpose"
+    }
+  },
+  "required": [
+    "class",
+    "schema"
+  ],
+  "recommended": [
+    "name",
+    "description"
+  ]
+}
