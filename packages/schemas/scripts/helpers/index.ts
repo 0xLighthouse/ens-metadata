@@ -105,7 +105,7 @@ export function toRepoPath(absPath: string, repoRoot: string) {
   return path.relative(repoRoot, absPath).split(path.sep).join("/");
 }
 
-export { publishFile } from "@ens-node-metadata/shared";
+export { publishFile } from "@ensmetadata/shared";
 
 export function buildEip712(
   message: {

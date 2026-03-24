@@ -28,7 +28,7 @@ const args = process.argv.slice(2);
 const usage = () => {
   console.log(
     [
-      "Usage: pnpm --filter @ens-node-metadata/schemas publish:globals [--bump patch|minor|major|x.y.z]",
+      "Usage: pnpm --filter @ensmetadata/schemas publish:globals [--bump patch|minor|major|x.y.z]",
       "Options:",
       "  --bump, -b      Semver bump (patch|minor|major) or explicit version (optional)",
       "  --notes         Short note for run log",

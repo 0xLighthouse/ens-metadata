@@ -1,11 +1,11 @@
-# @ens-node-metadata/sdk
+# @ensmetadata/sdk
 
 Read, validate, and write structured metadata on individual ENS nodes. Built on [viem](https://viem.sh) and [@ensdomains/ensjs](https://github.com/ensdomains/ensjs).
 
 ## Install
 
 ```bash
-pnpm add @ens-node-metadata/sdk viem @ensdomains/ensjs
+pnpm add @ensmetadata/sdk viem @ensdomains/ensjs
 ```
 
 ## Read
@@ -14,7 +14,7 @@ pnpm add @ens-node-metadata/sdk viem @ensdomains/ensjs
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { metadataReader } from '@ens-node-metadata/sdk'
+import { metadataReader } from '@ensmetadata/sdk'
 
 const publicClient = createPublicClient({
   chain: addEnsContracts(mainnet),
@@ -56,8 +56,8 @@ await reader.getMetadata({
 ## Validate
 
 ```ts
-import { validateMetadataSchema } from '@ens-node-metadata/sdk'
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
+import { validateMetadataSchema } from '@ensmetadata/sdk'
+import { SCHEMA_MAP } from '@ensmetadata/schemas'
 
 const result = validateMetadataSchema(
   { description: 'My agent', url: 'https://example.com' },
@@ -76,7 +76,7 @@ if (result.success) {
 Compute what changed between the current on-chain state and a desired state.
 
 ```ts
-import { computeDelta, hasChanges } from '@ens-node-metadata/sdk'
+import { computeDelta, hasChanges } from '@ensmetadata/sdk'
 
 const original = { description: 'Old desc', avatar: 'https://old.png' }
 const desired = { description: 'New desc', avatar: '' }
@@ -93,7 +93,7 @@ hasChanges(original, desired) // true
 import { createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { metadataWriter } from '@ens-node-metadata/sdk'
+import { metadataWriter } from '@ensmetadata/sdk'
 
 const walletClient = createWalletClient({
   chain: addEnsContracts(mainnet),
@@ -127,7 +127,7 @@ await writer.applyDelta({
 Pass a `schema` to `setMetadata` to validate before the transaction is sent. Throws `MetadataWriteError` if validation fails.
 
 ```ts
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
+import { SCHEMA_MAP } from '@ensmetadata/schemas'
 
 await writer.setMetadata({
   name: 'mynode.eth',

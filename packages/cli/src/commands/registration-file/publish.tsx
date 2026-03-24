@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { publishFile } from '@ens-node-metadata/shared'
+import { publishFile } from '@ensmetadata/shared'
 import { Box, Text, useApp } from 'ink'
 import React from 'react'
 import { z } from 'zod'

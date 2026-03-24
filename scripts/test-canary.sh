@@ -15,12 +15,12 @@ cat > package.json << 'EOF'
 }
 EOF
 
-echo "==> Installing @ens-node-metadata/sdk@canary..."
-pnpm add @ens-node-metadata/sdk@canary viem @ensdomains/ensjs 2>&1
+echo "==> Installing @ensmetadata/sdk@canary..."
+pnpm add @ensmetadata/sdk@canary viem @ensdomains/ensjs 2>&1
 
 echo "==> Running smoke test..."
 cat > smoke.mjs << 'SMOKE'
-import { metadataReader, metadataWriter, validateMetadataSchema, computeDelta, hasChanges } from '@ens-node-metadata/sdk'
+import { metadataReader, metadataWriter, validateMetadataSchema, computeDelta, hasChanges } from '@ensmetadata/sdk'
 
 // Verify all exports exist and are the right type
 const checks = [

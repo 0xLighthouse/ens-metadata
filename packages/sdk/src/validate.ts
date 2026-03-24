@@ -1,4 +1,4 @@
-import type { Schema } from '@ens-node-metadata/schemas/types'
+import type { Schema } from '@ensmetadata/schemas/types'
 import type { MetadataValidationError, MetadataValidationResult } from './types'
 
 export function validateMetadataSchema(data: unknown, schema: Schema): MetadataValidationResult {

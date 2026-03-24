@@ -28,7 +28,7 @@ const args = process.argv.slice(2);
 const usage = () => {
   console.log(
     [
-      "Usage: pnpm --filter @ens-node-metadata/schemas publish:schema -- --id <schemaId> [--bump patch|minor|major|x.y.z]",
+      "Usage: pnpm --filter @ensmetadata/schemas publish:schema -- --id <schemaId> [--bump patch|minor|major|x.y.z]",
       "Options:",
       "  --id, -i        Schema id (file base name in packages/schemas/src/schemas)",
       "  --bump, -b      Semver bump (patch|minor|major) or explicit version (optional)",

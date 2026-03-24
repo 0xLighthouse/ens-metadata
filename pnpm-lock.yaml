@@ -86,15 +86,15 @@ importers:
       '@duneanalytics/client-sdk':
         specifier: ^0.3.5
         version: 0.3.5
-      '@ens-node-metadata/schemas':
-        specifier: workspace:*
-        version: link:../../packages/schemas
-      '@ens-node-metadata/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
       '@ensdomains/ensjs':
         specifier: ^4.2.2
         version: 4.2.2(typescript@5.8.3)(viem@2.23.15(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76))(zod@3.25.76)
+      '@ensmetadata/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      '@ensmetadata/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@privy-io/react-auth':
         specifier: ^2.23.0
         version: 2.25.0(@solana/web3.js@1.98.2(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(utf-8-validate@5.0.10))(@types/react@18.3.23)(@upstash/redis@1.35.1)(bs58@6.0.0)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)(use-sync-external-store@1.5.0(react@18.3.1))(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -267,12 +267,12 @@ importers:
 
   packages/cli:
     dependencies:
-      '@ens-node-metadata/sdk':
-        specifier: workspace:*
-        version: link:../sdk
       '@ensdomains/ensjs':
         specifier: ^4.0.2
         version: 4.2.2(typescript@5.8.3)(viem@2.23.15(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76))(zod@3.25.76)
+      '@ensmetadata/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       ink:
         specifier: ^6.8.0
         version: 6.8.0(@types/react@18.3.23)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@5.0.10)
@@ -289,10 +289,10 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
-      '@ens-node-metadata/schemas':
+      '@ensmetadata/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ens-node-metadata/shared':
+      '@ensmetadata/shared':
         specifier: workspace:*
         version: link:../shared
       '@types/node':
@@ -313,7 +313,7 @@ importers:
 
   packages/schemas:
     dependencies:
-      '@ens-node-metadata/shared':
+      '@ensmetadata/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -336,7 +336,7 @@ importers:
         specifier: 2.23.15
         version: 2.23.15(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
     devDependencies:
-      '@ens-node-metadata/schemas':
+      '@ensmetadata/schemas':
         specifier: workspace:*
         version: link:../schemas
       tsup:

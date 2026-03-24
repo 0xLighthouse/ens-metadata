@@ -1,5 +1,5 @@
 {
-  "name": "@ens-node-metadata/cli",
+  "name": "@ensmetadata/cli",
   "version": "0.3.8",
   "description": "CLI for managing AI agent metadata on ENS using ERC-8004",
   "type": "module",
@@ -23,7 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ens-node-metadata/sdk": "workspace:*",
+    "@ensmetadata/sdk": "workspace:*",
     "@ensdomains/ensjs": "^4.0.2",
     "ink": "^6.8.0",
     "pastel": "^3.0.0",
@@ -37,8 +37,8 @@
   "devDependencies": {
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
-    "@ens-node-metadata/schemas": "workspace:*",
-    "@ens-node-metadata/shared": "workspace:*",
+    "@ensmetadata/schemas": "workspace:*",
+    "@ensmetadata/shared": "workspace:*",
     "tsconfig": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5"

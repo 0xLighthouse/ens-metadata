@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
-import { type MetadataValidationResult, validateMetadataSchema } from '@ens-node-metadata/sdk'
+import { SCHEMA_MAP } from '@ensmetadata/schemas'
+import { type MetadataValidationResult, validateMetadataSchema } from '@ensmetadata/sdk'
 import { Box, Text, useApp } from 'ink'
 import React from 'react'
 import { z } from 'zod'

@@ -1,4 +1,4 @@
-import type { Schema } from '@ens-node-metadata/schemas/types'
+import type { Schema } from '@ensmetadata/schemas/types'
 
 // --- Read types ---
 

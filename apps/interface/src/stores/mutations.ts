@@ -1,7 +1,7 @@
 import type { TreeNode } from '@/lib/tree/types'
-import { metadataWriter } from '@ens-node-metadata/sdk'
 import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
 import { createSubname } from '@ensdomains/ensjs/wallet'
+import { metadataWriter } from '@ensmetadata/sdk'
 import type { PublicClient, WalletClient } from 'viem'
 import { create } from 'zustand'
 import { type TreeMutation, useTreeEditStore } from './tree-edits'

@@ -1,6 +1,6 @@
 ---
 name: release
-description: Walk through the full UAT and release flow for publishing @ens-node-metadata/sdk and @ens-node-metadata/cli to npm.
+description: Walk through the full UAT and release flow for publishing @ensmetadata/sdk and @ensmetadata/cli to npm.
 disable-model-invocation: true
 argument-hint: "[patch|minor|major]"
 ---
@@ -115,6 +115,6 @@ Do NOT create git tags — version tracking is handled by npm only.
 
 ## Troubleshooting
 
-- **npm 404 on publish**: Ensure you are logged in (`pnpm whoami`) and the `@ens-node-metadata` org exists on npmjs.com with your account as a member.
+- **npm 404 on publish**: Ensure you are logged in (`pnpm whoami`) and the `@ensmetadata` org exists on npmjs.com with your account as a member.
 - **Corrupted canary version**: The canary script uses an EXIT trap to restore versions even on failure. If versions are still wrong, manually reset: `cd packages/sdk && pnpm version <correct-version> --no-git-tag-version`
 - **prepublishOnly runs build/test/lint again**: This is expected — the packages have `prepublishOnly` scripts that gate publishing. Pre-flight checks in this workflow catch issues early so you don't waste time on a publish that will fail.

@@ -1,5 +1,5 @@
 {
-  "name": "@ens-node-metadata/sdk",
+  "name": "@ensmetadata/sdk",
   "version": "0.1.3",
   "type": "module",
   "publishConfig": {
@@ -23,7 +23,7 @@
     "viem": "2.23.15"
   },
   "devDependencies": {
-    "@ens-node-metadata/schemas": "workspace:*",
+    "@ensmetadata/schemas": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5",
     "vitest": "^3.2.1"
