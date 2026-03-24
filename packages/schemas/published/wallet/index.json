@@ -1,6 +1,6 @@
 {
   "schemaId": "wallet",
-  "latest": "1.0.0",
+  "latest": "2.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -8,6 +8,13 @@
       "checksum": "sha256:1a6fadb35c51e238e7ddb947b1ac6b9e899df71247f0eb85c7724092fd075988",
       "timestamp": 1771420712,
       "schemaPath": "packages/schemas/published/wallet/versions/1.0.0/schema.json"
+    },
+    {
+      "version": "2.0.0",
+      "cid": "QmWPw8Mj4GrMDdGPnsDkPsjgv6RTQXLooi9rNX4LwA2BAV",
+      "checksum": "sha256:61910b80c8915c2a941fae4bcb3d87191f9a7ba5dfeebf9a1b062188c8f6df9d",
+      "timestamp": 1774383651,
+      "schemaPath": "packages/schemas/published/wallet/versions/2.0.0/schema.json"
     }
   ]
 }

@@ -11,26 +11,28 @@ A grant issued by an organization.
 
 | Key | Type | Recommended | Description | Values |
 | --- | --- | --- | --- | --- |
-| class | string | Y | High-level identifier of this node type | e.g. `Grant`, `GrantProgram` |
-| name | string | Y | The name of the grant program | - |
+| class | string | Y | Class identifier for this node | e.g. `Grant`, `GrantProgram` |
+| schema | string | Y | URI pointing to the grant schema | - |
+| name | string | Y | Display name of the grant | - |
 | description | string | Y | Description of the grant purpose and scope | - |
-| url | string | Y | URL of the grant program | - |
-| status | string | Y | Grant status | `Active`, `Incomplete`, `Pending`, `Completed`, `Cancelled` |
-| budget | string | Y | Total budget expressed as WEI eg. 100 USDC = 100 * 10^6 | - |
-| token | string | Y | Token expressed as ERC-20 token address eg. "0x0000000000000000000000000000000000000000" | - |
+| url | string | Y | URL pointing to information about the grant program | e.g. `https://www.example.com/grants/example-grant` |
+| status | string | Y | The current status of the grant | `Active`, `Incomplete`, `Pending`, `Completed`, `Cancelled` |
+| budget | string | Y | Total amount of the grant in WEI | - |
+| token | string | Y | The address of the ERC-20 token used to fund the grant | - |
 
 
 ## Metadata
 
 - Schema ID: `grant`
-- Latest version: `1.0.0`
+- Latest version: `2.0.0`
 - Source: [https://github.com/0xLighthouse/ens-node-metadata](https://github.com/0xLighthouse/ens-node-metadata)
-- CID: `QmdktToaxwvN31DGDEtWQ7uVKNURssW5k8oCtgceTFHemS`
-- Checksum: `sha256:205ff736e4ce769bbc86332aedf56fe55275154ffcfda4d2c5003bc809ca4df4`
-- Published at (UTC): `2026-02-18T13:18:08.000Z`
+- CID: `QmbWE66HnZytqtumkiTVt4VAsjzFkvBKosbxFJULthG5bN`
+- Checksum: `sha256:d1a8367ccd156e4bfa600ee7a8b578a4d7a5f3a9a2f195c8c423a3d02ea96619`
+- Published at (UTC): `2026-03-24T20:20:44.000Z`
 
 ## Version history
 
 | Version | CID | IPFS | Published at (UTC) |
 | --- | --- | --- | --- |
-| `1.0.0 (latest)` | `QmdktToaxwvN31DGDEtWQ7uVKNURssW5k8oCtgceTFHemS` | [Open](https://ipfs.io/ipfs/QmdktToaxwvN31DGDEtWQ7uVKNURssW5k8oCtgceTFHemS) | `2026-02-18T13:18:08.000Z` |
+| `2.0.0 (latest)` | `QmbWE66HnZytqtumkiTVt4VAsjzFkvBKosbxFJULthG5bN` | [Open](https://ipfs.io/ipfs/QmbWE66HnZytqtumkiTVt4VAsjzFkvBKosbxFJULthG5bN) | `2026-03-24T20:20:44.000Z` |
+| `1.0.0` | `QmdktToaxwvN31DGDEtWQ7uVKNURssW5k8oCtgceTFHemS` | [Open](https://ipfs.io/ipfs/QmdktToaxwvN31DGDEtWQ7uVKNURssW5k8oCtgceTFHemS) | `2026-02-18T13:18:08.000Z` |

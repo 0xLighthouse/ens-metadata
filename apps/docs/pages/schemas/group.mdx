@@ -5,17 +5,18 @@ weight: 6
 
 # Group
 
-This node describes a group of individuals or entities with a shared purpose or responsibility.
+A group of individuals or entities with a shared purpose or responsibility.
 
 ## Attributes
 
 | Key | Type | Recommended | Description | Values |
 | --- | --- | --- | --- | --- |
-| class | string | Y | High-level identifier of this node type | e.g. `Group`, `Committee`, `Council`, `Workgroup`, `Team` |
+| class | string | Y | Class identifier for this node | e.g. `Group`, `Committee`, `Council`, `Workgroup`, `Team` |
+| schema | string | Y | URI pointing to the group schema | - |
 | name | string | Y | The name of the group | - |
-| avatar | string | Y | A URL to an image used as an avatar or logo | - |
-| description | string | Y | A description of the name | - |
-| url | string | Y | URL of the group | - |
+| avatar | string | Y | URI pointing to the group's avatar | - |
+| description | string | Y | Short description of the group's purpose and responsibility | - |
+| url | string | Y | URL pointing to information about the group | e.g. `https://www.example.com/groups/example-group` |
 | lead | string | Y | ENS name or address of the group leader | - |
 | lead-title | string | - | Title or role of the group leader | e.g. `Lead Steward`, `Chair`, `Manager`, `Owner` |
 | members-title | string | - | Title or role of the group members | e.g. `Member`, `Steward`, `Contributor`, `Participant` |
@@ -24,14 +25,15 @@ This node describes a group of individuals or entities with a shared purpose or 
 ## Metadata
 
 - Schema ID: `group`
-- Latest version: `0.1.4`
+- Latest version: `2.0.0`
 - Source: [https://github.com/0xLighthouse/ens-node-metadata](https://github.com/0xLighthouse/ens-node-metadata)
-- CID: `QmYJieM3KXTeDhrwcFr3cMSi1LVWofxjCVkMzv1HTuoYSw`
-- Checksum: `sha256:ca4434bed698d565b4a5d24bf98c658dc3e6fa381c48f66cd49744fde1b47559`
-- Published at (UTC): `2026-02-18T13:18:14.000Z`
+- CID: `QmRMx99kKSPFttqZd8iHVBng4gtvNX7AAGfNjm9BTbxQ6j`
+- Checksum: `sha256:068272a56248b3fac238926ce674a10aae149e07d69dcae65f6effc850f2ab72`
+- Published at (UTC): `2026-03-24T20:20:45.000Z`
 
 ## Version history
 
 | Version | CID | IPFS | Published at (UTC) |
 | --- | --- | --- | --- |
-| `0.1.4 (latest)` | `QmYJieM3KXTeDhrwcFr3cMSi1LVWofxjCVkMzv1HTuoYSw` | [Open](https://ipfs.io/ipfs/QmYJieM3KXTeDhrwcFr3cMSi1LVWofxjCVkMzv1HTuoYSw) | `2026-02-18T13:18:14.000Z` |
+| `2.0.0 (latest)` | `QmRMx99kKSPFttqZd8iHVBng4gtvNX7AAGfNjm9BTbxQ6j` | [Open](https://ipfs.io/ipfs/QmRMx99kKSPFttqZd8iHVBng4gtvNX7AAGfNjm9BTbxQ6j) | `2026-03-24T20:20:45.000Z` |
+| `0.1.4` | `QmYJieM3KXTeDhrwcFr3cMSi1LVWofxjCVkMzv1HTuoYSw` | [Open](https://ipfs.io/ipfs/QmYJieM3KXTeDhrwcFr3cMSi1LVWofxjCVkMzv1HTuoYSw) | `2026-02-18T13:18:14.000Z` |

@@ -1,0 +1,67 @@
+{
+  "schemaId": "person",
+  "version": "2.0.0",
+  "title": "Person",
+  "description": "A person.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmU5KqV4PAPgejjKWSg4LAbz1R56aVRMU6MQK21zaSChJZ",
+  "checksum": "sha256:791483b8648574691a610f74afd69644e6fe10a6e18adfa5e6d9cfe7f48f66db",
+  "timestamp": 1774383648,
+  "schemaPath": "packages/schemas/published/person/versions/2.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0xd37e415b51c474f3cbce1a8fcb1bab95362bcf705a1da6d965a3feaf1417f28039d43edc4ece9aaf414af8b887aee1d7a070a70922e8dc30cfd2d1927e306ddd1c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "person",
+      "version": "2.0.0",
+      "cid": "QmU5KqV4PAPgejjKWSg4LAbz1R56aVRMU6MQK21zaSChJZ",
+      "checksum": "sha256:791483b8648574691a610f74afd69644e6fe10a6e18adfa5e6d9cfe7f48f66db",
+      "timestamp": 1774383648,
+      "schemaPath": "packages/schemas/published/person/versions/2.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

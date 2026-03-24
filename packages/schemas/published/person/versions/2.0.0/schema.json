@@ -1,0 +1,57 @@
+{
+  "$id": "https://github.com/0xLighthouse/ens-node-metadata/tree/main/packages/schemas/published/person/versions/2.0.0",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "title": "Person",
+  "version": "2.0.0",
+  "description": "A person.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Person",
+      "description": "Class identifier for this node",
+      "examples": [
+        "Person",
+        "Human",
+        "Signer",
+        "Signatory",
+        "Officer",
+        "Employee",
+        "Secretary"
+      ]
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the person schema"
+    },
+    "full-name": {
+      "type": "string",
+      "description": "Full legal or preferred name of the person",
+      "examples": [
+        "John Doe"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "description": "Title or role of the person",
+      "examples": [
+        "CEO",
+        "CFO",
+        "Director",
+        "Company Secretary",
+        "Treasurer",
+        "Officer",
+        "Employee"
+      ]
+    }
+  },
+  "required": [
+    "class",
+    "schema"
+  ],
+  "recommended": [
+    "full-name",
+    "title"
+  ]
+}

@@ -48,11 +48,19 @@ Target bump: **$ARGUMENTS** (default: patch)
 
 If any step fails, stop and fix before continuing.
 
+## npm OTP
+
+Publishing requires a one-time password. Fetch it from 1Password before each publish command:
+```
+OTP=$(op item get "$NPM_OTP_ITEM_ID" --otp --vault "$NPM_OTP_VAULT")
+```
+Pass it as `NPM_CONFIG_OTP="$OTP"` env var on publish commands.
+
 ## Canary publish (UAT)
 
 5. Publish canary versions to npm (the script handles version bumping, publishing, and restoring versions automatically):
    ```
-   ./scripts/publish-canary.sh
+   OTP=$(op item get "$NPM_OTP_ITEM_ID" --otp --vault "$NPM_OTP_VAULT") && NPM_CONFIG_OTP="$OTP" ./scripts/publish-canary.sh
    ```
 
 6. Run canary smoke test to verify the published packages work as a consumer:
@@ -64,34 +72,39 @@ If the canary test fails, stop. Debug, fix, and restart from step 1.
 
 ## Version bump
 
-7. Bump versions (use $ARGUMENTS or default to patch):
+7. Bump versions (use $ARGUMENTS or default to patch). Must `cd` into each package — `pnpm --dir` does not work with `version`.
+   After bumping, re-format with biome (pnpm version writes multi-line arrays that biome rejects):
    ```
-   pnpm --dir packages/sdk version $ARGUMENTS --no-git-tag-version
-   pnpm --dir packages/cli version $ARGUMENTS --no-git-tag-version
+   cd packages/sdk && pnpm version $ARGUMENTS --no-git-tag-version && cd ../..
+   cd packages/cli && pnpm version $ARGUMENTS --no-git-tag-version && cd ../..
+   pnpm biome format --write packages/sdk/package.json packages/cli/package.json
    ```
 
 ## Verify package contents
 
 8. Dry-run pack to confirm no `workspace:*` references leak into the tarball:
    ```
-   pnpm --dir packages/sdk pack --dry-run
-   pnpm --dir packages/cli pack --dry-run
+   cd packages/sdk && pnpm pack --dry-run 2>&1 | grep -i workspace; cd ../..
+   cd packages/cli && pnpm pack --dry-run 2>&1 | grep -i workspace; cd ../..
    ```
-   Inspect the output — if any `workspace:` entries appear, do NOT publish.
+   If any `workspace:` entries appear, do NOT publish.
 
 ## Publish to @latest
 
 Always use `pnpm publish` — never `npm publish`. pnpm automatically rewrites `workspace:*`
 dependencies to real version numbers at publish time. Using `npm publish` bypasses this.
 
+Use `--no-git-checks` because the version bump is not yet committed at this point.
+Fetch a fresh OTP for each publish (they expire quickly).
+
 9. Publish SDK first (CLI depends on it):
    ```
-   pnpm --dir packages/sdk publish --access public
+   OTP=$(op item get "$NPM_OTP_ITEM_ID" --otp --vault "$NPM_OTP_VAULT") && cd packages/sdk && NPM_CONFIG_OTP="$OTP" pnpm publish --access public --no-git-checks && cd ../..
    ```
 
 10. Publish CLI:
     ```
-    pnpm --dir packages/cli publish --access public
+    OTP=$(op item get "$NPM_OTP_ITEM_ID" --otp --vault "$NPM_OTP_VAULT") && cd packages/cli && NPM_CONFIG_OTP="$OTP" pnpm publish --access public --no-git-checks && cd ../..
     ```
 
 ## Commit
@@ -118,3 +131,4 @@ Do NOT create git tags — version tracking is handled by npm only.
 - **npm 404 on publish**: Ensure you are logged in (`pnpm whoami`) and the `@ensmetadata` org exists on npmjs.com with your account as a member.
 - **Corrupted canary version**: The canary script uses an EXIT trap to restore versions even on failure. If versions are still wrong, manually reset: `cd packages/sdk && pnpm version <correct-version> --no-git-tag-version`
 - **prepublishOnly runs build/test/lint again**: This is expected — the packages have `prepublishOnly` scripts that gate publishing. Pre-flight checks in this workflow catch issues early so you don't waste time on a publish that will fail.
+- **Biome format after version bump**: `pnpm version` reformats `package.json` arrays to multi-line, which biome rejects. Always run `pnpm biome format --write` on the package.json after bumping.
