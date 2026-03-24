@@ -1,7 +1,7 @@
 import { Text } from 'ink'
 import React from 'react'
 
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
+import { SCHEMA_MAP } from '@ensmetadata/schemas'
 
 export const description = 'Generate starter ENS metadata payload template'
 

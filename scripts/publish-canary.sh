@@ -41,7 +41,7 @@ pnpm publish --tag canary --access public --no-git-checks
 
 echo ""
 echo "==> Canary published!"
-echo "    pnpm add @ens-node-metadata/sdk@canary"
-echo "    pnpm add @ens-node-metadata/cli@canary"
+echo "    pnpm add @ensmetadata/sdk@canary"
+echo "    pnpm add @ensmetadata/cli@canary"
 echo ""
 echo "    Run './scripts/test-canary.sh' to smoke test the published packages."

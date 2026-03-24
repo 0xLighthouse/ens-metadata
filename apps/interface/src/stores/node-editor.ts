@@ -1,4 +1,4 @@
-import { computeDelta, hasChanges as sdkHasChanges } from '@ens-node-metadata/sdk'
+import { computeDelta, hasChanges as sdkHasChanges } from '@ensmetadata/sdk'
 import { create } from 'zustand'
 
 // biome-ignore lint/suspicious/noExplicitAny: form data values are dynamic

@@ -1,5 +1,5 @@
-import { SCHEMA_MAP } from '@ens-node-metadata/schemas'
-import { type GetMetadataResult, metadataReader } from '@ens-node-metadata/sdk'
+import { SCHEMA_MAP } from '@ensmetadata/schemas'
+import { type GetMetadataResult, metadataReader } from '@ensmetadata/sdk'
 import React from 'react'
 import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'

@@ -1,4 +1,4 @@
-import type { Schema } from '@ens-node-metadata/schemas/types'
+import type { Schema } from '@ensmetadata/schemas/types'
 import { describe, expect, it } from 'vitest'
 import { validate, validateMetadataSchema } from '../validate'
 

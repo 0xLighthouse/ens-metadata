@@ -1,4 +1,4 @@
-# @ens-node-metadata/schemas
+# @ensmetadata/schemas
 
 A package for managing and publishing ENSIP schema definitions to IPFS.
 

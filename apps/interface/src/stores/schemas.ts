@@ -1,5 +1,5 @@
 import { fetchSchemas as fetchSchemasAPI } from '@/lib/api/schemas'
-import type { Schema as BaseSchema } from '@ens-node-metadata/schemas/types'
+import type { Schema as BaseSchema } from '@ensmetadata/schemas/types'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
