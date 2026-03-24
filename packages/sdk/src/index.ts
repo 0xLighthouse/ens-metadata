@@ -1,7 +1,7 @@
-export { ensMetadataActions } from './read'
+export { metadataReader } from './read'
 export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
-export { ensMetadataWalletActions, MetadataWriteError } from './write'
+export { metadataWriter, MetadataWriteError } from './write'
 
 export type {
   GetSchemaOptions,

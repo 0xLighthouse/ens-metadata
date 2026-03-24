@@ -85,7 +85,7 @@ async function getMetadataImpl(
   }
 }
 
-export function ensMetadataActions() {
+export function metadataReader() {
   return (client: PublicClient) => ({
     getSchema: (opts: GetSchemaOptions) => getSchemaImpl(client, opts),
     getMetadata: (opts: GetMetadataOptions) => getMetadataImpl(client, opts),
