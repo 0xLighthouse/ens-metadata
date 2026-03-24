@@ -43,7 +43,7 @@ If any step fails, stop and fix before continuing.
 
 ## Canary publish (UAT)
 
-5. Publish canary versions to npm:
+5. Publish canary versions to npm (the script handles version bumping, publishing, and restoring versions automatically):
    ```
    ./scripts/publish-canary.sh
    ```
@@ -74,6 +74,9 @@ If the canary test fails, stop. Debug, fix, and restart from step 1.
 
 ## Publish to @latest
 
+Always use `pnpm publish` — never `npm publish`. pnpm automatically rewrites `workspace:*`
+dependencies to real version numbers at publish time. Using `npm publish` bypasses this.
+
 9. Publish SDK first (CLI depends on it):
    ```
    pnpm --dir packages/sdk publish --access public
@@ -84,20 +87,15 @@ If the canary test fails, stop. Debug, fix, and restart from step 1.
     pnpm --dir packages/cli publish --access public
     ```
 
-## Tag and push
+## Commit
 
 11. Commit the version bump:
     ```
-    git add packages/sdk/package.json packages/cli/package.json
+    git add packages/sdk/package.json packages/cli/package.json pnpm-lock.yaml
     git commit -m "chore: Release sdk@<version> cli@<version>"
     ```
 
-12. Tag the release:
-    ```
-    git tag sdk@<version>
-    git tag cli@<version>
-    git push origin --tags
-    ```
+Do NOT create git tags — version tracking is handled by npm only.
 
 ## Verification checklist
 
@@ -107,4 +105,9 @@ If the canary test fails, stop. Debug, fix, and restart from step 1.
 - [ ] SDK published to npm
 - [ ] CLI published to npm
 - [ ] Version bump committed
-- [ ] Tags pushed
+
+## Troubleshooting
+
+- **npm 404 on publish**: Ensure you are logged in (`pnpm whoami`) and the `@ens-node-metadata` org exists on npmjs.com with your account as a member.
+- **Corrupted canary version**: The canary script uses an EXIT trap to restore versions even on failure. If versions are still wrong, manually reset: `cd packages/sdk && pnpm version <correct-version> --no-git-tag-version`
+- **prepublishOnly runs build/test/lint again**: This is expected — the packages have `prepublishOnly` scripts that gate publishing. Pre-flight checks in this workflow catch issues early so you don't waste time on a publish that will fail.
