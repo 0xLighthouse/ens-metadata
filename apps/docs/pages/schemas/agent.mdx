@@ -5,36 +5,38 @@ weight: 1
 
 # Agent
 
-AI agent identity metadata aligned with ERC-8004 registration format.
+An AI agent with ERC-8004 metadata.
 
 ## Attributes
 
 | Key | Type | Recommended | Description | Values |
 | --- | --- | --- | --- | --- |
-| class | string | Y | High-level identifier of this node type | - |
-| agent-uri | string | Y | URI to the ERC-8004 registration file | - |
-| type | string | - | Registration file type discriminator | - |
-| name | string | - | Agent display name | - |
+| class | string | Y | Class identifier for this node | - |
+| schema | string | Y | URI pointing to the agent schema | - |
+| agent-uri | string | Y | URI pointing to an ERC-8004 registration file | - |
+| name | string | - | Display name of the agent | - |
 | description | string | - | Natural-language description of the agent | - |
-| services | string | - | Advertised service endpoints | - |
-| x402-support | boolean | - | Whether x402 payment flow is supported | - |
-| active | string | - | Whether the agent is currently active | - |
-| registrations | string | - | Cross-chain identity registrations | - |
+| avatar | string | - | URI pointing to the agent's avatar image | - |
+| services | string | - | URI pointing to a payload containing the agent's services | - |
+| x402-support | string | - | Indicates whether or not the agent supports x402 payments | - |
+| active | string | - | Indicates whether or not the agent is currently active | - |
+| registrations | string | - | URI pointing to a payload containing the agent's cross-chain identity registrations | - |
 | supported-trust | string | - | Trust models supported by the agent | - |
-| agent-wallet | string | - | Verified payout wallet for agent operations | - |
+| agent-wallet | string | - | The address where the agent receives payments | - |
 
 
 ## Metadata
 
 - Schema ID: `agent`
-- Latest version: `1.0.0`
-- Source: [https://eips.ethereum.org/EIPS/eip-8004](https://eips.ethereum.org/EIPS/eip-8004)
-- CID: `QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ`
-- Checksum: `sha256:6778eeaf90b71eb75c2a174f50062e8a5dbfcb62152e0ab905339a6da5e01e3b`
-- Published at (UTC): `2026-02-18T13:13:22.000Z`
+- Latest version: `2.0.0`
+- Source: [https://github.com/0xLighthouse/ens-node-metadata](https://github.com/0xLighthouse/ens-node-metadata)
+- CID: `QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF`
+- Checksum: `sha256:368d30d0e857b4bf30f144d8a857969773f6f87021911874fea20f1bc9c037ad`
+- Published at (UTC): `2026-03-24T20:20:12.000Z`
 
 ## Version history
 
 | Version | CID | IPFS | Published at (UTC) |
 | --- | --- | --- | --- |
-| `1.0.0 (latest)` | `QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ` | [Open](https://ipfs.io/ipfs/QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ) | `2026-02-18T13:13:22.000Z` |
+| `2.0.0 (latest)` | `QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF` | [Open](https://ipfs.io/ipfs/QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF) | `2026-03-24T20:20:12.000Z` |
+| `1.0.0` | `QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ` | [Open](https://ipfs.io/ipfs/QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ) | `2026-02-18T13:13:22.000Z` |

@@ -5,32 +5,34 @@ weight: 2
 
 # Application
 
-An application, service, or dApp within the organization.
+A software application, service, or website.
 
 ## Attributes
 
 | Key | Type | Recommended | Description | Values |
 | --- | --- | --- | --- | --- |
-| class | string | Y | High-level identifier of this node type | e.g. `Application`, `Service`, `Website` |
-| name | string | Y | The name of the application | - |
+| class | string | Y | Class identifier for this node | e.g. `Application`, `Service`, `Website` |
+| schema | string | Y | URI pointing to the application schema | - |
+| name | string | Y | Displayname of the application | - |
 | description | string | Y | Description of the application's purpose and functionality | - |
-| url | string | Y | URL where the application is hosted or accessed | - |
-| repository | string | - | Source code repository URL | - |
+| url | string | Y | URL where the application is hosted or accessed | e.g. `https://example.com`, `https://app.example.com` |
+| repository | string | - | URL pointing to the source code repository | e.g. `https://github.com/example/example` |
 | version | string | - | Current version of the application | - |
-| status | string | Y | Application status | `Active`, `Development`, `Deprecated` |
+| status | string | - | The current status of the application | `Active`, `Development`, `Deprecated` |
 
 
 ## Metadata
 
 - Schema ID: `application`
-- Latest version: `1.0.0`
+- Latest version: `2.0.0`
 - Source: [https://github.com/0xLighthouse/ens-node-metadata](https://github.com/0xLighthouse/ens-node-metadata)
-- CID: `QmSsjRkk2xZSU6yXxjgPmyKpyfQVGmUw5qLGaPkYcdPW9A`
-- Checksum: `sha256:79de7f6f9d48810193959754c27315a7558529d713a532d5c2566f3de2197819`
-- Published at (UTC): `2026-02-18T13:17:52.000Z`
+- CID: `QmXMMavDn5CGU4ZixXDpVcQV3Z1bvd4aLvRycfHetEyUzh`
+- Checksum: `sha256:186c7eab6d794a81f22075ee1e493d713b6320824d11e586166cee2dff40ddc0`
+- Published at (UTC): `2026-03-24T20:20:38.000Z`
 
 ## Version history
 
 | Version | CID | IPFS | Published at (UTC) |
 | --- | --- | --- | --- |
-| `1.0.0 (latest)` | `QmSsjRkk2xZSU6yXxjgPmyKpyfQVGmUw5qLGaPkYcdPW9A` | [Open](https://ipfs.io/ipfs/QmSsjRkk2xZSU6yXxjgPmyKpyfQVGmUw5qLGaPkYcdPW9A) | `2026-02-18T13:17:52.000Z` |
+| `2.0.0 (latest)` | `QmXMMavDn5CGU4ZixXDpVcQV3Z1bvd4aLvRycfHetEyUzh` | [Open](https://ipfs.io/ipfs/QmXMMavDn5CGU4ZixXDpVcQV3Z1bvd4aLvRycfHetEyUzh) | `2026-03-24T20:20:38.000Z` |
+| `1.0.0` | `QmSsjRkk2xZSU6yXxjgPmyKpyfQVGmUw5qLGaPkYcdPW9A` | [Open](https://ipfs.io/ipfs/QmSsjRkk2xZSU6yXxjgPmyKpyfQVGmUw5qLGaPkYcdPW9A) | `2026-02-18T13:17:52.000Z` |
