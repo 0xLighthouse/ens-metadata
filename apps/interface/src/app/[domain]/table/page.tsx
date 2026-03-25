@@ -423,8 +423,7 @@ export default function TablePage() {
     if (!search.trim()) return rows
     const q = search.toLowerCase()
     return rows.filter(({ node }) => {
-      // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-      const currentClass = ((node as any).class || node.texts?.class) as string | undefined
+      const currentClass = node.texts?.class as string | undefined
       const mutation = pendingMutations.get(node.name)
       const pendingClass = mutation?.changes?.class as string | undefined
       const classToSearch = pendingClass || currentClass
@@ -455,10 +454,8 @@ export default function TablePage() {
           return dir * compareByNamespaceHierarchy(parentA, parentB)
         }
         case 'class': {
-          // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-          const currentClassA = ((a as any).class || a.texts?.class) ?? ''
-          // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-          const currentClassB = ((b as any).class || b.texts?.class) ?? ''
+          const currentClassA = a.texts?.class ?? ''
+          const currentClassB = b.texts?.class ?? ''
           const mutation = pendingMutations.get(a.name)
           const pendingClassA = mutation?.changes?.class as string | undefined
           const mutation2 = pendingMutations.get(b.name)
@@ -522,8 +519,7 @@ export default function TablePage() {
         )
 
       case 'class': {
-        // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-        const currentClass = ((node as any).class || node.texts?.class) as string | undefined
+        const currentClass = node.texts?.class as string | undefined
         const pendingClass = getPendingClassChange(node.name)
         const displayClass = pendingClass || currentClass
         const hasPendingClassChange = !!pendingClass

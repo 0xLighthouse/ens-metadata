@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       transport: http(rpcUrl),
     })
 
-    const nodeClass = node.class || node.texts?.class
+    const nodeClass = node.texts?.class
 
     // biome-ignore lint/suspicious/noExplicitAny: inspection result shape is built dynamically
     const result: any = {

@@ -1,3 +1,4 @@
+import { resolveNodeValue } from '@/lib/tree/resolveNodeValue'
 import { computeDelta, hasChanges as sdkHasChanges } from '@ensmetadata/sdk'
 import { create } from 'zustand'
 
@@ -55,11 +56,6 @@ interface NodeEditorState {
     // biome-ignore lint/suspicious/noExplicitAny: delta values are dynamic
   ) => { changes: Record<string, any>; deleted: string[] }
 }
-
-// Resolve a value: check top-level first (pending edit merges), then node.texts
-// biome-ignore lint/suspicious/noExplicitAny: dynamic tree node shape
-const resolveNodeValue = (node: any, key: string) =>
-  node?.[key] !== undefined ? node[key] : node?.texts?.[key]
 
 const initialState = {
   formData: {},

@@ -6,7 +6,7 @@
 
 ## Critical: Text Record Resolution
 
-Node metadata (`class`, `schema`, etc.) are ENS text records stored in `node.texts`. Always resolve via `node.texts?.key` (or `resolveNodeValue` helper in `node-editor.ts`), never assume top-level access. Top-level properties only exist after pending mutation merges.
+Node metadata (`class`, `schema`, etc.) are ENS text records stored in `node.texts`. Always resolve via `node.texts?.key` (or `resolveNodeValue` helper in `node-editor.ts`), never from top-level node properties. Pending mutation changes are merged into `node.texts` only — never spread onto the node top level, as text record keys like `name` would collide with structural TreeNode properties.
 
 ## Key Stores
 
