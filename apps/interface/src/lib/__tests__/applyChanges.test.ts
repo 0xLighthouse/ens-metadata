@@ -80,6 +80,27 @@ describe('buildMutationQueue', () => {
     expect(edits[0].ensName).toBe('agent.eth')
   })
 
+  it('excludes non-string values like inspectionData from delta', () => {
+    const mutations = new Map([
+      [
+        'agent.eth',
+        {
+          createNode: false,
+          changes: { class: 'Agent', inspectionData: { detectedType: 'safe' } } as Record<
+            string,
+            // biome-ignore lint/suspicious/noExplicitAny: testing mixed value types
+            any
+          >,
+          deleted: [] as string[],
+        },
+      ],
+    ])
+
+    const { edits } = buildMutationQueue(['agent.eth'], mutations, findNode)
+
+    expect(edits[0].delta.changes).toEqual({ class: 'Agent' })
+  })
+
   it('builds delta with null/undefined values stripped', () => {
     const mutations = new Map([
       [
