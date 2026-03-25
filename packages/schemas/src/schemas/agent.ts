@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const AGENT_SCHEMA_VERSION = '2.0.0';
+const AGENT_SCHEMA_VERSION = '3.0.0';
 
 export const AGENT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/agent/versions/${AGENT_SCHEMA_VERSION}`,
@@ -26,9 +26,9 @@ export const AGENT_SCHEMA: Schema = {
       format: 'uri',
       description: 'URI pointing to an ERC-8004 registration file',
     },
-    name: {
+    alias: {
       type: 'string',
-      description: 'Display name of the agent',
+      description: 'Display name of the agent, equivalent to the `name` field in an ERC-8004 registration file',
     },
     description: {
       type: 'string',
@@ -37,7 +37,7 @@ export const AGENT_SCHEMA: Schema = {
     avatar: {
       type: 'string',
       format: 'uri',
-      description: 'URI pointing to the agent\'s avatar image',
+      description: 'URI pointing to the agent\'s avatar image, equivalent to the `image` field in an ERC-8004 registration file',
     },
     services: {
       type: 'string',
@@ -90,5 +90,5 @@ export const AGENT_SCHEMA: Schema = {
 
   },
   required: ['class', 'schema'],
-  recommended: ['agent-uri']
+  recommended: ['agent-uri', 'alias', 'description', 'avatar']
 };
