@@ -60,7 +60,12 @@ const TreasuryNodeWrapper = ({ data }: NodeProps<DomainTreeNode>) => {
         for (const [index, signer] of result.metadata.signers.entries()) {
           const signerAddress = signer.address as `0x${string}`
           const existingNodes = findAllNodesByAddress(previewTree, signerAddress)
-          const existingSignerNode = existingNodes.find((n) => n.texts?.class === 'Signer')
+          // Computed signer nodes carry `class` as a top-level field, not in `texts`.
+          const existingSignerNode = existingNodes.find((n) => {
+            // biome-ignore lint/suspicious/noExplicitAny: class is a dynamic top-level field on computed nodes
+            const nodeClass = n.texts?.class ?? (n as any).class
+            return nodeClass === 'Signer'
+          })
 
           if (existingSignerNode) {
             existingRefs.push(existingSignerNode.name)

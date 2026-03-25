@@ -49,7 +49,11 @@ const FALLBACK_NODE_SIZES: Record<string, NodeDimensions> = {
 }
 
 const getFlowNodeType = (node: TreeNode): string => {
-  const explicitType = node.texts?.class
+  // Computed nodes (e.g. signer nodes from Safe inspection) carry `class` as a
+  // top-level field rather than inside `texts`. Fall back to node.class so they
+  // route to the correct React Flow component.
+  // biome-ignore lint/suspicious/noExplicitAny: class is a dynamic top-level field on computed nodes
+  const explicitType = node.texts?.class ?? (node as any).class
   if (explicitType) {
     // Treasury and Signer keep their dedicated components
     if (explicitType === 'Treasury' || explicitType === 'Signer') return explicitType
