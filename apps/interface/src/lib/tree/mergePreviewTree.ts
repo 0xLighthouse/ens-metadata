@@ -14,6 +14,13 @@ function buildCreatedSubtree(
 
   const children: TreeNode[] = []
   for (const [nodeName, creation] of childCreations) {
+    // Only use creation.changes as texts — do NOT inherit parent (createdNode) texts.
+    const textOnlyChanges: Record<string, string | null> = {}
+    for (const [key, value] of Object.entries(creation.changes)) {
+      if (typeof value === 'string' || value === null) {
+        textOnlyChanges[key] = value
+      }
+    }
     const childNode: TreeNode = {
       name: nodeName,
       id: nodeName,
@@ -23,7 +30,7 @@ function buildCreatedSubtree(
       isWrapped: createdNode.isWrapped,
       subdomainCount: 0,
       isPendingCreation: true,
-      texts: { ...(createdNode.texts ?? {}), ...creation.changes },
+      texts: textOnlyChanges,
     }
     children.push(buildCreatedSubtree(childNode, pendingMutations))
   }
@@ -51,9 +58,23 @@ export function mergePendingChanges(
   let mergedNode = { ...node }
   if (mutation && !mutation.createNode) {
     if (mutation.changes) {
+      // Separate genuine text-record changes (string values) from structural
+      // changes (e.g. inspectionData objects). Text-record changes go into
+      // node.texts; structural changes are applied at the top level so that
+      // properties like inspectionData are actually updated on the node.
+      const textChanges: Record<string, string | null> = {}
+      const structuralChanges: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(mutation.changes)) {
+        if (typeof value === 'string' || value === null) {
+          textChanges[key] = value
+        } else {
+          structuralChanges[key] = value
+        }
+      }
       mergedNode = {
         ...mergedNode,
-        texts: { ...(mergedNode.texts ?? {}), ...mutation.changes },
+        ...structuralChanges,
+        texts: { ...(mergedNode.texts ?? {}), ...textChanges },
       }
     }
     if (mutation.deleted?.length) {
@@ -72,6 +93,15 @@ export function mergePendingChanges(
 
   const nodesToAdd: TreeNode[] = []
   for (const [nodeName, creation] of creationsForNode) {
+    // Only seed texts from creation.changes — do NOT inherit parent texts.
+    // Spreading parent texts would incorrectly propagate the parent's ENS
+    // text records (description, avatar, etc.) into the child subdomain.
+    const textOnlyChanges: Record<string, string | null> = {}
+    for (const [key, value] of Object.entries(creation.changes)) {
+      if (typeof value === 'string' || value === null) {
+        textOnlyChanges[key] = value
+      }
+    }
     const createdNode: TreeNode = {
       name: nodeName,
       id: nodeName,
@@ -81,7 +111,7 @@ export function mergePendingChanges(
       isWrapped: node.isWrapped,
       subdomainCount: 0,
       isPendingCreation: true,
-      texts: { ...(node.texts ?? {}), ...creation.changes },
+      texts: textOnlyChanges,
     }
     nodesToAdd.push(buildCreatedSubtree(createdNode, pendingMutations))
   }

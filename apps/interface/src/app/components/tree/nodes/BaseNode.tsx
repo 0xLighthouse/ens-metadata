@@ -50,7 +50,10 @@ export const BaseNodeCard = ({
   footerSlot,
   overflow = 'hidden',
 }: BaseNodeCardProps) => {
-  const schemaType = node.texts?.class as string | undefined
+  // Computed nodes (e.g. signer nodes from inspection) carry `class` as a
+  // top-level field rather than inside `texts`. Fall back to node.class.
+  // biome-ignore lint/suspicious/noExplicitAny: class is a dynamic top-level field on computed nodes
+  const schemaType = (node.texts?.class ?? (node as any).class) as string | undefined
   const baseConfig = getNodeConfig(schemaType)
   const config = configOverride ? { ...baseConfig, ...configOverride } : baseConfig
 

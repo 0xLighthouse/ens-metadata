@@ -24,8 +24,10 @@ export function findNodeByAddress(
       // No type filter, just return the node
       return tree
     }
-    // Check if type matches
-    const nodeType = tree.texts?.class
+    // Check if type matches. Computed nodes (e.g. signer nodes from inspection)
+    // carry `class` as a top-level field rather than inside `texts`.
+    // biome-ignore lint/suspicious/noExplicitAny: class is a dynamic top-level field on computed nodes
+    const nodeType = tree.texts?.class ?? (tree as any).class
     if (nodeType === type) {
       return tree
     }

@@ -52,8 +52,11 @@ export function buildMutationQueue(
     const changes: Record<string, string> = {}
     if (edit.changes) {
       for (const [key, value] of Object.entries(edit.changes)) {
-        if (value === null || value === undefined) continue
-        changes[key] = String(value)
+        // Only include genuine text record entries (string values).
+        // Non-string values (e.g. inspectionData objects) are internal state
+        // and must not be written to ENS — they would produce "[object Object]".
+        if (typeof value !== 'string') continue
+        changes[key] = value
       }
     }
 
