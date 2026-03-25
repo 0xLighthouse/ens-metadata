@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { http, createPublicClient } from 'viem'
+import { http, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
 
 const SAFE_ABI = [
@@ -26,6 +26,10 @@ export async function POST(request: NextRequest) {
 
     if (!node?.address) {
       return NextResponse.json({ error: 'Node address is required' }, { status: 400 })
+    }
+
+    if (!isAddress(node.address)) {
+      return NextResponse.json({ error: 'Invalid Ethereum address' }, { status: 400 })
     }
 
     // Create viem client with fallback to public RPC
@@ -128,9 +132,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error inspecting node:', error)
-    return NextResponse.json(
-      { error: 'Failed to inspect node', details: (error as Error).message },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Failed to inspect node' }, { status: 500 })
   }
 }
