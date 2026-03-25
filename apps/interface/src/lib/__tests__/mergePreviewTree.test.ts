@@ -61,6 +61,44 @@ describe('mergePendingChanges', () => {
     expect(child.texts).toMatchObject({ name: 'Display', class: 'Agent' })
   })
 
+  it('applies non-string structural changes at top level, not in texts', () => {
+    const node = makeNode('treasury.jkm.eth', { texts: { class: 'Treasury' } })
+    const mutations = makeMutation('treasury.jkm.eth', {
+      // biome-ignore lint/suspicious/noExplicitAny: testing inspectionData merge
+      changes: { description: 'Updated', inspectionData: { detectedType: 'safe' } } as any,
+    })
+
+    const result = mergePendingChanges(node, mutations)
+
+    expect(result.texts).toMatchObject({ class: 'Treasury', description: 'Updated' })
+    expect(result.texts?.inspectionData).toBeUndefined()
+    expect(result.inspectionData).toMatchObject({ detectedType: 'safe' })
+  })
+
+  it('does not inherit parent texts into created children', () => {
+    const parent = makeNode('jkm.eth', {
+      texts: { class: 'Org', description: 'Parent desc', avatar: 'parent.png' },
+    })
+    const mutations = new Map<string, TreeMutation>([
+      [
+        'agent.jkm.eth',
+        {
+          createNode: true,
+          parentName: 'jkm.eth',
+          texts: {},
+          changes: { class: 'Agent' },
+          deleted: [],
+        },
+      ],
+    ])
+
+    const child = mergePendingChanges(parent, mutations).children![0]
+
+    expect(child.texts).toEqual({ class: 'Agent' })
+    expect(child.texts?.description).toBeUndefined()
+    expect(child.texts?.avatar).toBeUndefined()
+  })
+
   it('merges recursively into nested children', () => {
     const tree = makeNode('jkm.eth', {
       children: [makeNode('agent.jkm.eth', { texts: { class: 'Agent' } })],
