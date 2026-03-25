@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useTreeData } from '@/hooks/useTreeData'
+import { diffMutationChanges } from '@/lib/tree/diffMutationChanges'
 import { useTreeEditStore } from '@/stores/tree-edits'
 import { useTxnsStore } from '@/stores/txns'
 import { ExternalLink, Loader2, Receipt, XCircle } from 'lucide-react'
@@ -267,31 +268,11 @@ export function ApplyChangesDialog({
                   const editTxn = getByLabel(nodeName)
                   const originalNode = findNode(nodeName)
 
-                  // Resolve original value: check node.texts first, then top-level
-                  const resolveOriginal = (key: string) =>
-                    // biome-ignore lint/suspicious/noExplicitAny: dynamic tree node shape for text record resolution
-                    (originalNode as any)?.texts?.[key] ?? (originalNode as any)?.[key]
-
-                  const entries = change.changes
-                    ? Object.entries(change.changes).filter(([key, newValue]) => {
-                        const originalValue = resolveOriginal(key)
-                        if (newValue === originalValue) return false
-                        if (newValue === null || newValue === undefined || newValue === '')
-                          return false
-                        if (key === 'inspectionData') return false
-                        return true
-                      })
-                    : []
-
-                  const addedFields = entries.filter(([key]) => {
-                    const ov = resolveOriginal(key)
-                    return ov === undefined || ov === null || ov === ''
-                  })
-
-                  const modifiedFields = entries.filter(([key]) => {
-                    const ov = resolveOriginal(key)
-                    return ov !== undefined && ov !== null && ov !== ''
-                  })
+                  const { added: addedFields, modified: modifiedFields } = diffMutationChanges(
+                    originalNode,
+                    change.changes,
+                  )
+                  const resolveOriginal = (key: string) => originalNode?.texts?.[key]
 
                   return (
                     <div

@@ -60,10 +60,7 @@ const TreasuryNodeWrapper = ({ data }: NodeProps<DomainTreeNode>) => {
         for (const [index, signer] of result.metadata.signers.entries()) {
           const signerAddress = signer.address as `0x${string}`
           const existingNodes = findAllNodesByAddress(previewTree, signerAddress)
-          const existingSignerNode = existingNodes.find(
-            // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-            (n) => ((n as any).class || n.texts?.class) === 'Signer',
-          )
+          const existingSignerNode = existingNodes.find((n) => n.texts?.class === 'Signer')
 
           if (existingSignerNode) {
             existingRefs.push(existingSignerNode.name)

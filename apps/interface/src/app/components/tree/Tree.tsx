@@ -49,8 +49,7 @@ const FALLBACK_NODE_SIZES: Record<string, NodeDimensions> = {
 }
 
 const getFlowNodeType = (node: TreeNode): string => {
-  // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-  const explicitType = (node as any).class || node.texts?.class
+  const explicitType = node.texts?.class
   if (explicitType) {
     // Treasury and Signer keep their dedicated components
     if (explicitType === 'Treasury' || explicitType === 'Signer') return explicitType

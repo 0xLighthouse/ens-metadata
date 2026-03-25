@@ -1,3 +1,4 @@
+import { buildMutationQueue } from '@/lib/tree/buildMutationQueue'
 import type { TreeNode } from '@/lib/tree/types'
 import type { ClientWithAccount } from '@ensdomains/ensjs/contracts'
 import { createSubname } from '@ensdomains/ensjs/wallet'
@@ -51,79 +52,24 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
     }
 
     const allMutations = useTreeEditStore.getState().pendingMutations
-    const selectedMutations: [string, TreeMutation][] = []
-    for (const id of mutationIds) {
-      const m = allMutations.get(id)
-      if (m) selectedMutations.push([id, m])
-    }
+    const { creations, edits } = buildMutationQueue(mutationIds, allMutations, findNode)
 
-    if (selectedMutations.length === 0) return
-
-    // Separate creations from edits
-    const creations = selectedMutations.filter(([_, m]) => m.createNode)
-    const edits = selectedMutations.filter(([_, m]) => !m.createNode)
-
-    // Build initial jobs list
-    const jobs: MutationJob[] = []
+    if (edits.length === 0 && creations.length === 0) return
 
     // Creations are placeholder — log warning and skip
-    for (const [nodeName, creation] of creations) {
+    for (const nodeName of creations) {
       console.warn(
-        `[mutations] createSubname not yet implemented — skipping creation for parent "${creation.parentName}"`,
+        `[mutations] createSubname not yet implemented — skipping creation for "${nodeName}"`,
       )
     }
 
-    // Group edits by ensName
-    const editsByName = new Map<
-      string,
-      {
-        resolverAddress: string
-        delta: { changes: Record<string, string>; deleted: string[] }
-        mutationIds: string[]
-      }
-    >()
-
-    for (const [ensName, edit] of edits) {
-      const node = findNode(ensName)
-      const resolverAddress = node?.resolverAddress
-      if (!resolverAddress) {
-        console.warn(`[mutations] No resolver address found for "${ensName}" — skipping`)
-        continue
-      }
-
-      const changes: Record<string, string> = {}
-      if (edit.changes) {
-        for (const [key, value] of Object.entries(edit.changes)) {
-          if (value === null || value === undefined) continue
-          changes[key] = String(value)
-        }
-      }
-
-      const existing = editsByName.get(ensName)
-      if (existing) {
-        Object.assign(existing.delta.changes, changes)
-        existing.delta.deleted.push(...(edit.deleted ?? []))
-        existing.mutationIds.push(ensName)
-      } else {
-        editsByName.set(ensName, {
-          resolverAddress,
-          delta: { changes, deleted: edit.deleted ?? [] },
-          mutationIds: [ensName],
-        })
-      }
-    }
-
     // Build jobs from grouped edits
-    for (const [ensName, { resolverAddress, mutationIds: mIds }] of editsByName) {
-      for (const id of mIds) {
-        jobs.push({
-          mutationId: id,
-          ensName,
-          resolverAddress,
-          status: 'pending',
-        })
-      }
-    }
+    const jobs: MutationJob[] = edits.map((edit) => ({
+      mutationId: edit.ensName,
+      ensName: edit.ensName,
+      resolverAddress: edit.resolverAddress,
+      status: 'pending' as const,
+    }))
 
     set({ jobs, status: 'executing' })
 
@@ -131,39 +77,36 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
     const writer = metadataWriter({ publicClient: publicClient as PublicClient })(walletClient)
 
     // Submit one applyDelta call per ensName
-    for (const [ensName, { resolverAddress, delta, mutationIds: mIds }] of editsByName) {
+    for (const edit of edits) {
       // Update jobs to signing
       set({
         jobs: get().jobs.map((j) =>
-          mIds.includes(j.mutationId) ? { ...j, status: 'signing' as const } : j,
+          j.ensName === edit.ensName ? { ...j, status: 'signing' as const } : j,
         ),
       })
 
       try {
         const result = await writer.applyDelta({
-          name: ensName,
-          delta,
-          resolverAddress: resolverAddress as `0x${string}`,
+          name: edit.ensName,
+          delta: edit.delta,
+          resolverAddress: edit.resolverAddress as `0x${string}`,
         })
 
         // Track in txns store; discard mutation only after on-chain confirmation
         const { addTxn, watchTxn } = useTxnsStore.getState()
-        addTxn({ hash: result.txHash, type: 'setRecords', label: ensName })
+        addTxn({ hash: result.txHash, type: 'setRecords', label: edit.ensName })
         watchTxn(result.txHash, publicClient).then(() => {
           const { txns } = useTxnsStore.getState()
           const txn = txns.find((t) => t.hash === result.txHash)
           if (txn?.status === 'confirmed') {
-            const { discardPendingMutation } = useTreeEditStore.getState()
-            for (const id of mIds) {
-              discardPendingMutation(id)
-            }
+            useTreeEditStore.getState().discardPendingMutation(edit.ensName)
           }
         })
 
         // Update job to submitted (dialog tracks confirmed state via txns store)
         set({
           jobs: get().jobs.map((j) =>
-            mIds.includes(j.mutationId)
+            j.ensName === edit.ensName
               ? { ...j, status: 'submitted' as const, txHash: result.txHash }
               : j,
           ),
@@ -173,19 +116,19 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
         const errorMessage = err?.message ?? 'Transaction failed'
         set({
           jobs: get().jobs.map((j) =>
-            mIds.includes(j.mutationId)
+            j.ensName === edit.ensName
               ? { ...j, status: 'error' as const, error: errorMessage }
               : j,
           ),
           status: 'error',
         })
-        console.error(`[mutations] setRecords failed for "${ensName}":`, err)
+        console.error(`[mutations] setRecords failed for "${edit.ensName}":`, err)
       }
     }
 
     // Discard creation mutations that were skipped (edit mutations are discarded in watchTxn callbacks)
     const { discardPendingMutation } = useTreeEditStore.getState()
-    for (const [nodeName] of creations) {
+    for (const nodeName of creations) {
       discardPendingMutation(nodeName)
     }
 

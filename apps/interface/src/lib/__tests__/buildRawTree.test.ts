@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { buildRawTree } from '../tree/buildRawTree'
 import { TreeNode } from '../tree/types'
 

@@ -25,8 +25,7 @@ export function findNodeByAddress(
       return tree
     }
     // Check if type matches
-    // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-    const nodeType = (tree as any).class || tree.texts?.class
+    const nodeType = tree.texts?.class
     if (nodeType === type) {
       return tree
     }

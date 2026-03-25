@@ -50,8 +50,7 @@ export const BaseNodeCard = ({
   footerSlot,
   overflow = 'hidden',
 }: BaseNodeCardProps) => {
-  // biome-ignore lint/suspicious/noExplicitAny: class may exist on pending mutation merge
-  const schemaType = ((node as any).class || node.texts?.class) as string | undefined
+  const schemaType = node.texts?.class as string | undefined
   const baseConfig = getNodeConfig(schemaType)
   const config = configOverride ? { ...baseConfig, ...configOverride } : baseConfig
 
