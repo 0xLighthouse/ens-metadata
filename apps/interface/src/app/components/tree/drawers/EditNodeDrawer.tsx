@@ -250,6 +250,21 @@ export function EditNodeDrawer() {
                       }
                     }
 
+                    // Also include keys added via addCustomAttribute that exist in formData
+                    // but not yet persisted to nodeWithEdits.texts
+                    const systemFields = new Set(['schema', 'class'])
+                    const extraKeySet = new Set(extraKeys)
+                    for (const [key, value] of Object.entries(formData)) {
+                      if (
+                        !schemaKeys.has(key) &&
+                        !extraKeySet.has(key) &&
+                        !systemFields.has(key) &&
+                        typeof value === 'string'
+                      ) {
+                        extraKeys.push(key)
+                      }
+                    }
+
                     return (
                       <div>
                         {/* Address fields */}
