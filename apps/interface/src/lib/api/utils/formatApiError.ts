@@ -76,6 +76,24 @@ export function formatApiError(code: ErrorCode): FormattedError {
         message: 'The request took too long to complete. Please try again.',
       }
 
+    case ErrorCode.UPSTREAM_SERVICE_ERROR:
+      return {
+        title: 'External Service Error',
+        message: 'An external service is temporarily unavailable. Please try again later.',
+      }
+
+    case ErrorCode.ENSNODE_UNAVAILABLE:
+      return {
+        title: 'ENSNode Unavailable',
+        message: 'Unable to connect to the ENSNode service. Please try again later.',
+      }
+
+    case ErrorCode.ENSNODE_ERROR:
+      return {
+        title: 'ENSNode Error',
+        message: 'The ENSNode service returned an error. Please try again later.',
+      }
+
     case ErrorCode.INSUFFICIENT_BALANCE:
       return {
         title: 'Insufficient Balance',
