@@ -85,13 +85,13 @@ export function formatApiError(code: ErrorCode): FormattedError {
     case ErrorCode.ENSNODE_UNAVAILABLE:
       return {
         title: 'ENS Node Subgraph Unavailable',
-        message: 'The ENS node subgraph is currently down. Please try again later.',
+        message: 'The ENS Node subgraph is currently down. Please try again later.',
       }
 
     case ErrorCode.ENSNODE_ERROR:
       return {
         title: 'ENS Node Subgraph Error',
-        message: 'The ENS node subgraph is currently down. Please try again later.',
+        message: 'The ENS Node subgraph is currently down. Please try again later.',
       }
 
     case ErrorCode.INSUFFICIENT_BALANCE:
