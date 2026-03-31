@@ -10,9 +10,21 @@ import { resolveApiError } from '@/lib/api/utils/resolveApiError'
  * Transforms an upstream service error into a user-friendly error.
  * Logs the original error for debugging and returns a sanitized error for the UI.
  */
-function handleUpstreamError(error: unknown, serviceName: string): Error {
+function handleUpstreamError(
+  error: unknown,
+  serviceName: string,
+  errorCode?: ErrorCode,
+): Error {
   // Always log the original error for debugging
   console.error(`[${serviceName}] Upstream service error:`, error)
+
+  // If a specific error code is provided, use the formatted message for it directly
+  if (errorCode) {
+    const formatted = formatApiError(errorCode)
+    const userError = new Error(formatted.message)
+    ;(userError as Error & { code?: string }).code = errorCode
+    return userError
+  }
 
   const resolved = resolveApiError(error)
 
@@ -76,14 +88,14 @@ export const useApiStore = create<ApiState>((set, get) => ({
     try {
       return await get().ensSubgraph.request<T>(query, variables)
     } catch (error) {
-      // Check if this is an upstream service error
+      // All errors from ensRequest are ENSNode errors — use the specific code
       if (isUpstreamServiceError(error)) {
-        const userError = handleUpstreamError(error, 'ENSNode')
+        const userError = handleUpstreamError(error, 'ENSNode', ErrorCode.ENSNODE_UNAVAILABLE)
         get().handleRequestError(userError)
         throw userError
       }
 
-      // For other errors (e.g., GraphQL validation errors), log and rethrow
+      // For other errors (e.g., GraphQL validation errors), still attribute to ENSNode
       console.error('[ENSNode] Request error:', error)
       get().handleRequestError(error)
       // biome-ignore lint/suspicious/noExplicitAny: GraphQL error shape is dynamic
