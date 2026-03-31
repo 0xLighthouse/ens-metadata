@@ -84,14 +84,14 @@ export function formatApiError(code: ErrorCode): FormattedError {
 
     case ErrorCode.ENSNODE_UNAVAILABLE:
       return {
-        title: 'ENSNode Unavailable',
-        message: 'Unable to connect to the ENSNode service. Please try again later.',
+        title: 'ENS Node Subgraph Unavailable',
+        message: 'The ENS node subgraph is currently down. Please try again later.',
       }
 
     case ErrorCode.ENSNODE_ERROR:
       return {
-        title: 'ENSNode Error',
-        message: 'The ENSNode service returned an error. Please try again later.',
+        title: 'ENS Node Subgraph Error',
+        message: 'The ENS node subgraph is currently down. Please try again later.',
       }
 
     case ErrorCode.INSUFFICIENT_BALANCE:

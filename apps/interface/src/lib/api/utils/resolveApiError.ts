@@ -83,12 +83,12 @@ export function resolveApiError(error: unknown): ResolvedError {
         (error as any).code === 'ENOTFOUND'
       ) {
         return {
-          message: 'Unable to connect to the ENSNode service. Please try again later.',
+          message: 'The ENS node subgraph is currently down. Please try again later.',
           code: ErrorCode.ENSNODE_UNAVAILABLE,
         }
       }
       return {
-        message: 'The ENSNode service returned an error. Please try again later.',
+        message: 'The ENS node subgraph is currently down. Please try again later.',
         code: ErrorCode.ENSNODE_ERROR,
       }
     }
