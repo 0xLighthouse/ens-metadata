@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const GRANT_SCHEMA_VERSION = '2.0.0';
+const GRANT_SCHEMA_VERSION = '3.0.0';
 
 export const GRANT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/grant/versions/${GRANT_SCHEMA_VERSION}`,
@@ -22,13 +22,18 @@ export const GRANT_SCHEMA: Schema = {
       format: 'uri',
       description: 'URI pointing to the grant schema',
     },
-    'name': {
+    alias: {
       type: 'string',
       description: 'Display name of the grant',
     },
     description: {
       type: 'string',
       description: 'Description of the grant purpose and scope',
+    },
+    avatar: {
+      type: 'string',
+      description: 'URI pointing to the grant\'s avatar',
+      inherit: true
     },
     url: {
       type: 'string',
@@ -51,5 +56,5 @@ export const GRANT_SCHEMA: Schema = {
     }
   },
   required: ['class', 'schema'],
-  recommended: ['name', 'description', 'url', 'status', 'budget', 'token']
+  recommended: ['alias', 'description', 'url', 'status', 'budget', 'token']
 }
