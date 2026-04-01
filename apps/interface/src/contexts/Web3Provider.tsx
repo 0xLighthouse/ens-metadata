@@ -5,7 +5,7 @@ import { addEnsContracts } from '@ensdomains/ensjs'
 import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { http, WalletClient, createPublicClient, createWalletClient, custom } from 'viem'
-import { mainnet } from 'viem/chains'
+import { base, mainnet } from 'viem/chains'
 
 const chain = addEnsContracts(mainnet)
 
@@ -15,10 +15,13 @@ const publicClient = createPublicClient({
   transport: http(process.env.NEXT_PUBLIC_RPC_URL!),
 })
 
+const noop = async () => {}
+
 const Web3Context = createContext<IWeb3Context>({
   publicClient,
   walletClient: null,
   isInitialized: false,
+  switchChain: noop,
 })
 
 export const useWeb3 = () => useContext(Web3Context)
@@ -28,6 +31,7 @@ interface IWeb3Context {
   // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
   publicClient: any
   walletClient: WalletClient | null
+  switchChain: (chainId: number) => Promise<void>
 }
 
 // Separate internal component that uses Privy hooks
@@ -67,8 +71,12 @@ const Web3ContextProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isInitialized, wallets])
 
+  const switchChain = async (chainId: number) => {
+    if (wallets[0]) await wallets[0].switchChain(chainId)
+  }
+
   return (
-    <Web3Context.Provider value={{ publicClient, walletClient, isInitialized }}>
+    <Web3Context.Provider value={{ publicClient, walletClient, isInitialized, switchChain }}>
       {children}
     </Web3Context.Provider>
   )
@@ -83,7 +91,7 @@ export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
         appearance: {
           theme: 'dark',
         },
-        supportedChains: [chain],
+        supportedChains: [chain, base],
         defaultChain: chain,
       }}
     >

@@ -7,6 +7,7 @@ import { useSchemaStore } from '@/stores/schemas'
 import type { Schema } from '@/stores/schemas'
 import { ChevronDown, Info, Lock, RefreshCw, Search, Unlock } from 'lucide-react'
 import { useRef } from 'react'
+import { AvatarField } from './AvatarField'
 
 /** Fields managed automatically (set when a schema is selected) — hidden from the manual editor */
 const MANAGED_FIELDS = new Set(['schema'])
@@ -16,6 +17,7 @@ interface SchemaEditorProps {
   addressFieldKeys: Set<string>
   onSelectSchema: (schemaId: string) => void
   onRefreshSchemas?: () => Promise<void>
+  ensName: string
 }
 
 export function SchemaEditor({
@@ -23,6 +25,7 @@ export function SchemaEditor({
   addressFieldKeys,
   onSelectSchema,
   onRefreshSchemas,
+  ensName,
 }: SchemaEditorProps) {
   const {
     formData,
@@ -218,6 +221,20 @@ export function SchemaEditor({
             // biome-ignore lint/suspicious/noExplicitAny: schema attribute shape from external registry
             .map(([key, attribute]: [string, any]) => {
               const isRequired = activeSchema!.required?.includes(key)
+
+              if (key === 'avatar') {
+                return (
+                  <AvatarField
+                    key={key}
+                    value={formData[key] ?? ''}
+                    onChange={(url) => updateField(key, url)}
+                    ensName={ensName}
+                    isRequired={isRequired}
+                    description={attribute.description}
+                  />
+                )
+              }
+
               const isTextArea = attribute.type === 'text' || key === 'description'
               const inputType =
                 attribute.format === 'uri' || attribute.format === 'url'
@@ -295,6 +312,18 @@ export function SchemaEditor({
             )
             // biome-ignore lint/suspicious/noExplicitAny: schema attribute shape from external registry
             .map(([key, attribute]: [string, any]) => {
+              if (key === 'avatar') {
+                return (
+                  <AvatarField
+                    key={key}
+                    value={formData[key] ?? ''}
+                    onChange={(url) => updateField(key, url)}
+                    ensName={ensName}
+                    description={attribute.description}
+                  />
+                )
+              }
+
               const isTextArea = attribute.type === 'text' || key === 'description'
               const inputType =
                 attribute.format === 'uri' || attribute.format === 'url'

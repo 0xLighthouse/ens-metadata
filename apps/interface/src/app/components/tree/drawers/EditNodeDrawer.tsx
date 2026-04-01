@@ -226,6 +226,7 @@ export function EditNodeDrawer() {
                   addressFieldKeys={addressFieldKeys}
                   onSelectSchema={handleSelectSchema}
                   onRefreshSchemas={handleRefreshSchemas}
+                  ensName={selectedNode ?? ''}
                 />
 
                 {/* Text Records Section */}

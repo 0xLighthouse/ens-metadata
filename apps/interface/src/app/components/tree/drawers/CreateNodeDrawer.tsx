@@ -287,6 +287,7 @@ export function CreateNodeDrawer({ isOpen, onClose, suggestionId, suggestionTitl
                 activeSchema={activeSchema ?? null}
                 addressFieldKeys={addressFieldKeys}
                 onSelectSchema={handleSelectSchema}
+                ensName={selectedParent}
               />
             </div>
 
