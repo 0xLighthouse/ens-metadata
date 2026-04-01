@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const GROUP_SCHEMA_VERSION = '2.0.0';
+const GROUP_SCHEMA_VERSION = '3.0.0';
 
 export const GROUP_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/group/versions/${GROUP_SCHEMA_VERSION}`,
@@ -15,16 +15,16 @@ export const GROUP_SCHEMA: Schema = {
       type: 'string',
       default: 'Group',
       description: 'Class identifier for this node',
-      examples: ['Group', 'Committee', 'Council', 'Workgroup', 'Team'],
+      examples: ['Group', 'Committee', 'Council', 'Workgroup', 'Team', 'Department'],
     },
     schema: {
       type: 'string',
       format: 'uri',
       description: 'URI pointing to the group schema',
     },
-    name: {
+    alias: {
       type: 'string',
-      description: 'The name of the group',
+      description: 'Display name of the group',
     },
     avatar: {
       type: 'string',
@@ -53,8 +53,9 @@ export const GROUP_SCHEMA: Schema = {
       type: 'string',
       description: 'Title or role of the group members',
       examples: ['Member', 'Steward', 'Contributor', 'Participant'],
+      inherit: true
     },
   },
   required: ['class', 'schema'],
-  recommended: ['name', 'lead', 'avatar', 'url', 'description']
+  recommended: ['alias', 'lead', 'avatar', 'url', 'description']
 }

@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const ORGANIZATION_SCHEMA_VERSION = '2.0.0';
+const ORGANIZATION_SCHEMA_VERSION = '3.0.0';
 
 export const ORGANIZATION_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/org/versions/${ORGANIZATION_SCHEMA_VERSION}`,
@@ -22,7 +22,7 @@ export const ORGANIZATION_SCHEMA: Schema = {
       format: 'uri',
       description: 'URI pointing to the organization schema',
     },
-    name: {
+    alias: {
       type: 'string',
       description: 'Display name of the organization',
     },
@@ -42,5 +42,5 @@ export const ORGANIZATION_SCHEMA: Schema = {
     },
   },
   required: ['class', 'schema'],
-  recommended: ['name', 'description', 'url']
+  recommended: ['alias', 'description', 'url']
 }
