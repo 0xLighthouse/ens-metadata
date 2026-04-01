@@ -1,6 +1,6 @@
 {
   "name": "@ensmetadata/cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "CLI for managing AI agent metadata on ENS using ERC-8004",
   "type": "module",
   "main": "./dist/index.js",
