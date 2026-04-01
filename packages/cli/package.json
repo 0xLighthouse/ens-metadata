@@ -9,7 +9,8 @@
     "ens-metadata": "./dist/cli.js"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "files": ["dist", "SKILL.md", "README.md", "examples"],
   "scripts": {
