@@ -71,10 +71,20 @@ export interface Attribute {
   */
   format?: string;
 
-
+/**
+ * @description An optional field specifying the default value to be used if non is provided by the end user
+ */
   default?: string;
 
+  /**
+   * @description An optional field specifying example values to be shown to the end user to help them understand the expected format of the attribute
+   */
   examples?: string[];
+
+  /**
+   * @description An optional field specifying whether the attribute should be inherited from parent nodes
+   */
+  inherit?: boolean;
 
   /**
    * @description An optional field specifying the allowed values for the attribute

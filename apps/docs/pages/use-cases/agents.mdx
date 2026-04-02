@@ -39,16 +39,18 @@ Most schema fields are straightforward text records. A minimal agent registratio
 
 ```
 myagent.eth
-  └── class               = "Agent"
-  └── agent-uri           = "https://example.com/agent.json"
-  └── name          = "My Agent"
-  └── description   = "A natural-language description of what this agent does"
+  └── class          = "Agent"
+  └── agent-uri      = "https://example.com/agent.json"
+  └── alias          = "My Agent"
+  └── description    = "A natural-language description of what this agent does"
   └── avatar         = "https://example.com/avatar.png"
-  └── active        = "true"
-  └── x402-support  = "true"
+  └── active         = "true"
+  └── x402-support   = "true"
 ```
 
 Any consumer can resolve these with a standard ENS text record lookup.
+
+* Note: The `alias` and `avatar` fields are the ENS equivalent of the `name` and `image` fields in an ERC-8004 registration file. ERC-8004 field names are inspired by NFT metadata, whereas ENS field names are designed more for identity and profiles ([ENSIP-5](https://docs.ens.domains/ensip/5) and [ENSIP-18](https://docs.ens.domains/ensip/18)).
 
 ### Service Endpoints
 
@@ -110,7 +112,7 @@ Not every field needs to be on the ENS name. A reasonable strategy would be some
 **Publish on ENS**
 
 - `class`, `agent-uri`
-- `name`, `description`, `avatar` - These should hardly change
+- `alias`, `description`, `avatar` - These should hardly change
 - `registrations[*]` - These entries are immutable
 - `x402-support`
 - `agent-wallet`
