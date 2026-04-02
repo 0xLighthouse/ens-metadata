@@ -1,4 +1,5 @@
 import type { NormalizedTreeNode, TreeNode } from '@/lib/tree/types'
+import { type Address, getAddress, isAddressEqual } from 'viem'
 import { GraphQLClient, type RequestDocument, gql } from 'graphql-request'
 import { fetchTexts } from './fetchTexts'
 import { type ENSDataByAddress, mapNamesByAddress } from './mapNamesByAddress'
@@ -52,6 +53,7 @@ export const RESOLVE_DOMAIN_BY_NAME = gql`
 `
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const NAME_WRAPPER_ADDRESS = '0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401'
 
 const RESOLVE_CHILDREN_BY_PARENT_ID = gql`
   query ResolveChildrenByParentId($parentId: String!, $first: Int!, $skip: Int!) {
@@ -73,6 +75,18 @@ const RESOLVE_CHILDREN_BY_PARENT_ID = gql`
     }
   }
 `
+
+/**
+ * Determines the true owner of a domain.
+ * The subgraph may return a stale wrappedOwnerId — only trust it when
+ * the registry owner is the NameWrapper contract itself.
+ */
+function getTrueOwner(ownerId: Address, wrappedOwnerId?: Address): `0x${string}` {
+  if (wrappedOwnerId && isAddressEqual(ownerId, NAME_WRAPPER_ADDRESS)) {
+    return getAddress(wrappedOwnerId)
+  }
+  return getAddress(ownerId)
+}
 
 // Helper to collect all unique owner addresses from the tree
 function collectOwnerAddresses(node: NormalizedTreeNode): Set<`0x${string}`> {
@@ -120,7 +134,10 @@ export async function buildRawTree(rootName: string): Promise<TreeNode | undefin
 
   const buildNode = async (indexed: ENSRecord): Promise<NormalizedTreeNode | undefined> => {
     const resolvedAddress = indexed.resolvedAddress?.id as `0x${string}`
-    const owner = (indexed.wrappedOwnerId ?? indexed.ownerId) as `0x${string}`
+    const owner = getTrueOwner(
+      indexed.ownerId as Address,
+      indexed.wrappedOwnerId as Address | undefined,
+    )
     const ttl = indexed.ttl == null ? undefined : Number(indexed.ttl)
 
     // If the node is owned by the zero address, omit it
@@ -143,7 +160,7 @@ export async function buildRawTree(rootName: string): Promise<TreeNode | undefin
       ttl,
       subdomainCount: 0,
       children: [],
-      isWrapped: !!indexed.wrappedOwnerId && indexed.wrappedOwnerId !== ZERO_ADDRESS,
+      isWrapped: isAddressEqual(indexed.ownerId as Address, NAME_WRAPPER_ADDRESS),
     }
 
     // If the resolver has texts, fetch them and add them to the node
