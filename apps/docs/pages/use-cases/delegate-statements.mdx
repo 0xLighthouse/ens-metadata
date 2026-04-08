@@ -3,63 +3,96 @@ title: Delegate statements
 weight: 2
 ---
 
-# Delegate Statements
+# Filling out your delegate information
 
-## The Problem
+This guide explains how to publish your delegate information as ENS
+metadata, turning your ENS name into a single source of truth for your online delegate identity.
 
-Delegates in a DAO governance system often publish a statement — a
-summary of their philosophy and why others should delegate voting power
-to them. Because many delegates participate in multiple DAOs, their
-statement often varies from one community to the next.
+## Step 1: Choose the right ENS node
 
-Right now, every governance platform — Agora, Tally, Karma — stores
-delegate statements independently. Delegates update their statement in
-one place and it doesn't propagate anywhere else. There is no on-chain
-source of truth.
+Delegate records should live on the ENS name that **resolves to the address
+holding your voting power**. Governance tools trace delegation on-chain
+from token balances to an address, then reverse-resolve that address to find your ENS name. If your metadata records are on a different name/subname, they may be hard to find.
 
-## Proposed Solution
+Here are step-by-step instructions on how to properly set up your delegate information, using ensmetadata.app and app.ens.domains to directly query on-chain data.
 
-ENS metadata allows delegates to publish statements
-directly on their ENS name, with a unique version scoped to each DAO
-they are active in — using the DAO's ENS name as the parameter.
+1. **Identify the address that holds your voting power.** This is the
+   address you use to vote on proposals.
+2. **Check which ENS name resolves to that address.** If you already have an ENS name configured, open [app.ens.domains](https://app.ens.domains) and search for your name. The name whose forward record (the `ETH address`
+   record) points to your voting address is the correct node to use. If you don't yet have an ENS name configured, you can make one now.
+3. **Confirm the reverse record matches.** For governance tools to find
+   you, the address should also have a primary ENS name set, and that
+   primary name should be the same node you are editing. If the reverse
+   record is missing or points somewhere else, set it in the ENS app under
+   *My Names → Set as primary ENS*.
+4. **Use a subname if you want to keep delegate data separate.** Many
+   users prefer to isolate delegate metadata on a dedicated subname such
+   as `delegate.alice.eth` and point its address record at their voting
+   wallet. This keeps your main name's records uncluttered. Just make
+   sure the subname's address record and reverse record both point at the
+   voting address.
+
+## Step 2: Add your delegate information
+
+1. You are now ready to add your delegate information via ensmetadata.app. Connect your wallet, and navigate to the node you identified in step 2 above.
+2. Under `Schema`, select `Delegate`.
+3. The most common fields will appear automatically. To add additional fields, choose "+ Add Optional Field" and select from the list.
+
+
+| Record key | What to put |
+| --- | --- |
+| `display-name` | The name or username you want shown in delegate lists |
+| `legal-name` | *(Optional)* Your real name, if you want to make it public and it differs from your display name |
+| `statement` | Your default delegate statement: your philosophy, priorities, and why token holders should delegate to you |
+| `conflict-of-interest` | Your default conflict-of-interest declaration |
+| `forum-handle` | Your default governance forum username |
+
+The `statement`, `conflict-of-interest`, and `forum-handle` fields act as
+fallbacks that any DAO can read when you haven't written something
+specific for them.
+
+## Step 3: Add DAO-specific statements and conflict-of-interest
+
+If you delegate in multiple DAOs, you'll usually want a different
+statement and conflict-of-interest declaration for each one. The delegate
+schema supports this through parametrised keys, where the parameter is
+the DAO's own ENS name.
+
+Add one record per DAO you participate in:
 
 ```
 delegate.alice.eth
-  └── statement[uniswap.eth] = "I prioritise..."   # Uniswap statement
-  └── statement[ens.eth]    = "My focus is..."     # ENS statement
-  └── statement             = "I am a delegate..."  # default fallback
+  ├── statement[uniswap.eth]            = "My Uniswap priorities are..."
+  ├── statement[ens.eth]                = "For ENS governance I focus on..."
+  ├── conflict-of-interest[uniswap.eth] = "I hold positions in..."
+  ├── conflict-of-interest[ens.eth]     = "I am a contributor to..."
+  ├── forum-handle[uniswap.eth]         = "alice"
+  └── forum-handle[ens.eth]             = "alice576"
 ```
 
-Because ENS records are public and permissionlessly readable, any
-governance tool can resolve the statement without a proprietary API or
-platform-specific submission flow. One update propagates everywhere.
+For now, adding these variants is a manual process:
 
-## Discovering delegates
+1. With the node selected, click the "+ Record" button at the bottom of the metadata editing drawer.
+2. Enter the parametrised key exactly as shown (for example,
+   `statement[ens.eth]`) with the DAO's full ENS name in square brackets.
+3. Paste your statement or declaration as the value for that record, and save the changes.
+4. Repeat for each DAO you are active in, and then broadcast the transaction to update your records.
 
-For DAOs with permissionless delegation systems, delegates can be
-discovered automatically:
+## How delegate information is discovered
 
-1. Look at on-chain token balances to generate a list of accounts that
-   have been delegated to.
-2. For each account, perform a reverse ENS lookup to find their
-   associated ENS name.
-3. Check whether they have a `statement[your-dao.eth]` record set.
-4. If found, surface their statement directly — no manual curation needed.
+Once records are live, any governance tool can find and display
+them. Here's how the discovery process works:
 
-If no DAO-specific statement is found, consumers can fall back to the
-default `statement` value.
-
-## Real-World Context
-
-This problem is visible in ENS's own governance. The official
-[ENS delegation guide](https://discuss.ens.domains/t/managing-delegation-and-submitting-a-delegate-statement-guide/20197)
-notes that statements entered via the Agora UI "are stored off-chain and
-are NOT pulled from `eth.ens.delegate`" — meaning a delegate who
-updates their ENS record sees no change in Agora or Tally. Platforms
-have diverged from the on-chain record entirely.
-
-The parametrized `statement` key solves this by making the ENS name the
-single source of truth, with governance UIs as readers rather than stores.
+1. **Start from on-chain token balances.** The governance tool queries
+   the DAO's token contract for all addresses that currently hold
+   delegated voting power. Most ERC20Votes-style contracts expose a
+   `delegates(address)` mapping and emit `DelegateChanged` events, which
+   together produce a list of every address with voting power.
+2. **Reverse-resolve each address to an ENS name.** For each delegate
+   address, perform a reverse ENS lookup (`addr.reverse`) to
+   find the primary ENS name set by that address.
+3. **Read the delegate text records.** Any name which includes a `schema` record pointing to a known `Delegate` schema can now be queried for specific delegate information.
+4. **Query DAO-specific records, fall back to defaults.** If the schema supports parametrised keys, you can now query those records adding in the ENS name of the DAO you are interested in. If no DAO-specific record is found, query the default records instead.
 
 ## Related
 
