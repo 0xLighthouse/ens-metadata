@@ -32,9 +32,9 @@ export default defineConfig({
       items: nav.navItems('/schemas'),
     },
     {
-      text: 'Use cases',
+      text: 'How-to guides',
       collapsed: false,
-      items: nav.navItems('/use-cases'),
+      items: nav.navItems('/how-to-guides'),
     },
     {
       text: 'SDK',
