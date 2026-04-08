@@ -1,0 +1,282 @@
+---
+title: Organizations
+weight: 3
+---
+
+# Representing your organization with ENS metadata
+
+This guide explains how to use a single ENS name as the canonical, on-chain index of everything an organization controls, including legal entities, officers, treasuries, smart contracts, and internal working groups. The end result is a tree of subnames under your organization's root ENS name, where each subname resolves to a real on-chain address and carries structured metadata describing its role.
+
+The finished structure looks something like this:
+
+```
+supercooldao.eth                              (Org)
+  ├── treasury.supercooldao.eth               (Treasury)
+  ├── ops.supercooldao.eth                    (Wallet)
+  ├── governor.supercooldao.eth               (Contract)
+  ├── token.supercooldao.eth                  (Contract)
+  ├── duna.supercooldao.eth                   (Legal entity)
+  │     ├── ceo.duna.supercooldao.eth         (Person)
+  │     ├── secretary.duna.supercooldao.eth   (Person)
+  │     ├── agent.duna.supercooldao.eth       (Person)
+  │     └── wallet.duna.supercooldao.eth      (Wallet)
+  └── grants.supercooldao.eth                 (Group)
+        └── wallet.grants.supercooldao.eth    (Wallet)
+```
+
+The root name is the trust anchor. Whoever controls it is the entity asserting that every subname below belongs to the organization.
+
+## Step 1: Choose the organization's root ENS name
+
+Pick the ENS name you want to be the organization's public identity (`supercooldao.eth` in the examples below). This is the name that anchors the entire namespace you're about to build.
+
+1. **The wallet that controls the root name should reflect how the organization actually makes decisions.** A multisig, a governor contract, or another governance-controlled address is appropriate here. The authority to issue subnames and edit records flows down from this wallet to everything underneath it.
+2. **Set the root name's address record to an address that speaks for the organization.** If the DAO is governed by a governor contract, point the root at that contract; if it's governed by a multisig, point at the multisig. This way, any signature or transaction originating from the address `supercooldao.eth` resolves to is verifiably an official, top-level decision by the organization. The root becomes both a namespace anchor *and* the canonical "voice" of the organization.
+3. **If you don't have a name set up yet,** register one at [app.ens.domains](https://app.ens.domains) before continuing.
+
+## Step 2: Apply the Org schema to the root
+
+Setting the organization-level metadata on the root name lets indexers recognise the name as an organization and display it sensibly.
+
+1. Open [ensmetadata.app](https://ensmetadata.app), connect the wallet that controls the root name, and navigate to it.
+2. Under `Schema`, select `Org`. This automatically sets `class = "Org"` and the `schema` record.
+3. Fill in the recommended fields and broadcast the transaction.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | The organization's type, usually `DAO` |
+| `name` | Display name of the organization |
+| `description` | Short description of what the organization does |
+| `url` | Canonical URL for the organization (homepage, docs site, governance forum) |
+| `avatar` | URI to a logo or avatar image |
+
+After this step the root carries enough metadata for any consumer to identify it:
+
+```
+supercooldao.eth
+  ├── class       = "DAO"
+  ├── schema      = "<org schema URI>"
+  ├── name        = "Super Cool DAO"
+  ├── description = "A public-goods infrastructure DAO"
+  └── url         = "https://supercool.dao"
+```
+
+The root represents the DAO as a whole. It is the governance-controlled namespace from which everything else hangs. If the DAO has a legal wrapper whose authority sits beneath the DAO, that entity will be represented as a subname and not the root.
+
+## Step 3: Plan the subname structure
+
+Before creating any subnames, decide on a naming convention and stick to it. Subnames are how the rest of the world will refer to the constituent parts of the organization, so they should be human-readable and predictable.
+
+A few rules of thumb:
+
+- **One subname per real-world thing.** Don't conflate a treasury and a governor contract into a single node. Each gets its own subname so each can carry the right schema and the right address.
+- **Use short, descriptive labels.** `treasury.dao.eth`, `governor.dao.eth` , etc.
+- **Set each subname's address record to the address it represents.** A treasury subname points at the treasury multisig, a contract subname points at the deployed contract, an officer subname points at an address that individual controls. The metadata on the subname describes what's at that address; the address record itself is what makes the subname resolvable.
+- **Issue subnames from the wallet that controls the parent name.** This preserves the chain of authority. Every subname can be traced back to the organization's root, and consumers can trust that the parent has explicitly claimed each one.
+
+Subnames can be created and edited in [ensmetadata.app](https://ensmetadata.app) wherever supported, or in [app.ens.domains](https://app.ens.domains). Records on each subname are then edited in ensmetadata.app exactly like any other node.
+
+## Step 4: Add treasury, wallet, and contract subnames
+
+These three node types cover most of an organization's on-chain footprint. The pattern for each is the same: create a subname, point its address record at the relevant on-chain address, then apply the right schema in ensmetadata.app and fill in the fields.
+
+If you have many contracts to claim, it might be worthwhile to group them under a single subname (perhaps `contracts.dao.eth`).
+
+### Treasuries
+
+Use the `Treasury` schema for any address whose primary purpose is holding and disbursing assets under collective control, such as main treasuries, grant vaults, and escrow vaults. The address record should point at the multisig or vault contract that holds the funds.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | `Treasury` (or `Vault`) |
+| `name` | Display name (e.g. `Main Treasury`) |
+| `description` | What this treasury is for and who controls it |
+
+```
+treasury.supercooldao.eth
+  ├── address record → 0x... (governance multisig)
+  ├── class       = "Treasury"
+  ├── name        = "Main DAO Treasury"
+  └── description = "Primary treasury managed by the governor contract"
+```
+
+Use additional subnames (`grants-treasury.dao.eth`, `escrow.dao.eth`) when an organization wants to separate funds by purpose.
+
+### Operational wallets
+
+Use the `Wallet` schema for hot wallets, operational EOAs, or smaller-purpose accounts that aren't full treasuries. The schema is intentionally simple, and just lets you label and describe the address.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | `Wallet` (or `Account`) |
+| `name` | Display name |
+| `description` | What this wallet is used for |
+
+```
+ops.supercooldao.eth
+  ├── address record → 0x... (operations EOA)
+  ├── class       = "Wallet"
+  ├── name        = "Operations Hot Wallet"
+  └── description = "Day-to-day operational expenses, topped up monthly from treasury"
+```
+
+### Smart contracts
+
+Use the `Contract` schema for any deployed smart contract the organization wants to claim, such as governor contracts, token contracts, staking contracts, factories, and periphery contracts. The address record points at the deployed contract address.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | `Contract` |
+| `name` | Display name (e.g. `Governor`, `Token`) |
+| `description` | What the contract does |
+| `category` | *(Optional)* `defi`, `gaming`, `dao`, `utility`, `proxy`, `factory`, etc. |
+| `license` | *(Optional)* SPDX identifier for the source code license |
+| `docs` | *(Optional)* Primary documentation URL |
+| `compiled-metadata` | *(Optional)* URI to the compiler metadata file |
+| `audits` | *(Optional)* URI or inline data for third-party audit reports |
+
+```
+governor.supercooldao.eth
+  ├── address record → 0x... (Governor contract)
+  ├── class       = "Contract"
+  ├── name        = "Super Cool Governor"
+  ├── description = "OpenZeppelin Governor used for on-chain proposals and voting"
+  ├── category    = "dao"
+  └── docs        = "https://docs.supercool.dao/governance"
+```
+
+Once these subnames exist, the organization has a verifiable, on-chain answer to the question "is this address really yours?" When someone shares a contract address claiming it belongs to the organization, anyone can resolve the organization's ENS name and check whether the address appears under it. Omissions become visible too. If funds are flowing through an address that isn't published as a subname, that's a signal worth investigating.
+
+## Step 5: Add the legal entity, its officers, and its wallet
+
+Many DAOs adopt a legal wrapper, such as a Wyoming DUNA, a Cayman foundation, or an LLC, to interact with the off-chain world. The wrapper has its own identity, its own officers, and usually its own dedicated funds, distinct from the DAO's broader treasury. Publishing all of that as children under a single subname keeps the legal entity neatly contained as one branch of the org's tree.
+
+### The legal entity subname
+
+Create a subname like `duna.supercooldao.eth` (use whatever short label matches the wrapper, such as `foundation.dao.eth` or `llc.dao.eth`) and apply the `Org` schema to it. The class on this node should be the specific legal form, and the description and URL fields are where the registered office address and contact information live.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | The legal form, such as `DUNA`, `Foundation`, or `LLC` |
+| `name` | The legal entity's registered name |
+| `description` | The registered office address and any other contact info you want published on-chain |
+| `url` | URL to the entity's filings, registered-agent page, or contact page |
+
+```
+duna.supercooldao.eth
+  ├── class       = "DUNA"
+  ├── schema      = "<org schema URI>"
+  ├── name        = "Super Cool DAO LCA"
+  ├── description = "Wyoming Decentralized Unincorporated Nonprofit Association. Registered office: 123 Main St, Cheyenne, WY 82001"
+  └── url         = "https://supercool.dao/legal"
+```
+
+### Officers
+
+Use the `Person` schema to publish the individuals who hold named roles in the legal entity, such as the CEO, secretary, registered agent, or any other officer the wrapper requires. Each officer gets a child subname under `duna.supercooldao.eth`, and each subname's address record should point at an address that individual actually controls.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | `Officer` (or `Person`, `Signer`, `Signatory`, `Employee`) |
+| `full-name` | The person's full legal or preferred name |
+| `title` | Their role, such as `Chief Executive Officer`, `Secretary`, or `Registered Agent` |
+
+```
+ceo.duna.supercooldao.eth
+  ├── address record → 0x... (Alice's wallet)
+  ├── class     = "Officer"
+  ├── full-name = "Alice Johnson"
+  └── title     = "Chief Executive Officer"
+
+secretary.duna.supercooldao.eth
+  ├── address record → 0x... (Bob's wallet)
+  ├── class     = "Officer"
+  ├── full-name = "Bob Chen"
+  └── title     = "Secretary"
+
+agent.duna.supercooldao.eth
+  ├── address record → 0x... (registered agent's wallet)
+  ├── class     = "Officer"
+  ├── full-name = "Wyoming Registered Agents LLC"
+  └── title     = "Registered Agent"
+```
+
+### The legal entity's wallet
+
+The legal wrapper usually controls funds that are its own, used for legal fees, government filings, registered-agent renewals, and other expenses incurred by the entity rather than by the broader DAO. Publish that wallet as a child subname of the legal entity, distinct from the main `treasury.supercooldao.eth` from Step 4.
+
+```
+wallet.duna.supercooldao.eth
+  ├── address record → 0x... (legal entity multisig)
+  ├── class       = "Wallet"
+  ├── name        = "DUNA Operating Wallet"
+  └── description = "Funds controlled by the legal entity for filings, legal fees, and registered-agent renewals"
+```
+
+Keeping this wallet under `duna.supercooldao.eth` makes the separation explicit: anyone walking the tree can see which funds belong to the legal wrapper and which belong to the DAO at large.
+
+### Why this structure matters
+
+Nesting the officers and the entity's wallet under a single legal-entity subname has a powerful consequence: because each officer subname resolves to a real address, signatures from that address can be traced back through the legal entity, back through the org root, to the governance that authorised the wrapper in the first place. If `ceo.duna.supercooldao.eth` signs a message, anyone can verify that the signer is the person the legal entity has designated as its CEO, and that the legal entity itself is the one the DAO has adopted. The chain of attribution runs from signature → address → officer subname → legal entity subname → root → governance, entirely on-chain.
+
+This matters anywhere official authority matters: signing governance proposals, authorising treasury disbursements, issuing public statements, or executing legal agreements on-chain. The subname structure turns the organization's ENS name into something close to a corporate seal.
+
+## Step 6: Add working groups and committees
+
+Use the `Group` schema for the organization's internal structure, including workgroups, committees, councils, and teams. A group subname represents the group itself; the group can then have its own child subnames for the wallets and contracts it controls, mirroring the pattern from Steps 4 and 5.
+
+Set the group subname's address record to the address that signs on behalf of the group, typically a multisig controlled by the group's members. That way, when the group authorises something, the signature comes from an address that resolves back through `grants.supercooldao.eth` to the organization's root.
+
+| Record key | What to put |
+| --- | --- |
+| `class` | `Group` (or `Committee`, `Council`, `Workgroup`, `Team`) |
+| `name` | The group's name |
+| `description` | What the group is responsible for |
+| `url` | URL with more information about the group |
+| `lead` | ENS name or address of the group's lead |
+| `lead-title` | *(Optional)* The lead's title, such as `Lead Steward` or `Chair` |
+| `members-title` | *(Optional)* The title used for ordinary members |
+| `avatar` | *(Optional)* URI to a logo or avatar |
+
+A workgroup with its own operating budget might look like this:
+
+```
+grants.supercooldao.eth
+  ├── address record → 0x... (workgroup multisig)
+  ├── class         = "Workgroup"
+  ├── name          = "Grants Workgroup"
+  ├── description   = "Reviews and funds public-goods grant proposals"
+  ├── url           = "https://supercool.dao/grants"
+  ├── lead          = "carol.supercooldao.eth"
+  ├── lead-title    = "Lead Steward"
+  └── members-title = "Steward"
+
+wallet.grants.supercooldao.eth
+  ├── address record → 0x... (grants operating wallet)
+  ├── class       = "Wallet"
+  ├── name        = "Grants Operating Wallet"
+  └── description = "Operating budget for the Grants Workgroup, topped up quarterly"
+```
+
+The grants workgroup is now a discoverable branch of the organization in its own right: it has a name, a lead, an authorising multisig, and its own operational wallet, all anchored back to `supercooldao.eth`. The same pattern can be repeated for any committee, council, or team the organization wants to publish.
+
+## How an organization's structure is discovered
+
+Once the tree is in place, any consumer can map an organization's full on-chain footprint without querying any external API or documentation site:
+
+1. **Start from the organization's root ENS name** (`supercooldao.eth`).
+2. **Enumerate its subnames** via the ENS Subgraph, or by scanning `NewOwner` events on the registry under the root's namehash.
+3. **For each subname, read the `class` and `schema` records** to determine whether it's a treasury, contract, officer, group, or something else.
+4. **Read the schema-specific records** (`name`, `description`, `full-name`, `title`, `lead`, etc.) and resolve the subname's address record to find the on-chain target.
+5. **Recurse into group subnames** to discover their own child wallets and contracts.
+
+The result is a live, permissionless map of the organization's legal structure, treasuries, contracts, and internal groups, all anchored in the same name people already use to refer to the organization.
+
+## Related
+
+- [Organization schema](/schemas/org)
+- [Treasury schema](/schemas/treasury)
+- [Wallet schema](/schemas/wallet)
+- [Contract schema](/schemas/contract)
+- [Person schema](/schemas/person)
+- [Group schema](/schemas/group)
