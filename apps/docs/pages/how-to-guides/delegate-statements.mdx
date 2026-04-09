@@ -14,7 +14,7 @@ Delegate records should live on the ENS name that **resolves to the address
 holding your voting power**. Governance tools trace delegation on-chain
 from token balances to an address, then reverse-resolve that address to find your ENS name. If your metadata records are on a different name/subname, they may be hard to find.
 
-Here are step-by-step instructions on how to properly set up your delegate information, using ensmetadata.app and app.ens.domains to directly query on-chain data.
+Here are step-by-step instructions on how to properly set up your delegate information, using [ensmetadata.app](https://ensmetadata.app) and [app.ens.domains](https://app.ens.domains) to directly query on-chain data.
 
 1. **Identify the address that holds your voting power.** This is the
    address you use to vote on proposals.
@@ -37,7 +37,6 @@ Here are step-by-step instructions on how to properly set up your delegate infor
 1. You are now ready to add your delegate information via ensmetadata.app. Connect your wallet, and navigate to the node you identified in step 2 above.
 2. Under `Schema`, select `Delegate`.
 3. The most common fields will appear automatically. To add additional fields, choose "+ Add Optional Field" and select from the list.
-
 
 | Record key | What to put |
 | --- | --- |
@@ -78,21 +77,9 @@ For now, adding these variants is a manual process:
 3. Paste your statement or declaration as the value for that record, and save the changes.
 4. Repeat for each DAO you are active in, and then broadcast the transaction to update your records.
 
-## How delegate information is discovered
+## Discovering delegates
 
-Once records are live, any governance tool can find and display
-them. Here's how the discovery process works:
-
-1. **Start from on-chain token balances.** The governance tool queries
-   the DAO's token contract for all addresses that currently hold
-   delegated voting power. Most ERC20Votes-style contracts expose a
-   `delegates(address)` mapping and emit `DelegateChanged` events, which
-   together produce a list of every address with voting power.
-2. **Reverse-resolve each address to an ENS name.** For each delegate
-   address, perform a reverse ENS lookup (`addr.reverse`) to
-   find the primary ENS name set by that address.
-3. **Read the delegate text records.** Any name which includes a `schema` record pointing to a known `Delegate` schema can now be queried for specific delegate information.
-4. **Query DAO-specific records, fall back to defaults.** If the schema supports parametrised keys, you can now query those records adding in the ENS name of the DAO you are interested in. If no DAO-specific record is found, query the default records instead.
+Once records are live, any governance tool can find and display them. Typical on-chain voting systems make it possible to discover a list of all addresses that currently hold voting power. Each of those addresses can then be reverse-resolved to its primary ENS name, connecting the on-chain voting power to the delegate records published under that name.
 
 ## Related
 

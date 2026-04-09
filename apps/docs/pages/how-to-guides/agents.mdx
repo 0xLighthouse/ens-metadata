@@ -11,32 +11,20 @@ This guide explains how to publish your AI agent's identity and capabilities as 
 
 Agent records should live on the ENS name you want to be your agent's canonical identity. Indexers find agents by scanning ENS text records on-chain, so the name you choose here is the address consumers will resolve when they look your agent up.
 
-1. **Pick the ENS name (or subname) the agent will be known by.** This might be a top-level name like `myagent.eth`, or a dedicated subname like `agent.alice.eth`. Subnames are recommended when an operator runs multiple agents, since each subname gets its own independent set of records.
-2. **Point the address record at the agent's controlling wallet.** The ETH address record on the node should resolve to the address that operates the agent. If you don't have a name set up yet, you can register one at [app.ens.domains](https://app.ens.domains).
-3. **Make sure the wallet that owns the records can write to the resolver.** All metadata records in this guide are written as ENS text records on the Public Resolver, so the wallet that controls the node needs to be the one connected when you edit metadata in the next step.
-4. **Decide on a payout wallet.** This can be the same as the controlling wallet or a separate address. You'll publish it in Step 3 as the `agent-wallet` record, and it should match the payout address used by any ERC-8004 registration the agent has.
+Two distinct addresses are involved in this step, and it's worth being clear about both before proceeding.
 
-## Step 2: Set the agent class and schema
+1. **The address the ENS name resolves to should be the address controlled by the agent.** This is the agent's on-chain identity: any transaction or signature coming from this address is understood to originate from the agent itself. The ETH address record on the node should be set to this address.
+2. **The owner or manager of the ENS name controls who can update records and create subnames.** This can be set to either the agent's own address (giving the agent the ability to update its own records autonomously) or to a user's address (so the operator retains control and can update the agent's records on its behalf).
 
-The `class` record is the field indexers filter on to find agents on-chain, and the `schema` record tells consumers which version of the agent schema your records conform to. Setting these is the first step towards discoverability.
+With those two decisions made, you can proceed:
 
-1. Open [ensmetadata.app](https://ensmetadata.app), connect your wallet, and navigate to the node you chose in Step 1.
-2. Under `Schema`, select `Agent`. This automatically sets `class = "Agent"` and the `schema` record pointing to the current agent schema, and reveals the recommended fields for the next step.
-3. Save the changes and broadcast the transaction.
+3. **Pick the ENS name (or subname) the agent will be known by.** This might be a top-level name like `myagent.eth`, or a dedicated subname like `agent.alice.eth`. Subnames are recommended when an operator runs multiple agents, since each subname gets its own independent set of records.
 
-After this step the on-chain records on your node will include:
+## Step 2: Add your agent information
 
-```
-myagent.eth
-  ├── class  = "Agent"
-  └── schema = "<agent schema URI>"
-```
-
-Any indexer scanning `TextChanged` events on the Public Resolver can now see that this node is an agent.
-
-## Step 3: Add core agent information
-
-With the schema selected, the most common fields appear automatically in the metadata editor. To add additional fields, choose "+ Add Optional Field" and select from the list.
+1. Open [ensmetadata.app](https://ensmetadata.app), connect the wallet that controls the ENS name you want to use, and navigate to the node you chose in Step 1.
+2. Under `Schema`, select `Agent`. This automatically sets the `class` and `schema` records and reveals the recommended fields.
+3. Fill in your agent's information. The most common fields appear automatically; to add additional fields, choose "+ Add Optional Field" and select from the list.
 
 | Record key | What to put |
 | --- | --- |
@@ -65,7 +53,7 @@ myagent.eth
 
 Consumers can now resolve all of these with a standard ENS text record lookup.
 
-## Step 4: Advertise services
+## Step 3: Advertise services
 
 Services are how clients discover what your agent actually does and where to call it. The agent schema supports two approaches that can coexist.
 
@@ -96,9 +84,9 @@ For now, adding parametrised entries is a manual process in [ensmetadata.app](ht
 
 Clients should treat the bare `services` record as a fallback value that gets queried when they can't find a direct `services[name]` entry on the ENS name.
 
-## Step 5: Cross-registry references and trust models
+## Step 4: Cross-registry references and trust models
 
-These two array fields are optional but recommended for agents that participate in on-chain registries or advertise verification mechanisms. Both are added through the same "+ Record" flow as parametrised services in Step 4.
+These two array fields are optional but recommended for agents that participate in on-chain registries or advertise verification mechanisms. Both are added through the same "+ Record" flow as parametrised services in Step 3.
 
 **Cross-registry references.** Agents registered with ERC-8004 or other on-chain registries can advertise those registrations using the `registrations[*]` array field. Each entry follows [CAIP-19 format](https://github.com/ChainAgnostic/CAIPs/blob/main/CAIPs/caip-19.md), since ERC-8004 identities are modelled as ERC-721 tokens (`{namespace}:{chainId}/{tokenStandard}:{identityRegistry}/{agentId}`):
 

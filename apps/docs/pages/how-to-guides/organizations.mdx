@@ -26,20 +26,23 @@ supercooldao.eth                              (Org)
 
 The root name is the trust anchor. Whoever controls it is the entity asserting that every subname below belongs to the organization.
 
-## Step 1: Choose the organization's root ENS name
+## Step 1: Configure the organization's root ENS name
 
 Pick the ENS name you want to be the organization's public identity (`supercooldao.eth` in the examples below). This is the name that anchors the entire namespace you're about to build.
 
-1. **The wallet that controls the root name should reflect how the organization actually makes decisions.** A multisig, a governor contract, or another governance-controlled address is appropriate here. The authority to issue subnames and edit records flows down from this wallet to everything underneath it.
-2. **Set the root name's address record to an address that speaks for the organization.** If the DAO is governed by a governor contract, point the root at that contract; if it's governed by a multisig, point at the multisig. This way, any signature or transaction originating from the address `supercooldao.eth` resolves to is verifiably an official, top-level decision by the organization. The root becomes both a namespace anchor *and* the canonical "voice" of the organization.
-3. **If you don't have a name set up yet,** register one at [app.ens.domains](https://app.ens.domains) before continuing.
+Two distinct addresses are involved in this step, and it's worth being clear about both before proceeding.
+
+1. **The owner or manager of the ENS name** is the address with the authority to update records and create subnames under the root. This address controls the namespace itself, so it should reflect how the organization actually makes decisions. A multisig, governor contract, or other governance-controlled address is appropriate here. The authority to issue subnames and edit records flows down from this address to everything underneath it.
+2. **The address the root name resolves to** represents the organization's on-chain identity. Any signature or transaction originating from this address is understood to be an official, top-level action by the organization, so it should be an address that genuinely speaks for the organization.
+
+Both of these can be the same address, or they can be separate. For example, an organization might use a governance-controlled multisig to manage the namespace while pointing the address record at a different address that represents the organization's identity. What matters is that both choices are intentional: the first address controls the authority to update records, and the second represents the organization to the outside world.
 
 ## Step 2: Apply the Org schema to the root
 
 Setting the organization-level metadata on the root name lets indexers recognise the name as an organization and display it sensibly.
 
 1. Open [ensmetadata.app](https://ensmetadata.app), connect the wallet that controls the root name, and navigate to it.
-2. Under `Schema`, select `Org`. This automatically sets `class = "Org"` and the `schema` record.
+2. Under `Schema`, select `Organization`. This automatically sets `class = "Organization"` and the `schema` record.
 3. Fill in the recommended fields and broadcast the transaction.
 
 | Record key | What to put |
@@ -61,7 +64,7 @@ supercooldao.eth
   └── url         = "https://supercool.dao"
 ```
 
-The root represents the DAO as a whole. It is the governance-controlled namespace from which everything else hangs. If the DAO has a legal wrapper whose authority sits beneath the DAO, that entity will be represented as a subname and not the root.
+The root represents the DAO as a whole. It is the governance-controlled namespace from which everything else hangs. If the DAO has a legal wrapper whose authority sits beneath the DAO, it probably makes more sense for that entity to be represented as a subname beneath the root level.
 
 ## Step 3: Plan the subname structure
 
