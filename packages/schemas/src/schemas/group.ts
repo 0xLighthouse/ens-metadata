@@ -48,6 +48,7 @@ export const GROUP_SCHEMA: Schema = {
       type: 'string',
       description: 'Title or role of the group leader',
       examples: ['Lead Steward', 'Chair', 'Manager', 'Owner'],
+      inherit: true
     },
     'members-title': {
       type: 'string',
