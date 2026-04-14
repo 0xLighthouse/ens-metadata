@@ -2,32 +2,26 @@
 title: Introduction
 ---
 
-# Node Classification Metadata
+# ENS Metadata
 
-Node Classification Metadata is a proposed ENS standard (ENSIP) that allows ENS names and subnames to declare their role within a larger organizational structure. By attaching a `class` and a `schema` to any ENS node, owners can label what that node represents (such as a person, treasury, or smart contract) and publish structured metadata that describes it in more detail.
+ENS names are already how people and organizations identify themselves on-chain. ENS metadata takes this a step further: it lets any ENS name or subname carry structured, on-chain data that describes what it represents and what it does. Because the data lives in ENS text records, any client can read it with a standard lookup.
+
+By adding metadata to each node, a flat list of subnames becomes a hierarchical tree where every branch has a defined role and machine-readable attributes.
 
 ![Node tree structure](/node-tree.png)
 
-This makes it possible for wallets, governance platforms, and other tools to automatically discover and interpret the purpose of an ENS name, without relying on off-chain registries or manual curation.
+## What can you do with it?
 
-## Documentation overview
+**Represent an entire organization.** A DAO or company can use a single ENS name as the root of a tree. Subnames underneath represent the organization's treasuries, smart contracts, legal entities, officers, working groups, and operational wallets. Each subname resolves to the address it represents and carries metadata describing its role. The result is a live, verifiable map of everything the organization controls, anchored in one name. [Read the guide →](/guides/organizations)
 
-### Overview
+**Publish your delegate profile.** If you participate in DAO governance, you can attach your delegate statement, conflict-of-interest declarations, and forum handles directly to the ENS name that holds your voting power. Governance tools can discover this information automatically, and you can publish different statements for different DAOs using parameterized keys. [Read the guide →](/guides/delegate-statements)
 
-Background on the ENSIP specification itself, how schemas work, and additional resources for following the proposal's development.
+**Give your AI agent an identity.** An AI agent that owns an ENS name can publish its capabilities, service endpoints, trust models, and cross-registry references as metadata. Any consumer can resolve the agent's name to find everything they need, without a centralized agent registry. [Read the guide →](/guides/agents)
 
-### Schemas
+## Where to start
 
-A reference for each of the proposed schemas, organized by class. These schemas define which metadata attributes can be attached to a node of a given type, and are published to IPFS for long-term availability.
+To understand the building blocks behind all of this, read [how schemas work](/overview/schemas).
 
-### How-to guides
+To look up which attributes are available for each node type, see the [schema reference](/schemas/agent).
 
-Step-by-step guides for applying node classification metadata to real-world scenarios, including delegate statements for DAO governance, metadata for AI agents, and representing an entire organization's on-chain structure.
-
-### SDK
-
-Developer documentation for querying ENS metadata programmatically using our TypeScript SDK.
-
-## Contributions
-
-Everything here is still a work in progress. To get involved, please see our [Notion page](https://stealth-respect-4e8.notion.site/Organizational-Metadata-on-ENS-2313a8375c77801dad2ce5b513ce9450) for more information.
+If you're building a tool that reads ENS metadata, the [SDK documentation](/sdk/documentation) covers querying metadata programmatically.

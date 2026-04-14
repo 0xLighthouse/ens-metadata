@@ -1,6 +1,6 @@
-# ENS: Node Classification Metadata
+# ENS Metadata
 
-This is a monorepo for the Node Classification Metadata project, sponsored by ENS. An ENSIP is [currently in development](https://github.com/ensdomains/ensips/pull/64) to standardize a protocol for adding additional metadata attributes to ENS names. This will make it possible to attach structured, typed records (like organizational roles, categories, or labels) directly to ENS nodes onchain. This repo includes a proof-of-concept interface for reading and writing those records, along with the supporting SDK, schemas, and documentation.
+This is a monorepo for the ENS Metadata project, sponsored by ENS. An ENSIP is [currently in development](https://github.com/ensdomains/ensips/pull/64) to standardize a protocol for adding additional metadata attributes to ENS names. This will make it possible to attach structured, typed records (like organizational roles, categories, or labels) directly to ENS nodes onchain. This repo includes a proof-of-concept interface for reading and writing those records, along with the supporting SDK, schemas, and documentation.
 
 For additional background on the project, see [our Notion page](https://stealth-respect-4e8.notion.site/Organizational-Metadata-on-ENS-2313a8375c77801dad2ce5b513ce9450).
 

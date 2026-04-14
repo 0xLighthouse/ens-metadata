@@ -5,7 +5,7 @@ weight: 2
 
 # How schemas work
 
-Node classification metadata is built on three layers: a class label, a schema definition, and the attributes themselves. Together they let any ENS node declare what it represents and carry structured, machine-readable metadata about it.
+ENS metadata is built on three layers: a class label, a schema definition, and the attributes themselves. Together they let any ENS node declare what it represents and carry structured, machine-readable metadata about it.
 
 ## Class: the label
 
@@ -76,12 +76,12 @@ treasury.supercooldao.eth
 
 Clients reading the node can look up the schema to understand what each record means, validate the data, and present it in a structured way.
 
-Some attributes support parameterized key names, which allow a single attribute to hold multiple entries as either a dictionary (map) or an ordered list (array). For example, an agent might publish `services[web]`, `services[mcp]`, and `services[a2a]` as separate records under one parameterized key. See the [parameterized keys guide](/how-to-guides/parameterized-keys) for details.
+Some attributes support parameterized key names, which allow a single attribute to hold multiple entries as either a dictionary (map) or an ordered list (array). For example, an agent might publish `services[web]`, `services[mcp]`, and `services[a2a]` as separate records under one parameterized key. See the [parameterized keys guide](/guides/parameterized-keys) for details.
 
 ## Custom schemas
 
-The standard schemas listed in the [schema reference](/schemas/agent) cover the most common node types. Anyone is free to create and publish additional schemas for use cases not covered by the standard set. Custom schemas follow the same JSON Schema format and can be published to IPFS for immutability or hosted over HTTPS if mutability is preferred. See the [ENSIP specification](/overview/ensip-xx) for the full requirements.
+The standard schemas listed in the [schema reference](/schemas/agent) cover the most common node types. Anyone is free to create and publish additional schemas for use cases not covered by the standard set. Custom schemas follow the same JSON Schema format and can be published to IPFS for immutability or hosted over HTTPS if mutability is preferred.
 
 ## Where to go next
 
-The [schema reference](/schemas/agent) documents every attribute available for each node type. The [how-to guides](/how-to-guides/agents) walk through applying schemas to real scenarios, from setting up a delegate profile to representing an entire organization's on-chain structure.
+The [schema reference](/schemas/agent) documents every attribute available for each node type. The [guides](/guides/agents) walk through applying schemas to real scenarios, from setting up a delegate profile to representing an entire organization's on-chain structure.
