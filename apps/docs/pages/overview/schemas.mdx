@@ -3,14 +3,85 @@ title: Schemas
 weight: 2
 ---
 
-# Schemas
+# How schemas work
 
- The node classification metadata spec dictates how JSON schemas can be appended to an ENS name (or subname) to expose which additional metadata attributes are expected to be provided for that node. It is expected that a popular, standardized set of schemas will become widely used, which will improve cross-compatibility across the industry, however anyone is free to create additional JSON schemas to facilitate attaching whatever metadata serves their purpose best. 
- 
- In the section below, you can find our collection of proposed schemas which we hope the industry will use and build upon. All of these schemas are still a work in progress, and we are open to feedback and suggestions.
- 
- Our schemas are all published to IPFS to ensure immutability and availability for the long term. They also include an EIP-712 signature to provide proof of authorship.
+Node classification metadata is built on three layers: a class label, a schema definition, and the attributes themselves. Together they let any ENS node declare what it represents and carry structured, machine-readable metadata about it.
 
-## Schema Categories
+## Class: the label
 
-Each schema is named for the `class` of node it is expected to be used with. We have also included a `globals` schema which includes text records defined by other ENSIPs.
+Any ENS node can set a `class` text record to declare what role the node plays. The value is pascal case and should be one of the recognised class identifiers (such as `Treasury`, `Contract`, `Person`, `Agent`, `Org`, or `Delegate`), though custom values are allowed for specialised use cases.
+
+```
+treasury.supercooldao.eth
+  └── class = "Treasury"
+```
+
+This single record is enough for indexers and governance tools to recognise the node's purpose. It answers the question "what is this node?"
+
+## Schema: the structure
+
+A node can also set a `schema` text record pointing to a JSON schema. The schema declares which additional metadata attributes the node is expected to carry, what each attribute means, and which ones are required.
+
+```
+treasury.supercooldao.eth
+  ├── class  = "Treasury"
+  └── schema = "ipfs://QmXrSd..."
+```
+
+Schemas are published to IPFS so they are immutable and available for the long term. They follow the [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core) specification, and describe a flat object where every property is of type `string`, matching the ENS text record model. A minimal schema looks like this:
+
+```json
+{
+  "$id": "https://github.com/0xLighthouse/ens-node-metadata/.../treasury/2.0.0",
+  "title": "Treasury",
+  "description": "Funds and assets managed by a collective of individuals or entities.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Treasury",
+      "description": "Class identifier for this node"
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the treasury schema"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name of the treasury"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the treasury"
+    }
+  },
+  "required": ["class", "schema"]
+}
+```
+
+Interfaces like [ensmetadata.app](https://ensmetadata.app) read the schema to determine which fields to show, which are required, and what descriptions and examples to display when editing a node's records.
+
+## Attributes: the data
+
+Once a schema is selected, the node can be populated with the attributes it defines. Each attribute is stored as an ordinary ENS text record on the node's resolver.
+
+```
+treasury.supercooldao.eth
+  ├── class       = "Treasury"
+  ├── schema      = "ipfs://QmXrSd..."
+  ├── name        = "Main DAO Treasury"
+  └── description = "Primary treasury managed by the governor contract"
+```
+
+Clients reading the node can look up the schema to understand what each record means, validate the data, and present it in a structured way.
+
+Some attributes support parameterized key names, which allow a single attribute to hold multiple entries as either a dictionary (map) or an ordered list (array). For example, an agent might publish `services[web]`, `services[mcp]`, and `services[a2a]` as separate records under one parameterized key. See the [parameterized keys guide](/how-to-guides/parameterized-keys) for details.
+
+## Custom schemas
+
+The standard schemas listed in the [schema reference](/schemas) cover the most common node types. Anyone is free to create and publish additional schemas for use cases not covered by the standard set. Custom schemas follow the same JSON Schema format and can be published to IPFS for immutability or hosted over HTTPS if mutability is preferred. See the [ENSIP specification](/overview/ensip-xx) for the full requirements.
+
+## Where to go next
+
+The [schema reference](/schemas) documents every attribute available for each node type. The [how-to guides](/how-to-guides) walk through applying schemas to real scenarios, from setting up a delegate profile to representing an entire organization's on-chain structure.

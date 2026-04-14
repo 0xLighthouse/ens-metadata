@@ -1,0 +1,157 @@
+---
+title: Parameterized keys
+weight: 10
+---
+
+# Using parameterized key names
+
+ENS text records are simple key-value pairs. Parameterized key names extend this model to support dictionaries and ordered lists, without requiring any changes to the underlying resolver. A parameter is appended to a key name in square brackets:
+
+```
+key-name[parameter]
+```
+
+This guide explains the two types of parameterized keys, how to populate them on a node, and how to define them in a schema.
+
+## Maps
+
+A map is a set of key-value pairs where the parameter is a free-form label. Use maps when each entry represents a named variant of the same attribute.
+
+For example, a delegate might publish a different statement for each DAO they participate in, using the DAO's ENS name as the parameter:
+
+```
+delegate.alice.eth
+  ├── statement                    = "My general governance philosophy..."
+  ├── statement[ens.eth]           = "For ENS governance I focus on..."
+  ├── statement[uniswap.eth]      = "My Uniswap priorities are..."
+  └── statement[arbitrum.eth]     = "For Arbitrum I care most about..."
+```
+
+An agent might publish a map of service endpoints, keyed by service name:
+
+```
+myagent.eth
+  ├── services[web]  = "https://web.agentxyz.com/"
+  ├── services[mcp]  = "https://mcp.agentxyz.com/"
+  └── services[a2a]  = "https://agent.example/.well-known/agent-card.json"
+```
+
+The base form of the key (`statement`, `services`) can coexist alongside parameterized entries. Clients should treat the base form as a default or fallback when no specific parameter is requested.
+
+### Populating a map in ensmetadata.app
+
+If the schema has already been selected and the parameterized key appears in the schema, the common fields will appear automatically. To add additional entries:
+
+1. Click "+ Record" at the bottom of the metadata editing drawer.
+2. Enter the full key including the parameter in square brackets, for example `statement[ens.eth]`.
+3. Enter the value and save.
+4. Repeat for each entry, then broadcast the transaction.
+
+## Arrays
+
+An array is an ordered, zero-indexed list. Use arrays when the entries form a sequence and their position matters more than a named label.
+
+For example, an agent might publish the on-chain registries it is registered with:
+
+```
+myagent.eth
+  ├── registrations[0]  = "eip155:1/erc721:0x742.../22"
+  ├── registrations[1]  = "eip155:8453/erc721:0x.../7"
+  └── registrations[2]  = "eip155:42161/erc721:0x.../3"
+```
+
+Array entries start at index `0` and must be sequential with no gaps. Clients read arrays by starting at `0` and incrementing until no value is found. If a gap exists in the sequence, clients will stop at the gap and will not retrieve entries beyond it.
+
+Like maps, arrays also support a base form of the key as a fallback.
+
+### Populating an array in ensmetadata.app
+
+Adding array entries follows the same process as maps:
+
+1. Click "+ Record" at the bottom of the metadata editing drawer.
+2. Enter the key with the next index in square brackets, for example `registrations[0]`.
+3. Enter the value and save.
+4. Repeat for each entry in order, then broadcast the transaction.
+
+When removing entries, re-index the remaining items so there are no gaps in the sequence.
+
+## Defining parameterized keys in a schema
+
+Parameterized keys are declared in the `patternProperties` section of a JSON schema. The property name is a regex pattern that matches both the base form and the parameterized form of the key. The following regex format accepts either form while rejecting empty brackets:
+
+```
+^key-name(\[[^\]]+\])?$
+```
+
+We recommend running your schema through a JSON Schema validator to ensure it is valid before publishing.
+
+### Defining a map
+
+Add the property to `patternProperties` with `"parameterType": "map"`. If `parameterType` is omitted, the default is `"map"`.
+
+```json
+{
+  "patternProperties": {
+    "^services(\\[[^\\]]+\\])?$": {
+      "type": "string",
+      "parameterType": "map",
+      "format": "uri",
+      "description": "A map of service names to their endpoints"
+    }
+  }
+}
+```
+
+This allows records like `services`, `services[web]`, `services[mcp]`, etc.
+
+### Defining an array
+
+Add the property to `patternProperties` with `"parameterType": "array"`.
+
+```json
+{
+  "patternProperties": {
+    "^registrations(\\[[^\\]]+\\])?$": {
+      "type": "string",
+      "parameterType": "array",
+      "description": "An array of cross-chain identity registrations following CAIP-19 format"
+    }
+  }
+}
+```
+
+This allows records like `registrations[0]`, `registrations[1]`, `registrations[2]`, etc.
+
+### Combining both types in one schema
+
+A schema can include any number of parameterized keys, mixing maps and arrays as needed. For example, the agent schema defines `services` as a map and `registrations` as an array:
+
+```json
+{
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Display name of the agent"
+    }
+  },
+  "patternProperties": {
+    "^services(\\[[^\\]]+\\])?$": {
+      "type": "string",
+      "parameterType": "map",
+      "format": "uri",
+      "description": "A map of service names to their endpoints"
+    },
+    "^registrations(\\[[^\\]]+\\])?$": {
+      "type": "string",
+      "parameterType": "array",
+      "description": "An array of cross-chain identity registrations following CAIP-19 format"
+    }
+  }
+}
+```
+
+## Related
+
+- [ENSIP specification](/overview/ensip-xx)
+- [Agent schema](/schemas/agent) (uses both maps and arrays)
+- [Delegate schema](/schemas/delegate) (uses maps for DAO-specific statements)
