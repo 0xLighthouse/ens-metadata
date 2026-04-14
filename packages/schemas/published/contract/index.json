@@ -1,6 +1,6 @@
 {
   "schemaId": "contract",
-  "latest": "3.0.0",
+  "latest": "3.0.1",
   "published": [
     {
       "version": "1.1.1",
@@ -22,6 +22,13 @@
       "checksum": "sha256:2d1158958fecbe78eaf0fbdcf050dec83bb7ae0bfd756d7a4022188460ee49f2",
       "timestamp": 1776160276,
       "schemaPath": "packages/schemas/published/contract/versions/3.0.0/schema.json"
+    },
+    {
+      "version": "3.0.1",
+      "cid": "QmbioLkr8t9A35aBaqWuChJhLyvjUoYVYB3ekw3nrGAL3P",
+      "checksum": "sha256:5c9eaa06da290d7208ef93c834db68cba7159a726e293ea4f35daf8dfc8c4492",
+      "timestamp": 1776162134,
+      "schemaPath": "packages/schemas/published/contract/versions/3.0.1/schema.json"
     }
   ]
 }

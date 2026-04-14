@@ -1,0 +1,67 @@
+{
+  "schemaId": "agent",
+  "version": "3.0.1",
+  "title": "Agent",
+  "description": "An AI agent with ERC-8004 metadata.",
+  "source": "https://github.com/0xLighthouse/ens-metadata",
+  "cid": "QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs",
+  "checksum": "sha256:cc1dd0a2ebabd867492a0b6699f05d21eb4fa04153f6197eea0a3990a9349476",
+  "timestamp": 1776162125,
+  "schemaPath": "packages/schemas/published/agent/versions/3.0.1/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x24e91ccb85dd0e4853702e7744c417639e93ea0fbc2e7d1449d7ef1f9a1161c83a027e575341e711d77a92562f07c478901f3fe656d0d0ad9e386e08f12da7d61c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "agent",
+      "version": "3.0.1",
+      "cid": "QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs",
+      "checksum": "sha256:cc1dd0a2ebabd867492a0b6699f05d21eb4fa04153f6197eea0a3990a9349476",
+      "timestamp": 1776162125,
+      "schemaPath": "packages/schemas/published/agent/versions/3.0.1/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}
