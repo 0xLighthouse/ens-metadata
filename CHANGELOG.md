@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-14
+
 ### Added
 
 - [deb871e] [44bed45] `inherit` flag on schema attributes so child nodes can pull values from their parent — applied across contract, group, and other schemas where inheritance is the expected behavior.
@@ -23,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [cef3be9] Group schema's lead title is now inherited from the parent node by default.
 - [a8e5c4e] [6683eba] Renamed the `use-cases` docs section to `how-to-guides` and rewrote the ENSIP-XX overview for clarity.
 
-[Unreleased]: https://github.com/0xLighthouse/ens-node-metadata/compare/HEAD...HEAD
+[Unreleased]: https://github.com/0xLighthouse/ens-node-metadata/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/0xLighthouse/ens-node-metadata/compare/ccf5ee8...v0.1.0
 
 [28244ce]: https://github.com/0xLighthouse/ens-node-metadata/commit/28244ce
 [cef3be9]: https://github.com/0xLighthouse/ens-node-metadata/commit/cef3be9
