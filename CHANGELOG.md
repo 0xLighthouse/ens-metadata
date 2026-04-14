@@ -25,17 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [cef3be9] Group schema's lead title is now inherited from the parent node by default.
 - [a8e5c4e] [6683eba] Renamed the `use-cases` docs section to `how-to-guides` and rewrote the ENSIP-XX overview for clarity.
 
-[Unreleased]: https://github.com/0xLighthouse/ens-node-metadata/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/0xLighthouse/ens-node-metadata/compare/ccf5ee8...v0.1.0
+[Unreleased]: https://github.com/0xLighthouse/ens-metadata/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/0xLighthouse/ens-metadata/compare/ccf5ee8...v0.1.0
 
-[28244ce]: https://github.com/0xLighthouse/ens-node-metadata/commit/28244ce
-[cef3be9]: https://github.com/0xLighthouse/ens-node-metadata/commit/cef3be9
-[44bed45]: https://github.com/0xLighthouse/ens-node-metadata/commit/44bed45
-[deb871e]: https://github.com/0xLighthouse/ens-node-metadata/commit/deb871e
-[8823689]: https://github.com/0xLighthouse/ens-node-metadata/commit/8823689
-[092509d]: https://github.com/0xLighthouse/ens-node-metadata/commit/092509d
-[6683eba]: https://github.com/0xLighthouse/ens-node-metadata/commit/6683eba
-[a8e5c4e]: https://github.com/0xLighthouse/ens-node-metadata/commit/a8e5c4e
-[7b5c10a]: https://github.com/0xLighthouse/ens-node-metadata/commit/7b5c10a
-[805459a]: https://github.com/0xLighthouse/ens-node-metadata/commit/805459a
-[6462279]: https://github.com/0xLighthouse/ens-node-metadata/commit/6462279
+[28244ce]: https://github.com/0xLighthouse/ens-metadata/commit/28244ce
+[cef3be9]: https://github.com/0xLighthouse/ens-metadata/commit/cef3be9
+[44bed45]: https://github.com/0xLighthouse/ens-metadata/commit/44bed45
+[deb871e]: https://github.com/0xLighthouse/ens-metadata/commit/deb871e
+[8823689]: https://github.com/0xLighthouse/ens-metadata/commit/8823689
+[092509d]: https://github.com/0xLighthouse/ens-metadata/commit/092509d
+[6683eba]: https://github.com/0xLighthouse/ens-metadata/commit/6683eba
+[a8e5c4e]: https://github.com/0xLighthouse/ens-metadata/commit/a8e5c4e
+[7b5c10a]: https://github.com/0xLighthouse/ens-metadata/commit/7b5c10a
+[805459a]: https://github.com/0xLighthouse/ens-metadata/commit/805459a
+[6462279]: https://github.com/0xLighthouse/ens-metadata/commit/6462279
