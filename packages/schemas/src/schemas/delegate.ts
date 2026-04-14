@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const DELEGATE_SCHEMA_VERSION = '3.0.0';
+const DELEGATE_SCHEMA_VERSION = '3.0.1';
 
 export const DELEGATE_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/delegate/versions/${DELEGATE_SCHEMA_VERSION}`,

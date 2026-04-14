@@ -56,7 +56,7 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
             </a>
           </div>
           <a
-            href="https://github.com/0xLighthouse/ens-node-metadata"
+            href="https://github.com/0xLighthouse/ens-metadata"
             target="_blank"
             rel="noreferrer"
             aria-label="GitHub repository (opens in new tab)"
