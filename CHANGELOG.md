@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- [81f641e] [803d364] Renamed the GitHub repository from `ens-node-metadata` to `ens-metadata`. All schema `$id` URLs, READMEs, the interface footer, and CLI docs now point at the new location.
+- [803d364] Republished every schema as v3.0.1 with the updated `$id` URL. New IPFS CIDs are recorded in `_registry.json`; v3.0.0 remains pinned at its original CIDs.
+
 ## [0.1.0] - 2026-04-14
 
 ### Added
@@ -39,3 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [7b5c10a]: https://github.com/0xLighthouse/ens-metadata/commit/7b5c10a
 [805459a]: https://github.com/0xLighthouse/ens-metadata/commit/805459a
 [6462279]: https://github.com/0xLighthouse/ens-metadata/commit/6462279
+[81f641e]: https://github.com/0xLighthouse/ens-metadata/commit/81f641e
+[803d364]: https://github.com/0xLighthouse/ens-metadata/commit/803d364
