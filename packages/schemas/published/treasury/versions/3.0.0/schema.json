@@ -1,0 +1,40 @@
+{
+  "$id": "https://github.com/0xLighthouse/ens-node-metadata/tree/main/packages/schemas/published/treasury/versions/3.0.0",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "title": "Treasury",
+  "version": "3.0.0",
+  "description": "Funds and assets managed by a collective of individuals or entities.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Treasury",
+      "description": "Class identifier for this node",
+      "examples": [
+        "Treasury",
+        "Vault"
+      ]
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the treasury schema"
+    },
+    "alias": {
+      "type": "string",
+      "description": "Display name of the treasury"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the treasury"
+    }
+  },
+  "required": [
+    "class",
+    "schema"
+  ],
+  "recommended": [
+    "alias",
+    "description"
+  ]
+}

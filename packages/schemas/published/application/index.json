@@ -1,6 +1,6 @@
 {
   "schemaId": "application",
-  "latest": "2.0.0",
+  "latest": "3.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -15,6 +15,13 @@
       "checksum": "sha256:186c7eab6d794a81f22075ee1e493d713b6320824d11e586166cee2dff40ddc0",
       "timestamp": 1774383638,
       "schemaPath": "packages/schemas/published/application/versions/2.0.0/schema.json"
+    },
+    {
+      "version": "3.0.0",
+      "cid": "Qmedeq2mJCamgmk3WqzWg1mpS7JX5rC7dBzkKwQHmvThKU",
+      "checksum": "sha256:9d8bcfc0e8f7655093e8ae47940a410910375c2483bea6f12eb5638bbd9a7dac",
+      "timestamp": 1776160271,
+      "schemaPath": "packages/schemas/published/application/versions/3.0.0/schema.json"
     }
   ]
 }

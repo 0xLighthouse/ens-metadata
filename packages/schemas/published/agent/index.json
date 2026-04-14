@@ -1,6 +1,6 @@
 {
   "schemaId": "agent",
-  "latest": "2.0.0",
+  "latest": "3.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -15,6 +15,13 @@
       "checksum": "sha256:368d30d0e857b4bf30f144d8a857969773f6f87021911874fea20f1bc9c037ad",
       "timestamp": 1774383612,
       "schemaPath": "packages/schemas/published/agent/versions/2.0.0/schema.json"
+    },
+    {
+      "version": "3.0.0",
+      "cid": "QmbteLU1FCjb2zaEkLD6F97KJvgRK372sQ7SxECbWxSAQs",
+      "checksum": "sha256:5f5db768237bcec983bfa0400ae444909cb2bba9f59af88473aa7b3e9af8776a",
+      "timestamp": 1776160265,
+      "schemaPath": "packages/schemas/published/agent/versions/3.0.0/schema.json"
     }
   ]
 }

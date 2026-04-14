@@ -1,0 +1,67 @@
+{
+  "schemaId": "org",
+  "version": "3.0.0",
+  "title": "Organization",
+  "description": "A legal or organizational entity.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmVuUd67YEGWQ3vCQFCRRKsUBvRBDHksHPo8vfvX3Y9eLX",
+  "checksum": "sha256:8015bca54c8a7e4370a34708066ba69ca70d6acf7b7725eb7c1021ce559c5874",
+  "timestamp": 1776160316,
+  "schemaPath": "packages/schemas/published/org/versions/3.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x4847904d957fd893c192e537c100237676382e0449784df88d91d3da238eb48d6816a45cdf7f3055c98bd3f84786ea4af5d47db1cdf4fb5d3a5456d8ed2279781c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "org",
+      "version": "3.0.0",
+      "cid": "QmVuUd67YEGWQ3vCQFCRRKsUBvRBDHksHPo8vfvX3Y9eLX",
+      "checksum": "sha256:8015bca54c8a7e4370a34708066ba69ca70d6acf7b7725eb7c1021ce559c5874",
+      "timestamp": 1776160316,
+      "schemaPath": "packages/schemas/published/org/versions/3.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "schemaId": "group",
-  "latest": "2.0.0",
+  "latest": "3.0.0",
   "published": [
     {
       "version": "0.1.4",
@@ -15,6 +15,13 @@
       "checksum": "sha256:068272a56248b3fac238926ce674a10aae149e07d69dcae65f6effc850f2ab72",
       "timestamp": 1774383645,
       "schemaPath": "packages/schemas/published/group/versions/2.0.0/schema.json"
+    },
+    {
+      "version": "3.0.0",
+      "cid": "QmU3UeqcMQiED7mydG55V6zFVNnWcTrcVBcxmajra6s3qF",
+      "checksum": "sha256:0b21c0ce036ac45e74cf527b87fee308ff60dd5a2c25a24db14cf9f6d97a8e4d",
+      "timestamp": 1776160312,
+      "schemaPath": "packages/schemas/published/group/versions/3.0.0/schema.json"
     }
   ]
 }

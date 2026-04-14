@@ -1,0 +1,67 @@
+{
+  "schemaId": "group",
+  "version": "3.0.0",
+  "title": "Group",
+  "description": "A group of individuals or entities with a shared purpose or responsibility.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmU3UeqcMQiED7mydG55V6zFVNnWcTrcVBcxmajra6s3qF",
+  "checksum": "sha256:0b21c0ce036ac45e74cf527b87fee308ff60dd5a2c25a24db14cf9f6d97a8e4d",
+  "timestamp": 1776160312,
+  "schemaPath": "packages/schemas/published/group/versions/3.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x9a33e2f4754588701ac8aec1c71dbabf604800100762e9d1ba351ac85b2019926cdc8cdbb5e543f6aa59115aa6757bfdfac6737927de534775271c2ace1b8c7c1b",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "group",
+      "version": "3.0.0",
+      "cid": "QmU3UeqcMQiED7mydG55V6zFVNnWcTrcVBcxmajra6s3qF",
+      "checksum": "sha256:0b21c0ce036ac45e74cf527b87fee308ff60dd5a2c25a24db14cf9f6d97a8e4d",
+      "timestamp": 1776160312,
+      "schemaPath": "packages/schemas/published/group/versions/3.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}
