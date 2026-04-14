@@ -1,0 +1,67 @@
+{
+  "schemaId": "treasury",
+  "version": "3.0.0",
+  "title": "Treasury",
+  "description": "Funds and assets managed by a collective of individuals or entities.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmdMnrVK98zghFj8y5W8y31MuLc2feo4AzNfRbAWDsRTG9",
+  "checksum": "sha256:d39ab3694dea3176c0ee376a302661f5e5cc05ff5b671c1f0bf0e9efa1b3d1dc",
+  "timestamp": 1776160326,
+  "schemaPath": "packages/schemas/published/treasury/versions/3.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0xb27b6e32066d8620e1257b360f8c74e9d58128d67041a82c2564a0aa30f706e80acce183a7c068ae98dde74f3d1d199103dd262ed1df31e57c1f55d1775860881c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "treasury",
+      "version": "3.0.0",
+      "cid": "QmdMnrVK98zghFj8y5W8y31MuLc2feo4AzNfRbAWDsRTG9",
+      "checksum": "sha256:d39ab3694dea3176c0ee376a302661f5e5cc05ff5b671c1f0bf0e9efa1b3d1dc",
+      "timestamp": 1776160326,
+      "schemaPath": "packages/schemas/published/treasury/versions/3.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

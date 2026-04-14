@@ -1,0 +1,67 @@
+{
+  "schemaId": "delegate",
+  "version": "3.0.0",
+  "title": "Delegate",
+  "description": "A voter who has been delegated voting power.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "QmWP9pn2voNgNXVb2u8e5P2nRVPUbgsoVqeXB9qSL6d1HJ",
+  "checksum": "sha256:188c279bb401dfa0458df385cac097cc39715810839e31e9e3fa063e2fb25a06",
+  "timestamp": 1776160281,
+  "schemaPath": "packages/schemas/published/delegate/versions/3.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x7fc3aeb4b7781c1d8fda6ac9edfcc1c37ade3b74be12928045e6a0fdc6c6ecaf4a315a436825fde0b743582017bef861c4daa8f333b4044b141afccd87db1a841c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "delegate",
+      "version": "3.0.0",
+      "cid": "QmWP9pn2voNgNXVb2u8e5P2nRVPUbgsoVqeXB9qSL6d1HJ",
+      "checksum": "sha256:188c279bb401dfa0458df385cac097cc39715810839e31e9e3fa063e2fb25a06",
+      "timestamp": 1776160281,
+      "schemaPath": "packages/schemas/published/delegate/versions/3.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

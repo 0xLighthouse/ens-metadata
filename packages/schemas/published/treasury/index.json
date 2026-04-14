@@ -1,6 +1,6 @@
 {
   "schemaId": "treasury",
-  "latest": "2.0.0",
+  "latest": "3.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -15,6 +15,13 @@
       "checksum": "sha256:3f794ebd1db23995142c8227c1e23b407d6a1cf44354f5ec1ac8308bbadb3b35",
       "timestamp": 1774383649,
       "schemaPath": "packages/schemas/published/treasury/versions/2.0.0/schema.json"
+    },
+    {
+      "version": "3.0.0",
+      "cid": "QmdMnrVK98zghFj8y5W8y31MuLc2feo4AzNfRbAWDsRTG9",
+      "checksum": "sha256:d39ab3694dea3176c0ee376a302661f5e5cc05ff5b671c1f0bf0e9efa1b3d1dc",
+      "timestamp": 1776160326,
+      "schemaPath": "packages/schemas/published/treasury/versions/3.0.0/schema.json"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "schemaId": "person",
-  "latest": "2.0.0",
+  "latest": "3.0.0",
   "published": [
     {
       "version": "1.0.0",
@@ -15,6 +15,13 @@
       "checksum": "sha256:791483b8648574691a610f74afd69644e6fe10a6e18adfa5e6d9cfe7f48f66db",
       "timestamp": 1774383648,
       "schemaPath": "packages/schemas/published/person/versions/2.0.0/schema.json"
+    },
+    {
+      "version": "3.0.0",
+      "cid": "QmZUAK5JkWchnbU6TMYRQhwDRFjSfqEAW2AiZpGEQ1weNy",
+      "checksum": "sha256:1d53f60ce3347071a92127df4ed1db9c69a44d38ff56320284ab3ab66a3946b8",
+      "timestamp": 1776160321,
+      "schemaPath": "packages/schemas/published/person/versions/3.0.0/schema.json"
     }
   ]
 }

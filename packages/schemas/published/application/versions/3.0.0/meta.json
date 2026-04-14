@@ -1,0 +1,67 @@
+{
+  "schemaId": "application",
+  "version": "3.0.0",
+  "title": "Application",
+  "description": "A software application, service, or website.",
+  "source": "https://github.com/0xLighthouse/ens-node-metadata",
+  "cid": "Qmedeq2mJCamgmk3WqzWg1mpS7JX5rC7dBzkKwQHmvThKU",
+  "checksum": "sha256:9d8bcfc0e8f7655093e8ae47940a410910375c2483bea6f12eb5638bbd9a7dac",
+  "timestamp": 1776160271,
+  "schemaPath": "packages/schemas/published/application/versions/3.0.0/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x3493ed32fcbedaf79f2419d814584e359864f0847ad70b5f6e96e8c1ad863b3a6a066e35d90d06d309f977022c132f1592a2a67f1ae5e0ae102ca18a5afa6fe31c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "application",
+      "version": "3.0.0",
+      "cid": "Qmedeq2mJCamgmk3WqzWg1mpS7JX5rC7dBzkKwQHmvThKU",
+      "checksum": "sha256:9d8bcfc0e8f7655093e8ae47940a410910375c2483bea6f12eb5638bbd9a7dac",
+      "timestamp": 1776160271,
+      "schemaPath": "packages/schemas/published/application/versions/3.0.0/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}
