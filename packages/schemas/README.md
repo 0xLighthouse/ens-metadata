@@ -64,7 +64,7 @@ published/
 
 ## Contributing
 
-To suggest a new schema or changes to an existing one, open a pull request against the `develop` branch of the [repository](https://github.com/0xLighthouse/ens-node-metadata).
+To suggest a new schema or changes to an existing one, open a pull request against the `develop` branch of the [repository](https://github.com/0xLighthouse/ens-metadata).
 
 ### Adding a new schema
 

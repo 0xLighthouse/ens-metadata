@@ -1,7 +1,7 @@
 import type { Schema } from "../types";
 import { GITHUB_URL } from "../config/constants";
 
-const GRANT_SCHEMA_VERSION = '3.0.0';
+const GRANT_SCHEMA_VERSION = '3.0.1';
 
 export const GRANT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/grant/versions/${GRANT_SCHEMA_VERSION}`,
