@@ -32,19 +32,11 @@ export default defineConfig({
       items: nav.navItems('/schemas'),
     },
     {
-      text: 'How-to guides',
+      text: 'Guides',
       collapsed: false,
-      items: nav.navItems('/how-to-guides'),
+      items: nav.navItems('/guides'),
     },
-    {
-      text: 'SDK',
-      collapsed: false,
-      items: nav.navItems('/sdk'),
-    },
-    {
-      text: 'CLI',
-      collapsed: false,
-      items: nav.navItems('/cli'),
-    },
+    { text: 'SDK', link: '/sdk/documentation' },
+    { text: 'CLI', link: '/cli/documentation' },
   ],
 })
