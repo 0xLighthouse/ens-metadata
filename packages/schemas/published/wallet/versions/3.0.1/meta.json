@@ -1,0 +1,67 @@
+{
+  "schemaId": "wallet",
+  "version": "3.0.1",
+  "title": "Wallet",
+  "description": "A wallet for holding or managing assets.",
+  "source": "https://github.com/0xLighthouse/ens-metadata",
+  "cid": "QmNhNg4LFsWyLNEXRzotmAmzyo9cWYaWzxGc4gLgrxHeEL",
+  "checksum": "sha256:9d3d6d06b5e3a1e93838e16debc5a0a427dd587fec2a2cfb7e21e2b59db8ea61",
+  "timestamp": 1776162149,
+  "schemaPath": "packages/schemas/published/wallet/versions/3.0.1/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x72fadaded2f6eda916292f5958cf370f6251abb4962e95e566b2295068bf1c4141597821dedd1efeca11f14c55c7139c70f5202aa3b685897de97b44145f8e101c",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "wallet",
+      "version": "3.0.1",
+      "cid": "QmNhNg4LFsWyLNEXRzotmAmzyo9cWYaWzxGc4gLgrxHeEL",
+      "checksum": "sha256:9d3d6d06b5e3a1e93838e16debc5a0a427dd587fec2a2cfb7e21e2b59db8ea61",
+      "timestamp": 1776162149,
+      "schemaPath": "packages/schemas/published/wallet/versions/3.0.1/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

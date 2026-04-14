@@ -1,0 +1,76 @@
+{
+  "$id": "https://github.com/0xLighthouse/ens-metadata/tree/main/packages/schemas/published/grant/versions/3.0.1",
+  "source": "https://github.com/0xLighthouse/ens-metadata",
+  "title": "Grant",
+  "version": "3.0.1",
+  "description": "A grant issued by an organization.",
+  "type": "object",
+  "properties": {
+    "class": {
+      "type": "string",
+      "default": "Grant",
+      "description": "Class identifier for this node",
+      "examples": [
+        "Grant",
+        "GrantProgram"
+      ]
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI pointing to the grant schema"
+    },
+    "alias": {
+      "type": "string",
+      "description": "Display name of the grant"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the grant purpose and scope"
+    },
+    "avatar": {
+      "type": "string",
+      "description": "URI pointing to the grant's avatar",
+      "inherit": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL pointing to information about the grant program",
+      "examples": [
+        "https://www.example.com/grants/example-grant"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "description": "The current status of the grant",
+      "enum": [
+        "Active",
+        "Incomplete",
+        "Pending",
+        "Completed",
+        "Cancelled"
+      ]
+    },
+    "budget": {
+      "type": "string",
+      "description": "Total amount of the grant in WEI"
+    },
+    "token": {
+      "type": "string",
+      "description": "The address of the ERC-20 token used to fund the grant"
+    }
+  },
+  "required": [
+    "class",
+    "schema"
+  ],
+  "recommended": [
+    "alias",
+    "description",
+    "url",
+    "status",
+    "budget",
+    "token"
+  ]
+}

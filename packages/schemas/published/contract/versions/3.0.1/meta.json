@@ -1,0 +1,67 @@
+{
+  "schemaId": "contract",
+  "version": "3.0.1",
+  "title": "Contract",
+  "description": "An on-chain smart contract found at this node's resolved address.",
+  "source": "https://github.com/0xLighthouse/ens-metadata",
+  "cid": "QmbioLkr8t9A35aBaqWuChJhLyvjUoYVYB3ekw3nrGAL3P",
+  "checksum": "sha256:5c9eaa06da290d7208ef93c834db68cba7159a726e293ea4f35daf8dfc8c4492",
+  "timestamp": 1776162134,
+  "schemaPath": "packages/schemas/published/contract/versions/3.0.1/schema.json",
+  "publisher": "pinata",
+  "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
+  "signature": "0x5f50338c97d5479b657eeef8d3bc6e8fab74ff1c2f4cea661da4ff8f3c12c8f835b11079755d105baa7b039856f9f72b542ae0731577518f51acd335d831baeb1b",
+  "eip712": {
+    "domain": {
+      "name": "ENS Schema Publisher",
+      "version": "1"
+    },
+    "types": {
+      "PublishedSchema": [
+        {
+          "name": "schemaId",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "name": "schemaPath",
+          "type": "string"
+        },
+        {
+          "name": "publisher",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "PublishedSchema",
+    "message": {
+      "schemaId": "contract",
+      "version": "3.0.1",
+      "cid": "QmbioLkr8t9A35aBaqWuChJhLyvjUoYVYB3ekw3nrGAL3P",
+      "checksum": "sha256:5c9eaa06da290d7208ef93c834db68cba7159a726e293ea4f35daf8dfc8c4492",
+      "timestamp": 1776162134,
+      "schemaPath": "packages/schemas/published/contract/versions/3.0.1/schema.json",
+      "publisher": "pinata",
+      "notes": ""
+    }
+  }
+}

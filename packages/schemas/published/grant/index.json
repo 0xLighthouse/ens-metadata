@@ -1,6 +1,6 @@
 {
   "schemaId": "grant",
-  "latest": "3.0.0",
+  "latest": "3.0.1",
   "published": [
     {
       "version": "1.0.0",
@@ -22,6 +22,13 @@
       "checksum": "sha256:1796ea1920136055feb340f9c7075f46c1d190531370519b0c53be7ac964c3ba",
       "timestamp": 1776160285,
       "schemaPath": "packages/schemas/published/grant/versions/3.0.0/schema.json"
+    },
+    {
+      "version": "3.0.1",
+      "cid": "QmXHZB371UYkDXUnAJFHHRDPFT5MgAkyNQRbS7H5qsBcEb",
+      "checksum": "sha256:d230860d6e3a6ab493a8fed338ea98f5f131f4bea62a1fc14846e6f625124077",
+      "timestamp": 1776162138,
+      "schemaPath": "packages/schemas/published/grant/versions/3.0.1/schema.json"
     }
   ]
 }

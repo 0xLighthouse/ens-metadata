@@ -1,6 +1,6 @@
 {
   "schemaId": "org",
-  "latest": "3.0.0",
+  "latest": "3.0.1",
   "published": [
     {
       "version": "0.1.8",
@@ -22,6 +22,13 @@
       "checksum": "sha256:8015bca54c8a7e4370a34708066ba69ca70d6acf7b7725eb7c1021ce559c5874",
       "timestamp": 1776160316,
       "schemaPath": "packages/schemas/published/org/versions/3.0.0/schema.json"
+    },
+    {
+      "version": "3.0.1",
+      "cid": "QmaJ6HSdKy7fLsJy9Sk8xP6LW2CagLUwLgDm5KtKLPTwnp",
+      "checksum": "sha256:7d798099710c2d3eeb036613b1448df6a1fe3b0431da62e616525a6d5793f200",
+      "timestamp": 1776162142,
+      "schemaPath": "packages/schemas/published/org/versions/3.0.1/schema.json"
     }
   ]
 }

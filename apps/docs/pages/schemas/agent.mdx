@@ -14,9 +14,9 @@ An AI agent with ERC-8004 metadata.
 | class | string | Y | Class identifier for this node | - |
 | schema | string | Y | URI pointing to the agent schema | - |
 | agent-uri | string | Y | URI pointing to an ERC-8004 registration file | - |
-| name | string | - | Display name of the agent | - |
-| description | string | - | Natural-language description of the agent | - |
-| avatar | string | - | URI pointing to the agent's avatar image | - |
+| alias | string | Y | Display name of the agent, equivalent to the `name` field in an ERC-8004 registration file | - |
+| description | string | Y | Natural-language description of the agent | - |
+| avatar | string | Y | URI pointing to the agent's avatar image, equivalent to the `image` field in an ERC-8004 registration file | - |
 | services | string | - | URI pointing to a payload containing the agent's services | - |
 | x402-support | string | - | Indicates whether or not the agent supports x402 payments | - |
 | active | string | - | Indicates whether or not the agent is currently active | - |
@@ -28,15 +28,17 @@ An AI agent with ERC-8004 metadata.
 ## Metadata
 
 - Schema ID: `agent`
-- Latest version: `2.0.0`
-- Source: [https://github.com/0xLighthouse/ens-node-metadata](https://github.com/0xLighthouse/ens-node-metadata)
-- CID: `QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF`
-- Checksum: `sha256:368d30d0e857b4bf30f144d8a857969773f6f87021911874fea20f1bc9c037ad`
-- Published at (UTC): `2026-03-24T20:20:12.000Z`
+- Latest version: `3.0.1`
+- Source: [https://github.com/0xLighthouse/ens-metadata](https://github.com/0xLighthouse/ens-metadata)
+- CID: `QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs`
+- Checksum: `sha256:cc1dd0a2ebabd867492a0b6699f05d21eb4fa04153f6197eea0a3990a9349476`
+- Published at (UTC): `2026-04-14T10:22:05.000Z`
 
 ## Version history
 
 | Version | CID | IPFS | Published at (UTC) |
 | --- | --- | --- | --- |
-| `2.0.0 (latest)` | `QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF` | [Open](https://ipfs.io/ipfs/QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF) | `2026-03-24T20:20:12.000Z` |
+| `3.0.1 (latest)` | `QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs` | [Open](https://ipfs.io/ipfs/QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs) | `2026-04-14T10:22:05.000Z` |
+| `3.0.0` | `QmbteLU1FCjb2zaEkLD6F97KJvgRK372sQ7SxECbWxSAQs` | [Open](https://ipfs.io/ipfs/QmbteLU1FCjb2zaEkLD6F97KJvgRK372sQ7SxECbWxSAQs) | `2026-04-14T09:51:05.000Z` |
+| `2.0.0` | `QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF` | [Open](https://ipfs.io/ipfs/QmUjh8DBC6YjAhdzzumWJEssHNfzJ52sug1GE25YZ6B1BF) | `2026-03-24T20:20:12.000Z` |
 | `1.0.0` | `QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ` | [Open](https://ipfs.io/ipfs/QmS1ZHmucPJCo8KGaBG2e27c6jqpjFrFWoZWoVPyBPqVyJ) | `2026-02-18T13:13:22.000Z` |
