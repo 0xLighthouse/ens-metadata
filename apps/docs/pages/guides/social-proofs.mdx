@@ -1,0 +1,143 @@
+---
+title: Social Proofs
+weight: 5
+---
+
+# Linking a social account to your ENS name
+
+This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Today the supported platform is X (Twitter); the same scheme is designed to extend to other platforms by adding new `proof.<platform>` records.
+
+## Mental model
+
+A social proof is a **signed claim**, owned by the ENS name's controller, asserting "this ENS name is linked to this X account at this point in time". The claim is small enough to fit in a single ENS text record, so verification needs only an RPC call — no IPFS round-trip, no backend lookup.
+
+There are three pieces:
+
+1. **The claim** — a compact CBOR payload describing the link, signed with EIP-191 by the ENS owner's wallet. Detailed below.
+2. **The text record** — `proof.twitter` on the ENS name, holding the hex-encoded signed claim. This is the cheap path everyone reads.
+3. **The full proof document** — a richer payload pinned to IPFS, with the claim plus the upstream attestation (e.g. the OAuth subject Privy validated). The text record's `prf` field holds the CID. Verifiers only fetch this when they want to re-check the upstream attestation.
+
+The point of this layering is that the common case — "is this ENS name still linked to @handle?" — is one text-record read plus a signature check. Everything more expensive is opt-in.
+
+## Anatomy of a claim
+
+A claim is a CBOR map with eight signed fields plus the signature itself. Every field is part of the hash, so changing any of them invalidates the signature. The fields are deliberately short — they're paying for on-chain bytes.
+
+| Field | Type | Purpose |
+| --- | --- | --- |
+| `v` | uint | Schema version. Currently `1`. Lets verifiers reject formats they don't understand without trying to parse them. |
+| `p` | string | Platform identifier. `"twitter"` today; `"github"`, `"farcaster"`, etc. as the system grows. Verifiers key off this to pick the right `proof.<platform>` text record and the right upstream attestation method. |
+| `h` | string | Handle at the time of signing — e.g. `"vitalik"`. **Treat as a hint, not identity.** Handles can be released and re-registered by someone else, so anything load-bearing should key off `uid`. |
+| `uid` | string | Platform-stable user id. For X this is the `sub` claim from the OAuth JWT, which never changes even if the user renames their account. This is the field that actually identifies the linked account. |
+| `exp` | uint | Expiry, unix seconds. After this the claim is dead — verifiers reject it without checking anything else. Forces proofs to be refreshed periodically rather than living forever as stale assertions. |
+| `prf` | string | IPFS CID of the full proof document. Lets a verifier dig into the upstream attestation if they don't trust the on-chain claim alone. The CID is in the signed payload, so it can't be swapped out after the fact. |
+| `name` | string | ENS name this claim is bound to — `"alice.eth"`. Including it in the hash means a claim signed for one name can't be replayed onto another name the same address controls. |
+| `chainId` | uint | EVM chain id the claim is valid on. Stops a mainnet claim from being replayed to Sepolia (or vice versa) by an indexer that's not paying attention to which chain it's reading. |
+| `sig` | bytes | 65-byte EIP-191 signature over `keccak256(canonical_cbor(fields_without_sig))`. Recovered address must equal the current ENS owner — that's the entire trust check on the cheap path. |
+
+A worked example, in the JSON projection that `decodeClaim()` returns:
+
+```json
+{
+  "v": 1,
+  "p": "twitter",
+  "h": "vitalik",
+  "uid": "295218901",
+  "exp": 1798761600,
+  "prf": "bafyreigh2akiscaildc...",
+  "name": "vitalik.eth",
+  "chainId": 1,
+  "sig": "0x4e8a..."
+}
+```
+
+Encoded that comes out to roughly 200–250 bytes — well within the practical size of a single ENS text record, and small enough that reading it is cheaper than almost anything else a resolver does.
+
+A few subtleties that aren't obvious from the field list:
+
+- **The signed bytes are canonical CBOR, not the JSON projection above.** `dag-cbor` enforces RFC 8949 deterministic encoding (sorted map keys by length then bytewise, shortest-form integers, no indefinite-length items), so any compliant decoder reproduces the exact same bytes that were originally signed. JSON has no such guarantee — two equivalent JSON documents can serialize differently, and that's fatal for signature verification.
+- **`sig` is excluded from the hash.** The signer hashes the eight content fields, signs that hash, then attaches `sig` to the same map for transport. The verifier re-encodes without `sig`, re-hashes, and ecrecovers. This is why `signClaim()` and `verifyClaim()` both call `hashClaim()` over a `ClaimWithoutSig`, never over the full `Claim`.
+- **Owner is checked at verify time, not sign time.** The signer doesn't have to *be* the owner when they sign — they have to be the owner when someone else verifies. In practice the proofs app makes the signer and the current owner the same address, but if ownership transfers later, every existing proof flips to `wrong-owner` until the new owner re-signs. That's the intended behavior: an ownership change should invalidate identity assertions made by the previous owner.
+- **`uid` survives handle changes; the on-chain `h` does not.** If `@vitalik` renames to `@vbuterin`, the existing text record still verifies (the signature is still valid, the owner still matches), but the `h` field is now stale. Consumers that care about freshness should re-resolve the handle from the platform using `uid` rather than trusting `h`.
+
+## Step 1: Generate the proof
+
+1. Open the proofs app, connect the wallet that controls your ENS name, and select the name you want to attach the proof to.
+2. Link your X account through the in-app OAuth flow. The app reads the stable `sub` claim from the X-issued JWT — this is the identifier that survives handle changes, so the proof keeps verifying even if you rename your account.
+3. Sign the claim. Your wallet signs an EIP-191 message over the canonical CBOR of the claim fields. The signature's recovered address must match the ENS owner at verify time, so this step has to happen with the wallet that controls the name.
+
+Behind the scenes the app builds a full proof document, pins it to IPFS to get a CID, and bakes that CID into the on-chain claim before signing.
+
+## Step 2: Publish the text record
+
+The signed claim gets written to the resolver under the key `proof.twitter` as a single hex string. The proofs app handles this in one transaction; if you'd rather do it manually, the value is just `0x` + the hex of the CBOR-encoded `Claim`:
+
+```
+alice.eth
+  └── proof.twitter = "0xa86176..."   # hex(CBOR(claim))
+```
+
+Because the claim hash is bound to both `name` and `chainId`, you can't replay the same record on a different name or a different chain — verifiers reject any claim where the recovered owner doesn't match.
+
+## Step 3: Verify the proof
+
+Verification has two depths. Most consumers only need the cheap path.
+
+**Cheap path** — read the text record and check the signature against the current ENS owner. No IPFS, no third-party calls:
+
+```ts
+import { createPublicClient, http } from 'viem'
+import { mainnet } from 'viem/chains'
+import { addEnsContracts } from '@ensdomains/ensjs'
+import { ensSubgraphActions } from '@ensdomains/ensjs/subgraph'
+import { proofVerifier } from '@ensmetadata/sdk'
+
+const client = createPublicClient({
+  chain: addEnsContracts(mainnet),
+  transport: http(),
+})
+  .extend(ensSubgraphActions)
+  .extend(proofVerifier())
+
+const result = await client.verifyProof({
+  name: 'alice.eth',
+  platform: 'twitter',
+})
+
+if (result.valid) {
+  console.log('linked handle:', result.handle)
+  console.log('stable user id:', result.uid)
+  console.log('expires at:', new Date(result.expiresAt! * 1000))
+} else {
+  console.log('not valid:', result.reason)
+}
+```
+
+`reason` will be one of `missing`, `expired`, `bad-signature`, `wrong-owner`, `decode-error`, or `handle-changed`. The first four are the common failures — a missing or expired record, a malformed claim, or an ownership transfer that invalidated the old signer.
+
+**Deep path** — fetch the full proof document from IPFS and re-validate the upstream attestation. Use this when you care about *how* the link was originally established, not just that the ENS owner asserted it:
+
+```ts
+const full = await client.fetchAndVerifyFullProof(result.cid!, {
+  expectedOwner: '0x...', // optional — re-runs the cheap path against this address
+})
+
+console.log('attestation method:', full.method) // e.g. 'privy-linked'
+```
+
+The `method` field tells you which backend produced the attestation, so a verifier with stricter trust requirements can accept some methods and reject others without changing the on-chain format.
+
+## Why this design
+
+A few decisions are worth calling out, because they shape what the system can and can't do:
+
+- **Canonical CBOR, not JSON.** Signature verification needs byte-identical re-encoding. `dag-cbor` enforces RFC 8949 deterministic encoding (sorted map keys, shortest-form integers, no indefinite-length items), so `decode(encode(x))` round-trips cleanly across implementations. JSON has no such guarantee.
+- **Replay-bound to `name` and `chainId`.** Without these, a claim signed for `alice.eth` could be replayed onto any other name the same address controls, or moved between mainnet and Sepolia. Including them in the hash kills that class of attack.
+- **Stable user id, not handle.** The `uid` field stores the platform's immutable id (X's `sub` claim). Handles can change; ids can't. Verifiers should treat `handle` as a hint and `uid` as the identity.
+- **Layered storage.** The text record carries everything a normal verifier needs. The IPFS document carries everything a *paranoid* verifier needs. Putting the upstream attestation in the text record would either bloat it past the practical size limit or force every reader through IPFS.
+- **Backend-neutral attestation.** Today the attestation is a Privy-validated X OAuth flow. Tomorrow it could be a TLSNotary proof or a zk-verified JWT. The `method` field on the full proof document discriminates, so verifiers can opt into stricter backends without the on-chain claim format changing.
+
+## Related
+
+- [`@ensmetadata/sdk` reference](/sdk/documentation)
+- [Claim schema (CDDL)](https://github.com/0xLighthouse/ens-metadata/blob/main/packages/sdk/schemas/identity-proof.cddl)
