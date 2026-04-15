@@ -5,16 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { attest } from '@/lib/attester-client'
 import { type StorageTier, type UploadProofResult, uploadProof } from '@/lib/ipfs'
-import type { DraftFullProof } from '@/lib/twitter-proof'
 import { type Claim, encodeClaim, metadataWriter } from '@ensmetadata/sdk'
 import { encode as cborEncode } from '@ipld/dag-cbor'
 import { AlertTriangle, CheckCircle2, FileSignature } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { bytesToHex } from 'viem'
+import type { AnyDraftFullProof } from './Wizard'
 
 interface Props {
   name: string
-  draft: DraftFullProof
+  draft: AnyDraftFullProof
   sessionId: string
   onBack: () => void
 }
@@ -97,6 +97,11 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
   const [existingReference, setExistingReference] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingUpload | null>(null)
 
+  // ENS text record key for this proof, e.g. "com.x.proof" or
+  // "org.telegram.proof". Derived from the platform field on the draft so
+  // a single ReviewStep handles every platform without branching.
+  const recordKey = `${draft.claim.p}.proof`
+
   // Check for an abandoned upload on mount. If we find a recent one for this
   // name, surface the recovery card. Don't auto-use it — user must opt in.
   useEffect(() => {
@@ -149,7 +154,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
         const result: UploadProofResult = await uploadProof({
           bytes: proofDocBytes,
           ensName: name,
-          key: 'com.x.proof',
+          key: recordKey,
           tier,
           walletClient,
           switchChain,
@@ -198,7 +203,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
       const writer = metadataWriter({ publicClient })(walletClient)
       const { txHash: hash } = await writer.setMetadata({
         name,
-        records: { 'com.x.proof': textRecordHex },
+        records: { [recordKey]: textRecordHex },
       })
 
       // 6. Success — clear the recovery record.
@@ -258,7 +263,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
         <CardHeader>
           <CardTitle>Proof published</CardTitle>
           <CardDescription>
-            <span className="font-mono">com.x.proof</span> is now set on{' '}
+            <span className="font-mono">{recordKey}</span> is now set on{' '}
             <span className="font-mono">{name}</span>.
           </CardDescription>
         </CardHeader>
@@ -295,7 +300,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
         <CardTitle>Review and write</CardTitle>
         <CardDescription>
           Pin the proof document, get the attester to issue a signed claim, and write the{' '}
-          <span className="font-mono">com.x.proof</span> text record on{' '}
+          <span className="font-mono">{recordKey}</span> text record on{' '}
           <span className="font-mono">{name}</span>.
         </CardDescription>
       </CardHeader>
@@ -335,7 +340,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
           </div>
           <div className="flex justify-between">
             <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
-            <dd className="font-mono">com.x.proof</dd>
+            <dd className="font-mono">{recordKey}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="text-neutral-500 dark:text-neutral-400">Claim payload (draft)</dt>
