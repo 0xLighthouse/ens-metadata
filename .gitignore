@@ -44,6 +44,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# wrangler / cloudflare workers
+.wrangler/
+.dev.vars
+
+# typescript build cache
+*.tsbuildinfo
+
 # yarn
 .yarn/cache
 .yarn/install-state.gz
