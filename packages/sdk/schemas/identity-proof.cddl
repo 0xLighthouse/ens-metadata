@@ -1,4 +1,4 @@
-; ENS Metadata — Identity Proof Schema (Phase 1)
+; ENS Metadata — Identity Proof Schema (v2)
 ;
 ; Canonical CDDL for the on-chain CBOR claim and the full IPFS-pinned proof
 ; document. The on-chain claim is what gets written to `proof.<platform>`
@@ -15,10 +15,15 @@
 ; field removed. On verify, the verifier re-encodes without `sig`, re-hashes,
 ; and calls ecrecover.
 ;
-; Replay protection: `name` (ENS name) and `chainId` are part of the signed
-; payload. Without `name`, a claim for alice.eth could be replayed into
-; bob.eth if bob once held the same address. Without `chainId`, mainnet
-; and Sepolia claims are interchangeable. Both are non-negotiable.
+; Trust model (v2): the signer is an **attester** — a backend service that
+; observed both the wallet connection (via SIWE) and the platform login
+; (OAuth for Twitter, HMAC-SHA256 for Telegram, etc.) within a single
+; session, then signed a claim binding them together. `att` is the
+; attester's key address; `addr` is the wallet the attester observed.
+; Verifiers reject any claim whose `att` is not in their trusted set.
+;
+; Replay protection: `name`, `chainId`, `addr`, and `att` are all in the
+; signed payload. Tampering with any of them invalidates the signature.
 
 ; ---------------------------------------------------------------------------
 ; On-chain claim
@@ -27,15 +32,17 @@
 ; Every field except `sig` participates in the signed hash.
 
 claim = {
-  v:       uint,            ; schema version, currently 1
-  p:       tstr,            ; platform, e.g. "twitter"
+  v:       uint,            ; schema version, currently 2
+  p:       tstr,            ; platform, e.g. "twitter", "telegram"
   h:       tstr,            ; handle at time of attestation, e.g. "vitalik"
   uid:     tstr,            ; platform-stable user id (canonical identity)
   exp:     uint,            ; expiry, unix seconds
   prf:     tstr,            ; IPFS CID of the full proof doc (string form)
   name:    tstr,            ; ENS name this claim is bound to, e.g. "alice.eth"
   chainId: uint,            ; EVM chain id the claim is valid on
-  sig:     bstr .size 65,   ; EIP-191 signature over claim-without-sig (r||s||v)
+  addr:    tstr,            ; wallet observed by attester (SIWE), EIP-55 hex
+  att:     tstr,            ; attester key address, EIP-55 hex
+  sig:     bstr .size 65,   ; attester EIP-191 signature over claim-without-sig
 }
 
 ; The map that is actually hashed and signed. Identical shape minus `sig`.
@@ -48,6 +55,8 @@ claim-without-sig = {
   prf:     tstr,
   name:    tstr,
   chainId: uint,
+  addr:    tstr,
+  att:     tstr,
 }
 
 ; ---------------------------------------------------------------------------

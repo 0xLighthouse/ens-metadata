@@ -2,11 +2,19 @@ export { metadataReader } from './read'
 export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
 export { metadataWriter, MetadataWriteError } from './write'
-export { encodeClaim, decodeClaim, hashClaim, signClaim, verifyClaim } from './proof'
+export {
+  encodeClaim,
+  decodeClaim,
+  hashClaim,
+  signClaim,
+  verifyClaim,
+  CLAIM_VERSION,
+} from './proof'
 export {
   proofVerifier,
   verifyProof,
   fetchAndVerifyFullProof,
+  type ProofVerifierConfig,
 } from './verify'
 
 export type {
@@ -27,6 +35,8 @@ export type {
   ClaimFields,
   ClaimWithoutSig,
   Claim,
+  SignClaimInput,
+  VerifyClaimOptions,
   VerifyClaimResult,
   VerifyFailureReason,
   VerifyProofOptions,

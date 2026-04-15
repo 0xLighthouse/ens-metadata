@@ -4,6 +4,16 @@ import { normalize } from 'viem/ens'
 import { decodeClaim, verifyClaim } from './proof'
 import type { Claim, FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof-types'
 
+/**
+ * Configuration for the proof verifier extension. The trusted-attester list
+ * is required at extension construction time; per-call overrides can be
+ * added later if needed.
+ */
+export interface ProofVerifierConfig {
+  /** Attester key addresses this verifier accepts. EIP-55 or lowercase. */
+  trustedAttesters: readonly Address[]
+}
+
 const TEXT_KEY_PREFIX = 'proof.'
 
 // Avoid pulling in the full DOM lib just for fetch — declare the shape we use.
@@ -14,13 +24,15 @@ declare const fetch: (
 
 /**
  * Read the ENS text record `proof.<platform>`, decode the CBOR claim, and
- * verify its signature against the current ENS owner.
+ * verify its attester signature + staleness against the current ENS owner.
  *
- * This is the "cheap path": no IPFS fetch, no backend notary round-trip.
- * Use `fetchAndVerifyFullProof` for deep checks.
+ * This is the "cheap path": no IPFS fetch, no upstream attester round-trip.
+ * Use `fetchAndVerifyFullProof` for deep checks against the OAuth/HMAC
+ * payload stored in IPFS.
  */
 async function verifyProofImpl(
   client: PublicClient,
+  config: ProofVerifierConfig,
   opts: VerifyProofOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
@@ -73,7 +85,10 @@ async function verifyProofImpl(
     return { valid: false, reason: 'decode-error' }
   }
 
-  const result = await verifyClaim(claim, ownerAddress)
+  const result = await verifyClaim(claim, {
+    trustedAttesters: config.trustedAttesters,
+    expectedOwner: ownerAddress,
+  })
   if (!result.valid) {
     return {
       valid: false,
@@ -105,6 +120,7 @@ async function verifyProofImpl(
  */
 async function fetchAndVerifyFullProofImpl(
   cid: string,
+  config: ProofVerifierConfig,
   options: { gatewayUrl?: string; expectedOwner?: Address } = {},
 ): Promise<FullVerifyResult> {
   const gateway = options.gatewayUrl ?? 'https://ipfs.io/ipfs'
@@ -156,18 +172,19 @@ async function fetchAndVerifyFullProofImpl(
     return { valid: false, reason: 'decode-error', cid }
   }
 
-  if (options.expectedOwner) {
-    const result = await verifyClaim(claim, options.expectedOwner)
-    if (!result.valid) {
-      return {
-        valid: false,
-        reason: result.reason,
-        handle: claim.h,
-        uid: claim.uid,
-        expiresAt: claim.exp,
-        cid,
-        method: typeof fullProof.method === 'string' ? fullProof.method : undefined,
-      }
+  const result = await verifyClaim(claim, {
+    trustedAttesters: config.trustedAttesters,
+    expectedOwner: options.expectedOwner,
+  })
+  if (!result.valid) {
+    return {
+      valid: false,
+      reason: result.reason,
+      handle: claim.h,
+      uid: claim.uid,
+      expiresAt: claim.exp,
+      cid,
+      method: typeof fullProof.method === 'string' ? fullProof.method : undefined,
     }
   }
 
@@ -183,28 +200,35 @@ async function fetchAndVerifyFullProofImpl(
 
 /**
  * viem extension factory. Slots into `ensMetadataActions()` alongside
- * `getSchema` / `getMetadata`.
+ * `getSchema` / `getMetadata`. The trusted-attester set is fixed at
+ * extension creation; consumers configure it once based on which
+ * attesters they accept.
  */
-export function proofVerifier() {
+export function proofVerifier(config: ProofVerifierConfig) {
   return (client: PublicClient) => ({
-    verifyProof: (opts: VerifyProofOptions) => verifyProofImpl(client, opts),
+    verifyProof: (opts: VerifyProofOptions) => verifyProofImpl(client, config, opts),
     fetchAndVerifyFullProof: (
       cid: string,
       options?: { gatewayUrl?: string; expectedOwner?: Address },
-    ) => fetchAndVerifyFullProofImpl(cid, options),
+    ) => fetchAndVerifyFullProofImpl(cid, config, options),
   })
 }
 
 // Standalone wrappers for callers that don't want the extension pattern.
-export function verifyProof(client: PublicClient, opts: VerifyProofOptions): Promise<VerifyResult> {
-  return verifyProofImpl(client, opts)
+export function verifyProof(
+  client: PublicClient,
+  config: ProofVerifierConfig,
+  opts: VerifyProofOptions,
+): Promise<VerifyResult> {
+  return verifyProofImpl(client, config, opts)
 }
 
 export function fetchAndVerifyFullProof(
   cid: string,
+  config: ProofVerifierConfig,
   options?: { gatewayUrl?: string; expectedOwner?: Address },
 ): Promise<FullVerifyResult> {
-  return fetchAndVerifyFullProofImpl(cid, options)
+  return fetchAndVerifyFullProofImpl(cid, config, options)
 }
 
 function hexToBytes(hex: Hex | string): Uint8Array {
