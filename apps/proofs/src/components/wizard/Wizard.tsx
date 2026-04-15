@@ -1,7 +1,10 @@
 'use client'
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
 import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
+import { useSchema } from '@/lib/use-schema'
+import { AlertCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { ConnectTelegramStep } from './ConnectTelegramStep'
 import { ConnectTwitterStep } from './ConnectTwitterStep'
@@ -151,6 +154,17 @@ export function Wizard() {
   const incomingConfig = useMemo(() => readIncomingConfig(), [])
   const steps = useMemo(() => computeSteps(incomingConfig), [incomingConfig])
 
+  // Schema fetch + validation runs at the wizard root, before any step
+  // gets a chance to render. A broken schema URI compromises the entire
+  // submission — the wizard would write a `schema = ipfs://...` text
+  // record pointing at garbage — so we refuse to start the flow until
+  // the schema is either valid or absent.
+  const {
+    schema: resolvedSchema,
+    loading: schemaLoading,
+    error: schemaError,
+  } = useSchema(incomingConfig.schemaUri, incomingConfig.requestedAttrs)
+
   // Default platform: first allowed if the URL constrained it, else com.x.
   const initialPlatform: Platform =
     incomingConfig.allowedPlatforms[0] ?? 'com.x'
@@ -195,6 +209,59 @@ export function Wizard() {
       ? incomingConfig.allowedPlatforms
       : [...KNOWN_PLATFORMS]
   const showPlatformPicker = visiblePlatforms.length > 1
+
+  // Refuse to render any wizard step when the schema is broken. The user
+  // can still copy the failing URI to debug, but they can't proceed —
+  // this is the schema check the agent's URL template wants the user
+  // to bounce off rather than ride to a garbage on-chain write.
+  if (schemaError) {
+    return (
+      <div className="max-w-xl mx-auto w-full">
+        <Card>
+          <CardHeader>
+            <CardTitle>Schema error</CardTitle>
+            <CardDescription>
+              The link you followed points at a schema document that we couldn&apos;t use, so the
+              wizard can&apos;t start. The on-chain <span className="font-mono">schema</span> text
+              record would otherwise be written pointing at this URI, so we&apos;re refusing
+              up-front rather than letting the submission compromise itself.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-md border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-900 dark:text-red-100">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+                <div className="flex-1 space-y-2">
+                  <div className="font-medium">{schemaError}</div>
+                  <div className="text-xs">
+                    Schema URI:{' '}
+                    <span className="font-mono break-all">{incomingConfig.schemaUri}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Talk to whoever sent you the link — the agent or tool generating these URLs probably
+              has a typo or a stale schema reference.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (schemaLoading) {
+    return (
+      <div className="max-w-xl mx-auto w-full">
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading…</CardTitle>
+            <CardDescription>Fetching the schema referenced by this link.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-xl mx-auto w-full">
@@ -275,6 +342,7 @@ export function Wizard() {
           requestedAttrs={incomingConfig.requestedAttrs}
           classValue={incomingConfig.classValue ?? undefined}
           schemaUri={incomingConfig.schemaUri ?? undefined}
+          schema={resolvedSchema}
           onBack={back}
           onComplete={(records) => {
             setExtraRecords(records)
