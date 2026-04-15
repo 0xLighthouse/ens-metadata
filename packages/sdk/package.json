@@ -16,15 +16,18 @@
     "build": "tsup",
     "test": "vitest run",
     "lint": "biome check .",
+    "verify-proof": "tsx scripts/verify-proof.ts",
     "prepublishOnly": "pnpm build && pnpm test && pnpm lint"
   },
   "dependencies": {
     "@ensdomains/ensjs": "^4.0.2",
+    "@ipld/dag-cbor": "^9.2.6",
     "viem": "2.23.15"
   },
   "devDependencies": {
     "@ensmetadata/schemas": "workspace:*",
     "tsup": "^8.5.1",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^3.2.1"
   }

@@ -1,0 +1,67 @@
+; ENS Metadata — Identity Proof Schema (Phase 1)
+;
+; Canonical CDDL for the on-chain CBOR claim and the full IPFS-pinned proof
+; document. The on-chain claim is what gets written to `proof.<platform>`
+; as a hex-encoded blob. The full proof is pinned to IPFS and referenced
+; from the claim via `prf` (a CID).
+;
+; Encoding: dag-cbor (RFC 8949 Core Deterministic Encoding).
+;   - Map keys sorted by length, then bytewise.
+;   - Integers use shortest form.
+;   - No indefinite-length items.
+;
+; Signing: EIP-191 (`"\x19Ethereum Signed Message:\n32" || keccak256(cbor)`).
+; The hashed bytes are the canonical CBOR of the claim map with the `sig`
+; field removed. On verify, the verifier re-encodes without `sig`, re-hashes,
+; and calls ecrecover.
+;
+; Replay protection: `name` (ENS name) and `chainId` are part of the signed
+; payload. Without `name`, a claim for alice.eth could be replayed into
+; bob.eth if bob once held the same address. Without `chainId`, mainnet
+; and Sepolia claims are interchangeable. Both are non-negotiable.
+
+; ---------------------------------------------------------------------------
+; On-chain claim
+; ---------------------------------------------------------------------------
+; Written to the ENS text record `proof.<platform>` as `0x` + hex(cborBytes).
+; Every field except `sig` participates in the signed hash.
+
+claim = {
+  v:       uint,            ; schema version, currently 1
+  p:       tstr,            ; platform, e.g. "twitter"
+  h:       tstr,            ; handle at time of attestation, e.g. "vitalik"
+  uid:     tstr,            ; platform-stable user id (canonical identity)
+  exp:     uint,            ; expiry, unix seconds
+  prf:     tstr,            ; IPFS CID of the full proof doc (string form)
+  name:    tstr,            ; ENS name this claim is bound to, e.g. "alice.eth"
+  chainId: uint,            ; EVM chain id the claim is valid on
+  sig:     bstr .size 65,   ; EIP-191 signature over claim-without-sig (r||s||v)
+}
+
+; The map that is actually hashed and signed. Identical shape minus `sig`.
+claim-without-sig = {
+  v:       uint,
+  p:       tstr,
+  h:       tstr,
+  uid:     tstr,
+  exp:     uint,
+  prf:     tstr,
+  name:    tstr,
+  chainId: uint,
+}
+
+; ---------------------------------------------------------------------------
+; Full proof document (pinned to IPFS, referenced by `prf` above)
+; ---------------------------------------------------------------------------
+; This is the "deep path" payload. Bots / deep verifiers fetch it to
+; re-validate the attestation against the underlying notary (Reclaim etc).
+; Not stored on-chain — backend-agnostic on-chain claim keeps it swappable.
+
+full-proof = {
+  v:          uint,             ; schema version, currently 1
+  claim:      claim,            ; the signed on-chain claim, byte-for-byte
+  method:     tstr,             ; attestation backend, e.g. "reclaim", "privy-linked"
+  issuedAt:   uint,              ; unix seconds
+  proof:      any,              ; backend-native attestation payload
+  ? notes:    tstr,             ; optional free-form notes
+}
