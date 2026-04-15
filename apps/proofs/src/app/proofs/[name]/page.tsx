@@ -21,12 +21,14 @@ interface Props {
   params: Promise<{ name: string }>
 }
 
-// Phase 1 only supports Twitter. Adding platforms is just appending here.
-const PLATFORMS = ['twitter'] as const
+// Reverse-DNS platform identifiers. Adding a platform = append here +
+// register a validator on the attester worker.
+const PLATFORMS = ['com.x', 'org.telegram'] as const
 type Platform = (typeof PLATFORMS)[number]
 
 const PLATFORM_LABELS: Record<Platform, string> = {
-  twitter: 'Twitter',
+  'com.x': 'X',
+  'org.telegram': 'Telegram',
 }
 
 interface PlatformResult {

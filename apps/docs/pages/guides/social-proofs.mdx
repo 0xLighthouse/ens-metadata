@@ -5,7 +5,7 @@ weight: 5
 
 # Linking a social account to your ENS name
 
-This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X (Twitter) and Telegram; the same scheme extends to any platform with a server-verifiable login by adding a new `proof.<platform>` text record and a validator module on the attester.
+This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X (Twitter) and Telegram; the same scheme extends to any platform with a server-verifiable login by adding a new `<platform>.proof` text record and a validator module on the attester. Platform identifiers are reverse-DNS — `com.x` for X, `org.telegram` for Telegram — and the on-chain key is `<platform>.proof`.
 
 ## Mental model
 
@@ -15,7 +15,7 @@ There are four pieces:
 
 1. **The attester** — a backend service (in this repo, a Cloudflare Worker at `workers/attester`) that observes both your wallet and your social account in the same session and signs a claim binding them together. The attester holds the only signing key in this design; verifiers decide which attesters they trust.
 2. **The claim** — a compact CBOR payload describing the link. Detailed below.
-3. **The text record** — `proof.twitter` (or `proof.telegram`, etc.) on the ENS name, holding the hex-encoded signed claim. This is the cheap path everyone reads.
+3. **The text record** — `com.x.proof` (or `org.telegram.proof`, etc.) on the ENS name, holding the hex-encoded signed claim. The key is the platform's reverse-DNS namespace plus a `.proof` suffix. This is the cheap path everyone reads.
 4. **The full proof document** — a richer payload pinned to IPFS, with the signed claim plus the upstream evidence the attester collected (the OAuth subject, the Telegram HMAC payload, etc.). The text record's `prf` field holds the CID. Verifiers only fetch this when they want to re-check the upstream evidence themselves.
 
 The point of separating the attester from the wallet is that the cheap-path verifier learns something stronger than "the current owner asserts this linkage" — it learns "an attester I trust independently confirmed both the wallet and the social account in one session". The wallet's role is reduced to publishing the proof on-chain; the attester carries the trust.
@@ -37,7 +37,7 @@ A claim is a CBOR map with ten signed fields plus the signature itself. Every fi
 | Field | Type | Purpose |
 | --- | --- | --- |
 | `v` | uint | Schema version. Lets verifiers reject formats they don't understand. |
-| `p` | string | Platform identifier — `"twitter"`, `"telegram"`, etc. Verifiers key off this to pick the right `proof.<platform>` text record. |
+| `p` | string | Reverse-DNS platform namespace — `"com.x"`, `"org.telegram"`, etc. Verifiers key off this to pick the right `<platform>.proof` text record. |
 | `h` | string | Handle at the time of attestation — e.g. `"vitalik"`. **Treat as a hint, not identity.** Handles can be released and re-registered by someone else, so anything load-bearing should key off `uid`. |
 | `uid` | string | Platform-stable user id. For X this is the OAuth `sub` claim; for Telegram it's the numeric user id. Never changes when the handle does. |
 | `exp` | uint | Expiry, unix seconds. After this the claim is dead. Forces proofs to be refreshed periodically rather than living forever as stale assertions. |
@@ -53,7 +53,7 @@ A worked example, in the JSON projection that `decodeClaim()` returns:
 ```json
 {
   "v": 2,
-  "p": "twitter",
+  "p": "com.x",
   "h": "vitalik",
   "uid": "295218901",
   "exp": 1798761600,
@@ -88,13 +88,15 @@ You don't sign the claim with your wallet — only the attester does. Your walle
 
 ## Step 2: Publish the text record
 
-The signed claim gets written to the resolver under `proof.<platform>` (for example `proof.twitter` or `proof.telegram`) as a single hex string:
+The signed claim gets written to the resolver under `<platform>.proof` — `com.x.proof` for X, `org.telegram.proof` for Telegram, and so on — as a single hex string:
 
 ```
 alice.eth
-  ├── proof.twitter  = "0xa86176..."   # hex(CBOR(signedClaim))
-  └── proof.telegram = "0xa86176..."   # different platform, same format
+  ├── com.x.proof        = "0xa86176..."   # hex(CBOR(signedClaim))
+  └── org.telegram.proof = "0xa86176..."   # different platform, same format
 ```
+
+The reverse-DNS prefix groups every record about a given platform under one namespace — the same convention ENS profiles use for `com.twitter` / `com.github` / etc. — and the `.proof` suffix marks this specific record as a proof rather than a profile field.
 
 You can attach proofs for multiple platforms to the same name; each lives at its own key and verifies independently. The proofs app sends one transaction per write; if you'd rather do it manually, the value at each key is just `0x` + the hex of the CBOR-encoded `Claim` returned by the attester.
 
@@ -122,7 +124,7 @@ const client = createPublicClient({
 
 const result = await client.verifyProof({
   name: 'alice.eth',
-  platform: 'twitter',
+  platform: 'com.x',
 })
 
 if (result.valid) {
@@ -158,7 +160,7 @@ const full = await client.fetchAndVerifyFullProof(result.cid!, {
 console.log('attestation method:', full.method)
 ```
 
-The `method` field on the full proof document tells you which platform validator the attester used (e.g. `"privy-twitter"`, `"telegram-login-widget"`). A verifier with stricter trust requirements can accept some methods and reject others without changing the on-chain format.
+The `method` field on the full proof document tells you which platform validator the attester used (e.g. `"privy-com.x"`, `"telegram-login-widget"`). A verifier with stricter trust requirements can accept some methods and reject others without changing the on-chain format.
 
 ## Why this design
 

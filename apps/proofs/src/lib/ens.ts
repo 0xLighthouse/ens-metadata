@@ -1,8 +1,7 @@
-// TODO: Phase 1, deliverable 4 — thin wrapper around @ensmetadata/sdk's
-// setMetadata for writing a single proof.twitter text record.
-// See /tasks/link-app-spec.md "ENS write" decision: do NOT add a setProof
-// helper in the SDK. Call setMetadata({ name, records: { 'proof.twitter': hex } })
-// directly.
+// Thin helpers around @ensmetadata/sdk for ENS reads/writes used by the
+// proofs wizard. The actual proof write goes through metadataWriter's
+// setMetadata({ name, records: { 'com.x.proof': hex } }) directly — no
+// dedicated setProof helper in the SDK.
 
 import { getOwner } from '@ensdomains/ensjs/public'
 // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient

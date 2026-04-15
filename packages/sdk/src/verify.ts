@@ -14,7 +14,11 @@ export interface ProofVerifierConfig {
   trustedAttesters: readonly Address[]
 }
 
-const TEXT_KEY_PREFIX = 'proof.'
+/**
+ * Suffix appended to the platform's reverse-DNS namespace to form the ENS
+ * text record key. e.g. platform `"com.x"` → key `"com.x.proof"`.
+ */
+const TEXT_KEY_SUFFIX = '.proof'
 
 // Avoid pulling in the full DOM lib just for fetch — declare the shape we use.
 declare const fetch: (
@@ -23,8 +27,9 @@ declare const fetch: (
 ) => Promise<{ ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
 
 /**
- * Read the ENS text record `proof.<platform>`, decode the CBOR claim, and
- * verify its attester signature + staleness against the current ENS owner.
+ * Read the ENS text record `<platform>.proof` (e.g. `com.x.proof`), decode
+ * the CBOR claim, and verify its attester signature + staleness against
+ * the current ENS owner.
  *
  * This is the "cheap path": no IPFS fetch, no upstream attester round-trip.
  * Use `fetchAndVerifyFullProof` for deep checks against the OAuth/HMAC
@@ -36,7 +41,7 @@ async function verifyProofImpl(
   opts: VerifyProofOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
-  const textKey = `${TEXT_KEY_PREFIX}${opts.platform}`
+  const textKey = `${opts.platform}${TEXT_KEY_SUFFIX}`
 
   // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText/getEnsOwner
   const anyClient = client as any

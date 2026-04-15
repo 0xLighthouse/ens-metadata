@@ -138,6 +138,6 @@ async function validate(
 }
 
 export const telegramPlatform: Platform = {
-  id: 'telegram',
+  id: 'org.telegram',
   validate,
 }

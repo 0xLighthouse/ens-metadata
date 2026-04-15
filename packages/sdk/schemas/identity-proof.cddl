@@ -1,7 +1,7 @@
 ; ENS Metadata — Identity Proof Schema
 ;
 ; Canonical CDDL for the on-chain CBOR claim and the full IPFS-pinned proof
-; document. The on-chain claim is what gets written to `proof.<platform>`
+; document. The on-chain claim is what gets written to `<platform>.proof`
 ; as a hex-encoded blob. The full proof is pinned to IPFS and referenced
 ; from the claim via `prf` (a CID).
 ;
@@ -28,12 +28,14 @@
 ; ---------------------------------------------------------------------------
 ; On-chain claim
 ; ---------------------------------------------------------------------------
-; Written to the ENS text record `proof.<platform>` as `0x` + hex(cborBytes).
+; Written to the ENS text record `<platform>.proof` (e.g. `com.x.proof`,
+; `org.telegram.proof`) as `0x` + hex(cborBytes). The `<platform>` segment
+; is the reverse-DNS namespace of the platform, matching `claim.p`.
 ; Every field except `sig` participates in the signed hash.
 
 claim = {
   v:       uint,            ; schema version
-  p:       tstr,            ; platform, e.g. "twitter", "telegram"
+  p:       tstr,            ; reverse-DNS platform namespace, e.g. "com.x", "org.telegram"
   h:       tstr,            ; handle at time of attestation, e.g. "vitalik"
   uid:     tstr,            ; platform-stable user id (canonical identity)
   exp:     uint,            ; expiry, unix seconds

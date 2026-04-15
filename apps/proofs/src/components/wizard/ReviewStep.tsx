@@ -146,7 +146,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
         const result: UploadProofResult = await uploadProof({
           bytes: proofDocBytes,
           ensName: name,
-          key: 'proof.twitter',
+          key: 'com.x.proof',
           tier,
           walletClient,
           switchChain,
@@ -186,7 +186,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
       const writer = metadataWriter({ publicClient })(walletClient)
       const { txHash: hash } = await writer.setMetadata({
         name,
-        records: { 'proof.twitter': textRecordHex },
+        records: { 'com.x.proof': textRecordHex },
       })
 
       // 7. Success — clear the recovery record.
@@ -246,7 +246,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
         <CardHeader>
           <CardTitle>Proof published</CardTitle>
           <CardDescription>
-            <span className="font-mono">proof.twitter</span> is now set on{' '}
+            <span className="font-mono">com.x.proof</span> is now set on{' '}
             <span className="font-mono">{name}</span>.
           </CardDescription>
         </CardHeader>
@@ -283,7 +283,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
         <CardTitle>Review and write</CardTitle>
         <CardDescription>
           Sign the claim, pin the full proof, and write the{' '}
-          <span className="font-mono">proof.twitter</span> text record on{' '}
+          <span className="font-mono">com.x.proof</span> text record on{' '}
           <span className="font-mono">{name}</span>.
         </CardDescription>
       </CardHeader>
@@ -323,7 +323,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
           </div>
           <div className="flex justify-between">
             <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
-            <dd className="font-mono">proof.twitter</dd>
+            <dd className="font-mono">com.x.proof</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="text-neutral-500 dark:text-neutral-400">Claim payload (draft)</dt>

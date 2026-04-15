@@ -16,7 +16,7 @@ import type { Address } from 'viem'
 // renaming this file.
 
 /** Platform identifier for the Twitter proof flow. */
-export const TWITTER_PLATFORM = 'twitter'
+export const TWITTER_PLATFORM = 'com.x'
 
 /** Attestation backend identifier stamped into the full-proof document. */
 export const PRIVY_METHOD = 'privy-linked'

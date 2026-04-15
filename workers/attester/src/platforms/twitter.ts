@@ -102,6 +102,6 @@ async function validate(
 }
 
 export const twitterPlatform: Platform = {
-  id: 'twitter',
+  id: 'com.x',
   validate,
 }

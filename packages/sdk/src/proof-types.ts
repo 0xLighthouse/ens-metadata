@@ -17,7 +17,7 @@ import type { Address, Hex, WalletClient } from 'viem'
 export interface ClaimFields {
   /** Schema version. */
   v: number
-  /** Platform identifier, e.g. "twitter". */
+  /** Reverse-DNS platform namespace, e.g. "com.x", "org.telegram". */
   p: string
   /** Handle at time of attestation, e.g. "vitalik". */
   h: string

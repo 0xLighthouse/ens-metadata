@@ -23,7 +23,7 @@ const STRANGER_ADDR = privateKeyToAccount(STRANGER_PRIVATE_KEY).address
 function makeClaim(overrides: Partial<ClaimWithoutSig> = {}): ClaimWithoutSig {
   return {
     v: CLAIM_VERSION,
-    p: 'twitter',
+    p: 'com.x',
     h: 'vitalik',
     uid: '295218901',
     exp: Math.floor(Date.now() / 1000) + 3600,

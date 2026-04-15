@@ -30,8 +30,8 @@ export interface Platform {
 }
 
 const registry: Record<string, Platform> = {
-  twitter: twitterPlatform,
-  telegram: telegramPlatform,
+  'com.x': twitterPlatform,
+  'org.telegram': telegramPlatform,
 }
 
 export function getPlatform(id: string): Platform | undefined {

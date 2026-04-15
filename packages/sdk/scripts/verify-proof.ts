@@ -7,17 +7,27 @@
  *
  * Examples:
  *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth
- *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth twitter
- *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth twitter --deep
+ *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth com.x
+ *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth com.x --deep
  *
  * Env:
- *   RPC_URL — optional mainnet RPC endpoint (falls back to a public one)
+ *   RPC_URL            — optional mainnet RPC endpoint (falls back to a public one)
+ *   TRUSTED_ATTESTERS  — comma-separated list of attester addresses to trust
  */
 
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { http, type PublicClient, createPublicClient } from 'viem'
+import { type Address, http, type PublicClient, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
 import { fetchAndVerifyFullProof, verifyProof } from '../src/verify.js'
+
+function readTrustedAttesters(): Address[] {
+  const raw = process.env.TRUSTED_ATTESTERS
+  if (!raw) return []
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => isAddress(s)) as Address[]
+}
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -62,7 +72,7 @@ async function main(): Promise<void> {
   const name = args[0]
   const positional = args.slice(1).filter((a) => !a.startsWith('--'))
   const flags = args.slice(1).filter((a) => a.startsWith('--'))
-  const platform = positional[0] ?? 'twitter'
+  const platform = positional[0] ?? 'com.x'
   const deep = flags.includes('--deep')
 
   header('Setup')
@@ -88,16 +98,26 @@ async function main(): Promise<void> {
     c('dim', '  createPublicClient({ chain: addEnsContracts(mainnet), transport: http() })'),
   )
 
+  const trustedAttesters = readTrustedAttesters()
+  if (trustedAttesters.length === 0) {
+    console.log(
+      `  ${c('yellow', '! TRUSTED_ATTESTERS is empty — every claim will fail with untrusted-attester')}`,
+    )
+  } else {
+    console.log(`  ${c('gray', 'Trusted att ')} ${trustedAttesters.join(', ')}`)
+  }
+
   header('Calling SDK verifyProof (cheap path)')
-  console.log(c('dim', `  verifyProof(client, { name: '${name}', platform: '${platform}' })`))
-  console.log(c('dim', `  -> reads ENS text record "proof.${platform}"`))
+  console.log(c('dim', `  verifyProof(client, config, { name: '${name}', platform: '${platform}' })`))
+  console.log(c('dim', `  -> reads ENS text record "${platform}.proof"`))
   console.log(c('dim', '  -> hex-decodes + dag-cbor decodes the claim'))
   console.log(c('dim', '  -> resolves ENS owner'))
   console.log(c('dim', '  -> re-encodes claim without sig, keccak256, ecrecover'))
-  console.log(c('dim', '  -> compares recovered address to ENS owner'))
+  console.log(c('dim', '  -> verifies recovered === claim.att, claim.att in trusted set'))
+  console.log(c('dim', '  -> verifies claim.addr === current ENS owner'))
 
   const start = Date.now()
-  const result = await verifyProof(client, { name, platform })
+  const result = await verifyProof(client, { trustedAttesters }, { name, platform })
   const elapsed = Date.now() - start
 
   header(`Result  ${c('gray', `(${elapsed}ms)`)}`)
@@ -134,7 +154,11 @@ async function main(): Promise<void> {
       console.log(`  ${c('yellow', '! could not derive CID from reference')}`)
     } else {
       const deepStart = Date.now()
-      const deepResult = await fetchAndVerifyFullProof(cidOrPath, { gatewayUrl })
+      const deepResult = await fetchAndVerifyFullProof(
+        cidOrPath,
+        { trustedAttesters },
+        { gatewayUrl },
+      )
       const deepElapsed = Date.now() - deepStart
 
       header(`Deep result  ${c('gray', `(${deepElapsed}ms)`)}`)
