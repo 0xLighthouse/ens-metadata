@@ -3,26 +3,30 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
+import { bindPlatform } from '@/lib/attester-client'
 import {
   type DraftFullProof,
   type PrivyTwitterAccount,
+  TWITTER_PLATFORM,
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
-import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { AlertCircle, CheckCircle2, Twitter } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface Props {
   name: string
+  sessionId: string
   onBack: () => void
   onComplete: (draft: DraftFullProof) => void
 }
 
-export function ConnectTwitterStep({ name, onBack, onComplete }: Props) {
+export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Props) {
   const { publicClient } = useWeb3()
   const { user, linkTwitter } = usePrivy()
   const { wallets } = useWallets()
   const [error, setError] = useState<string | null>(null)
+  const [binding, setBinding] = useState(false)
 
   // Privy's `user.twitter` is populated once the OAuth round-trip completes.
   // If the user has a previously-linked Twitter account, it's already there
@@ -43,8 +47,9 @@ export function ConnectTwitterStep({ name, onBack, onComplete }: Props) {
     }
   }
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setError(null)
+    setBinding(true)
     try {
       if (!twitter) {
         throw new Error('No Twitter account linked yet.')
@@ -54,6 +59,22 @@ export function ConnectTwitterStep({ name, onBack, onComplete }: Props) {
         throw new Error('No wallet connected. Go back and reconnect.')
       }
       const chainId = publicClient?.chain?.id ?? 1
+
+      // Send both the Privy access token (for production) and the
+      // dev-passthrough fields (uid/handle from the linked account). The
+      // worker's twitter validator picks based on whether Privy creds are
+      // configured — in dev it falls back to the passthrough fields.
+      const privyAccessToken = (await getAccessToken().catch(() => null)) ?? undefined
+      await bindPlatform({
+        sessionId,
+        platform: TWITTER_PLATFORM,
+        payload: {
+          privyAccessToken,
+          uid: twitter.subject,
+          handle: twitter.username,
+        },
+      })
+
       const draft = buildTwitterProofFromPrivy({
         twitter,
         issuerAddress: issuer as `0x${string}`,
@@ -63,6 +84,8 @@ export function ConnectTwitterStep({ name, onBack, onComplete }: Props) {
       onComplete(draft)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBinding(false)
     }
   }
 
@@ -121,8 +144,8 @@ export function ConnectTwitterStep({ name, onBack, onComplete }: Props) {
             </Button>
           )}
           {twitter && (
-            <Button onClick={handleContinue} full>
-              Continue
+            <Button onClick={handleContinue} full isLoading={binding}>
+              {binding ? 'Binding to session…' : 'Continue'}
             </Button>
           )}
         </div>

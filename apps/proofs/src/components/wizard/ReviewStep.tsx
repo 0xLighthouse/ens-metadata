@@ -3,9 +3,10 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
+import { attest } from '@/lib/attester-client'
 import { type StorageTier, type UploadProofResult, uploadProof } from '@/lib/ipfs'
 import type { DraftFullProof } from '@/lib/twitter-proof'
-import { type Claim, encodeClaim, metadataWriter, signClaim } from '@ensmetadata/sdk'
+import { type Claim, encodeClaim, metadataWriter } from '@ensmetadata/sdk'
 import { encode as cborEncode } from '@ipld/dag-cbor'
 import { AlertTriangle, CheckCircle2, FileSignature } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,10 +15,11 @@ import { bytesToHex } from 'viem'
 interface Props {
   name: string
   draft: DraftFullProof
+  sessionId: string
   onBack: () => void
 }
 
-type Phase = 'idle' | 'uploading' | 'signing' | 'writing' | 'done' | 'error'
+type Phase = 'idle' | 'uploading' | 'attesting' | 'writing' | 'done' | 'error'
 
 interface PendingUpload {
   reference: string
@@ -84,7 +86,7 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, onBack }: Props) {
+export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
   const { walletClient, publicClient, switchChain } = useWeb3()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [copied, setCopied] = useState(false)
@@ -102,15 +104,16 @@ export function ReviewStep({ name, draft, onBack }: Props) {
   }, [name])
 
   const { claimHex, byteLen } = useMemo(() => {
-    // TODO(phase3): once the attester backend is wired up, the preview will
-    // show the claim returned by the attester. For now we self-attest with
-    // the connected wallet so the preview encodes — this matches the
-    // transitional signing path below.
-    const previewAtt = walletClient?.account?.address ?? draft.claim.addr
+    // The real claim is signed by the attester after we POST /api/attest;
+    // its `att` field is whatever attester key the worker is running. For
+    // the local preview we use the zero address so the bytes encode and
+    // the byte count is approximately right — the attester address adds
+    // the same number of bytes regardless of which key it is.
+    const previewAtt = '0x0000000000000000000000000000000000000000' as const
     const bytes = encodeClaim({ ...draft.claim, att: previewAtt })
     const hex = bytesToHex(bytes)
     return { claimHex: hex, byteLen: bytes.length }
-  }, [draft.claim, walletClient])
+  }, [draft.claim])
 
   const openDialog = () => dialogRef.current?.showModal()
   const closeDialog = () => dialogRef.current?.close()
@@ -168,20 +171,29 @@ export function ReviewStep({ name, draft, onBack }: Props) {
         effectiveTier = pending?.tier ?? tier
       }
 
-      // 3. Backfill claim.prf with the real reference.
-      const claimFields = { ...draft.claim, prf: reference }
+      // 3. Ask the attester to sign a claim. The worker checks that the
+      //    session has both a SIWE-bound wallet AND a validated platform
+      //    binding, then constructs the claim from session state (it never
+      //    trusts client-supplied uid/handle/addr) and signs with its own
+      //    key. The wallet does not sign the claim.
+      setPhase('attesting')
+      const signed: Claim = await attest({
+        sessionId,
+        name,
+        chainId: draft.claim.chainId,
+        expSeconds: draft.claim.exp,
+        prf: reference,
+      })
 
-      // 4. Sign the claim (EIP-191 via signClaim).
-      setPhase('signing')
-      const signed: Claim = await signClaim(claimFields, walletClient)
-
-      // 5. Encode the SIGNED claim. encodeClaim(ClaimFields | Claim) handles
+      // 4. Encode the SIGNED claim. encodeClaim(ClaimFields | Claim) handles
       //    both branches: when `sig` is present it's included as 65 raw bytes
       //    in the canonical dag-cbor map. This is the on-chain text record.
       const signedBytes = encodeClaim(signed)
       const textRecordHex = bytesToHex(signedBytes)
 
-      // 6. Write to ENS via the SDK's metadataWriter factory.
+      // 5. Write to ENS via the SDK's metadataWriter factory. This is the
+      //    only on-chain transaction in the flow — and the only thing the
+      //    user's wallet does after the SIWE sign-in.
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)
       const { txHash: hash } = await writer.setMetadata({
@@ -189,7 +201,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
         records: { 'com.x.proof': textRecordHex },
       })
 
-      // 7. Success — clear the recovery record.
+      // 6. Success — clear the recovery record.
       clearPending(name)
       setPending(null)
       setTxHash(hash)
@@ -230,14 +242,14 @@ export function ReviewStep({ name, draft, onBack }: Props) {
     }
   }
 
-  const busy = phase === 'uploading' || phase === 'signing' || phase === 'writing'
+  const busy = phase === 'uploading' || phase === 'attesting' || phase === 'writing'
   const phaseLabel: Record<Phase, string> = {
-    idle: 'Sign and publish',
+    idle: 'Issue and publish',
     uploading: tier === 'ipfs' ? 'Pinning to IPFS…' : 'Uploading to CDN…',
-    signing: 'Waiting for signature…',
+    attesting: 'Issuing attestation…',
     writing: 'Writing to ENS…',
     done: 'Done',
-    error: 'Sign and publish',
+    error: 'Issue and publish',
   }
 
   if (phase === 'done') {
@@ -282,7 +294,7 @@ export function ReviewStep({ name, draft, onBack }: Props) {
       <CardHeader>
         <CardTitle>Review and write</CardTitle>
         <CardDescription>
-          Sign the claim, pin the full proof, and write the{' '}
+          Pin the proof document, get the attester to issue a signed claim, and write the{' '}
           <span className="font-mono">com.x.proof</span> text record on{' '}
           <span className="font-mono">{name}</span>.
         </CardDescription>
