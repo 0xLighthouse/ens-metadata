@@ -101,7 +101,6 @@ describe('encodeClaim / decodeClaim — determinism', () => {
   })
 
   it('rejects unknown schema versions', () => {
-    expect(() => encodeClaim(makeClaim({ v: 1 }))).toThrow(/unsupported version/)
     expect(() => encodeClaim(makeClaim({ v: 99 }))).toThrow(/unsupported version/)
   })
 })

@@ -3,7 +3,7 @@ import type { Address, Hex, WalletClient } from 'viem'
 // --- Claim types ---
 
 /**
- * Fields required to construct an on-chain identity claim (v2).
+ * Fields required to construct an on-chain identity claim.
  *
  * Every field participates in the signed payload. The signature is produced
  * by an **attester** — a backend service that observed both the wallet
@@ -15,7 +15,7 @@ import type { Address, Hex, WalletClient } from 'viem'
  * hash. Tampering with any of them invalidates the signature.
  */
 export interface ClaimFields {
-  /** Schema version. Currently 2. */
+  /** Schema version. */
   v: number
   /** Platform identifier, e.g. "twitter". */
   p: string

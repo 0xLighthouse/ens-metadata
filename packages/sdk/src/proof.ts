@@ -11,7 +11,7 @@ import type {
   VerifyClaimResult,
 } from './proof-types'
 
-/** Current claim schema version. v1 was wallet-signed; v2 is attester-signed. */
+/** Current claim schema version. */
 export const CLAIM_VERSION = 2
 
 /**
