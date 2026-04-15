@@ -15,15 +15,16 @@ import type { Hex } from 'viem'
 import { createSiweMessage } from 'viem/siwe'
 
 interface Props {
+  defaultName?: string
   onComplete: (name: string, sessionId: string) => void
 }
 
 type Phase = 'idle' | 'checking-owner' | 'creating-session' | 'awaiting-siwe' | 'binding-wallet'
 
-export function ConnectWalletStep({ onComplete }: Props) {
+export function ConnectWalletStep({ defaultName, onComplete }: Props) {
   const { login, logout, authenticated, user, ready } = usePrivy()
   const { publicClient, walletClient, isInitialized } = useWeb3()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(defaultName ?? '')
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
 

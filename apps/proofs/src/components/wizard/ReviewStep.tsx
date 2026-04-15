@@ -14,7 +14,12 @@ import type { AnyDraftFullProof } from './Wizard'
 
 interface Props {
   name: string
-  draft: AnyDraftFullProof
+  /** Draft full-proof for the proof-issuance path. Null when the wizard
+   *  was launched in attrs-only mode (no platforms requested). */
+  draft: AnyDraftFullProof | null
+  /** Plain ENS text records to write alongside the proof — comes from
+   *  the EnterAttributesStep. May be empty in proof-only mode. */
+  extraRecords: Record<string, string>
   sessionId: string
   onBack: () => void
 }
@@ -86,7 +91,7 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
+export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Props) {
   const { walletClient, publicClient, switchChain } = useWeb3()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [copied, setCopied] = useState(false)
@@ -97,10 +102,11 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
   const [existingReference, setExistingReference] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingUpload | null>(null)
 
-  // ENS text record key for this proof, e.g. "com.x.proof" or
-  // "org.telegram.proof". Derived from the platform field on the draft so
-  // a single ReviewStep handles every platform without branching.
-  const recordKey = `${draft.claim.p}.proof`
+  // ENS text record key for this proof, e.g. "com.x.proof" — derived from
+  // the platform field on the draft. Null when the wizard is in attrs-only
+  // mode and there's no proof to write.
+  const recordKey = draft ? `${draft.claim.p}.proof` : null
+  const hasExtras = Object.keys(extraRecords).length > 0
 
   // Check for an abandoned upload on mount. If we find a recent one for this
   // name, surface the recovery card. Don't auto-use it — user must opt in.
@@ -109,6 +115,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
   }, [name])
 
   const { claimHex, byteLen } = useMemo(() => {
+    if (!draft) return { claimHex: '', byteLen: 0 }
     // The real claim is signed by the attester after we POST /api/attest;
     // its `att` field is whatever attester key the worker is running. For
     // the local preview we use the zero address so the bytes encode and
@@ -118,7 +125,7 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
     const bytes = encodeClaim({ ...draft.claim, att: previewAtt })
     const hex = bytesToHex(bytes)
     return { claimHex: hex, byteLen: bytes.length }
-  }, [draft.claim])
+  }, [draft])
 
   const openDialog = () => dialogRef.current?.showModal()
   const closeDialog = () => dialogRef.current?.close()
@@ -139,71 +146,89 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
       setPhase('error')
       return
     }
+    if (!draft && !hasExtras) {
+      setError('Nothing to write — no proof or attributes provided.')
+      setPhase('error')
+      return
+    }
     setError(null)
 
     try {
-      let reference = useExistingReference
+      // The records map we'll hand to setMetadata at the end. Build it up
+      // from extras first; the proof claim is added after the attester
+      // signs it, in the proof branch below.
+      const recordsToWrite: Record<string, string> = { ...extraRecords }
       let effectiveTier: StorageTier = tier
 
-      if (!reference) {
-        // 1. Encode full proof doc (not the claim) as dag-cbor bytes.
-        const proofDocBytes = cborEncode(draft as unknown as Record<string, unknown>)
+      // Proof branch: pin the IPFS doc, ask the attester to sign, encode
+      // the signed claim, and stick it in recordsToWrite under the
+      // platform's text key. Skipped entirely when there's no draft
+      // (attrs-only mode).
+      if (draft && recordKey) {
+        let reference = useExistingReference
 
-        // 2. Upload it — CDN or paid IPFS via x402.
-        setPhase('uploading')
-        const result: UploadProofResult = await uploadProof({
-          bytes: proofDocBytes,
-          ensName: name,
-          key: recordKey,
-          tier,
-          walletClient,
-          switchChain,
-        })
-        reference = result.reference
+        if (!reference) {
+          // 1. Encode full proof doc (not the claim) as dag-cbor bytes.
+          const proofDocBytes = cborEncode(draft as unknown as Record<string, unknown>)
 
-        // Persist immediately after a successful upload and before any signing.
-        // If the user bails between here and the ENS write we can recover.
-        writePending({
-          reference,
-          tier,
-          timestamp: Date.now(),
-          ensName: name,
+          // 2. Upload it — CDN or paid IPFS via x402.
+          setPhase('uploading')
+          const result: UploadProofResult = await uploadProof({
+            bytes: proofDocBytes,
+            ensName: name,
+            key: recordKey,
+            tier,
+            walletClient,
+            switchChain,
+          })
+          reference = result.reference
+
+          // Persist immediately after a successful upload and before any
+          // signing. If the user bails between here and the ENS write we
+          // can recover.
+          writePending({
+            reference,
+            tier,
+            timestamp: Date.now(),
+            ensName: name,
+          })
+          setExistingReference(reference)
+        } else {
+          // Recovery path — we already paid; infer the tier from the
+          // pending record only for display. The reference is authoritative.
+          effectiveTier = pending?.tier ?? tier
+        }
+
+        // 3. Ask the attester to sign a claim. The worker checks that the
+        //    session has both a SIWE-bound wallet AND a validated platform
+        //    binding, then constructs the claim from session state (never
+        //    trusts client-supplied uid/handle/addr) and signs with its own
+        //    key. The wallet does not sign the claim.
+        setPhase('attesting')
+        const signed: Claim = await attest({
+          sessionId,
+          name,
+          chainId: draft.claim.chainId,
+          expSeconds: draft.claim.exp,
+          prf: reference,
         })
-        setExistingReference(reference)
-      } else {
-        // Recovery path — we already paid; infer the tier from the pending
-        // record only for display. The reference is authoritative.
-        effectiveTier = pending?.tier ?? tier
+
+        // 4. Encode the SIGNED claim. encodeClaim(ClaimFields | Claim)
+        //    handles both branches: when `sig` is present it's included
+        //    as 65 raw bytes in the canonical dag-cbor map.
+        const signedBytes = encodeClaim(signed)
+        recordsToWrite[recordKey] = bytesToHex(signedBytes)
       }
 
-      // 3. Ask the attester to sign a claim. The worker checks that the
-      //    session has both a SIWE-bound wallet AND a validated platform
-      //    binding, then constructs the claim from session state (it never
-      //    trusts client-supplied uid/handle/addr) and signs with its own
-      //    key. The wallet does not sign the claim.
-      setPhase('attesting')
-      const signed: Claim = await attest({
-        sessionId,
-        name,
-        chainId: draft.claim.chainId,
-        expSeconds: draft.claim.exp,
-        prf: reference,
-      })
-
-      // 4. Encode the SIGNED claim. encodeClaim(ClaimFields | Claim) handles
-      //    both branches: when `sig` is present it's included as 65 raw bytes
-      //    in the canonical dag-cbor map. This is the on-chain text record.
-      const signedBytes = encodeClaim(signed)
-      const textRecordHex = bytesToHex(signedBytes)
-
-      // 5. Write to ENS via the SDK's metadataWriter factory. This is the
-      //    only on-chain transaction in the flow — and the only thing the
-      //    user's wallet does after the SIWE sign-in.
+      // 5. Write everything (proof + attrs) in a single multicall via the
+      //    SDK's metadataWriter. This is the only on-chain transaction in
+      //    the flow — and the only thing the user's wallet does after the
+      //    SIWE sign-in.
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)
       const { txHash: hash } = await writer.setMetadata({
         name,
-        records: { [recordKey]: textRecordHex },
+        records: recordsToWrite,
       })
 
       // 6. Success — clear the recovery record.
@@ -257,13 +282,24 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
     error: 'Issue and publish',
   }
 
+  // Human-friendly summary of what was/will be written.
+  const writeSummary = (() => {
+    const parts: string[] = []
+    if (recordKey) parts.push(recordKey)
+    const extraCount = Object.keys(extraRecords).length
+    if (extraCount > 0) {
+      parts.push(`${extraCount} profile record${extraCount === 1 ? '' : 's'}`)
+    }
+    return parts.join(' + ')
+  })()
+
   if (phase === 'done') {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Proof published</CardTitle>
+          <CardTitle>Records published</CardTitle>
           <CardDescription>
-            <span className="font-mono">{recordKey}</span> is now set on{' '}
+            <span className="font-mono">{writeSummary || 'Records'}</span> set on{' '}
             <span className="font-mono">{name}</span>.
           </CardDescription>
         </CardHeader>
@@ -294,14 +330,25 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
     )
   }
 
+  // Platform display name for the summary labels — derived from the
+  // draft's claim.p so Telegram doesn't get labelled as Twitter.
+  const platformLabel = (() => {
+    if (!draft) return ''
+    if (draft.claim.p === 'com.x') return 'X'
+    if (draft.claim.p === 'org.telegram') return 'Telegram'
+    return draft.claim.p
+  })()
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Review and write</CardTitle>
         <CardDescription>
-          Pin the proof document, get the attester to issue a signed claim, and write the{' '}
-          <span className="font-mono">{recordKey}</span> text record on{' '}
-          <span className="font-mono">{name}</span>.
+          {draft && hasExtras
+            ? 'Pin the proof document, get the attester to sign, and write the proof + profile records to ENS in one transaction.'
+            : draft
+              ? `Pin the proof document, get the attester to issue a signed claim, and write ${recordKey} on ${name}.`
+              : `Write ${Object.keys(extraRecords).length} profile record${Object.keys(extraRecords).length === 1 ? '' : 's'} to ${name}.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -338,125 +385,151 @@ export function ReviewStep({ name, draft, sessionId, onBack }: Props) {
             <dt className="text-neutral-500 dark:text-neutral-400">ENS name</dt>
             <dd className="font-mono">{name}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
-            <dd className="font-mono">{recordKey}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-neutral-500 dark:text-neutral-400">Claim payload (draft)</dt>
-            <dd>
-              <button
-                type="button"
-                onClick={openDialog}
-                className="font-mono text-xs rounded-md border border-neutral-200 dark:border-neutral-700 px-2 py-1 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
-              >
-                {truncateHex(claimHex)} · {byteLen} B
-              </button>
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-neutral-500 dark:text-neutral-400">Twitter handle</dt>
-            <dd className="font-mono">@{draft.claim.h}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-neutral-500 dark:text-neutral-400">Twitter user id</dt>
-            <dd className="font-mono">{draft.claim.uid}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-neutral-500 dark:text-neutral-400">Attestation method</dt>
-            <dd className="font-mono">{draft.method}</dd>
-          </div>
+
+          {draft && recordKey && (
+            <>
+              <div className="flex justify-between">
+                <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
+                <dd className="font-mono">{recordKey}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-neutral-500 dark:text-neutral-400">Claim payload (draft)</dt>
+                <dd>
+                  <button
+                    type="button"
+                    onClick={openDialog}
+                    className="font-mono text-xs rounded-md border border-neutral-200 dark:border-neutral-700 px-2 py-1 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    {truncateHex(claimHex)} · {byteLen} B
+                  </button>
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} handle</dt>
+                <dd className="font-mono">@{draft.claim.h}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} user id</dt>
+                <dd className="font-mono">{draft.claim.uid}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-500 dark:text-neutral-400">Attestation method</dt>
+                <dd className="font-mono">{draft.method}</dd>
+              </div>
+            </>
+          )}
+
+          {hasExtras && (
+            <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+              <dt className="text-neutral-500 dark:text-neutral-400 text-xs uppercase tracking-wide">
+                Profile records
+              </dt>
+              {Object.entries(extraRecords).map(([key, value]) => (
+                <div key={key} className="flex justify-between gap-4">
+                  <dd className="font-mono text-neutral-500 dark:text-neutral-400">{key}</dd>
+                  <dd className="font-mono truncate max-w-[16rem]" title={value}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </div>
+          )}
         </dl>
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Storage</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setTier('cdn')}
-              className={`text-left rounded-md border p-3 transition-colors ${
-                tier === 'cdn'
-                  ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-50 dark:bg-neutral-800'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <div className="text-sm font-medium">CDN (Free)</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                90-day cache. Good for testing.
-              </div>
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setTier('ipfs')}
-              className={`text-left rounded-md border p-3 transition-colors ${
-                tier === 'ipfs'
-                  ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-50 dark:bg-neutral-800'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <div className="text-sm font-medium">IPFS ($0.20/MB)</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                12-month pin. Real on-chain proof.
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: native <dialog> handles Esc via the cancel event; onClick here is only for backdrop-click-to-close */}
-        <dialog
-          ref={dialogRef}
-          onClick={(e) => {
-            if (e.target === dialogRef.current) closeDialog()
-          }}
-          className="backdrop:bg-black/60 rounded-lg p-0 max-w-2xl w-full bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xl"
-        >
-          <div className="p-6 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">Claim payload</h3>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Canonical CBOR (dag-cbor), pre-signature. This is exactly what gets hashed and
-                signed by your wallet. The on-chain value will differ because{' '}
-                <span className="font-mono">prf</span> is backfilled with the upload reference
-                before signing.
-              </p>
-            </div>
-
-            <div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                Fields (JSON view)
-              </div>
-              <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto">
-                {JSON.stringify(draft.claim, null, 2)}
-              </pre>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  CBOR bytes ({byteLen} B, hex)
+        {draft && (
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Storage</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setTier('cdn')}
+                className={`text-left rounded-md border p-3 transition-colors ${
+                  tier === 'cdn'
+                    ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-50 dark:bg-neutral-800'
+                    : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="text-sm font-medium">CDN (Free)</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  90-day cache. Good for testing.
                 </div>
-                <button
-                  type="button"
-                  onClick={copyHex}
-                  className="text-xs rounded border border-neutral-200 dark:border-neutral-700 px-2 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                >
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto break-all whitespace-pre-wrap">
-                {claimHex}
-              </pre>
-            </div>
-
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={closeDialog}>
-                Close
-              </Button>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setTier('ipfs')}
+                className={`text-left rounded-md border p-3 transition-colors ${
+                  tier === 'ipfs'
+                    ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-50 dark:bg-neutral-800'
+                    : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="text-sm font-medium">IPFS ($0.20/MB)</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  12-month pin. Real on-chain proof.
+                </div>
+              </button>
             </div>
           </div>
-        </dialog>
+        )}
+
+        {draft && (
+          /* biome-ignore lint/a11y/useKeyWithClickEvents: native <dialog> handles Esc via the cancel event; onClick here is only for backdrop-click-to-close */
+          <dialog
+            ref={dialogRef}
+            onClick={(e) => {
+              if (e.target === dialogRef.current) closeDialog()
+            }}
+            className="backdrop:bg-black/60 rounded-lg p-0 max-w-2xl w-full bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xl"
+          >
+            <div className="p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Claim payload</h3>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Canonical CBOR (dag-cbor), pre-signature. This is the byte preview of the inner
+                  claim — the real on-chain value differs because{' '}
+                  <span className="font-mono">prf</span>, <span className="font-mono">att</span>,
+                  and <span className="font-mono">sig</span> are all filled in by the attester
+                  worker after this is uploaded.
+                </p>
+              </div>
+
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                  Fields (JSON view)
+                </div>
+                <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto">
+                  {JSON.stringify(draft.claim, null, 2)}
+                </pre>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    CBOR bytes ({byteLen} B, hex)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyHex}
+                    className="text-xs rounded border border-neutral-200 dark:border-neutral-700 px-2 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto break-all whitespace-pre-wrap">
+                  {claimHex}
+                </pre>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={closeDialog}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </dialog>
+        )}
 
         {phase === 'error' && error && (
           <div className="rounded-md border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-900 dark:text-red-100">

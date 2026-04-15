@@ -2,10 +2,11 @@
 
 import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
 import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ConnectTelegramStep } from './ConnectTelegramStep'
 import { ConnectTwitterStep } from './ConnectTwitterStep'
 import { ConnectWalletStep } from './ConnectWalletStep'
+import { EnterAttributesStep } from './EnterAttributesStep'
 import { ReviewStep } from './ReviewStep'
 import { WizardStepIndicator } from './WizardStepIndicator'
 
@@ -15,16 +16,104 @@ import { WizardStepIndicator } from './WizardStepIndicator'
 export type AnyDraftFullProof = DraftTwitterProof | DraftTelegramProof
 
 type Platform = 'com.x' | 'org.telegram'
+const KNOWN_PLATFORMS: readonly Platform[] = ['com.x', 'org.telegram'] as const
 
-const STEPS = ['Connect wallet', 'Connect account', 'Review and write']
+function isPlatform(s: string): s is Platform {
+  return (KNOWN_PLATFORMS as readonly string[]).includes(s)
+}
+
+/**
+ * Config decoded from the URL. Each field is independent — agents can
+ * request just a proof, just attributes, both, or neither (in which case
+ * the wizard runs its default proof-only flow).
+ */
+interface IncomingConfig {
+  prefillName: string | null
+  /** Allowed platforms for the proof step. Empty = all platforms allowed. */
+  allowedPlatforms: Platform[]
+  /** Whether the URL specified `platforms` at all (vs. left it open). */
+  platformsRequested: boolean
+  /** Text record keys to surface as form inputs in the attributes step. */
+  requestedAttrs: string[]
+  /** Pre-set `class` text record value, written automatically. */
+  classValue: string | null
+  /** Pre-set `schema` text record value, written automatically. */
+  schemaUri: string | null
+}
+
+function readIncomingConfig(): IncomingConfig {
+  if (typeof window === 'undefined') {
+    return {
+      prefillName: null,
+      allowedPlatforms: [],
+      platformsRequested: false,
+      requestedAttrs: [],
+      classValue: null,
+      schemaUri: null,
+    }
+  }
+  const params = new URLSearchParams(window.location.search)
+  const platformsRaw = params.get('platforms')
+  const allowed = platformsRaw
+    ? platformsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(isPlatform)
+    : []
+  const attrsRaw = params.get('attrs')
+  const requestedAttrs = attrsRaw
+    ? attrsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : []
+  return {
+    prefillName: params.get('name'),
+    allowedPlatforms: allowed,
+    platformsRequested: !!platformsRaw,
+    requestedAttrs,
+    classValue: params.get('class'),
+    schemaUri: params.get('schema'),
+  }
+}
+
+// A wizard step is a named kind, not a number. The list of steps is
+// computed from the incoming config so the indicator and the routing
+// stay in sync without an off-by-one foot-gun.
+type StepKind = 'wallet' | 'social' | 'attrs' | 'review'
+
+interface StepEntry {
+  kind: StepKind
+  label: string
+}
+
+function computeSteps(config: IncomingConfig): StepEntry[] {
+  const steps: StepEntry[] = [{ kind: 'wallet', label: 'Connect wallet' }]
+
+  // Show the social step if the URL explicitly asks for platforms OR if
+  // nothing specific was asked (the default proof-only flow).
+  const wantsSocial =
+    config.platformsRequested ||
+    (config.requestedAttrs.length === 0 && !config.classValue && !config.schemaUri)
+  if (wantsSocial) {
+    steps.push({ kind: 'social', label: 'Connect account' })
+  }
+
+  // Show the attributes step if the URL asks for any text records.
+  const wantsAttrs =
+    config.requestedAttrs.length > 0 || !!config.classValue || !!config.schemaUri
+  if (wantsAttrs) {
+    steps.push({ kind: 'attrs', label: 'Profile' })
+  }
+
+  steps.push({ kind: 'review', label: 'Review and write' })
+  return steps
+}
+
 const STORAGE_KEY = 'proofs-wizard-state'
 
-// Privy's OAuth/login flows redirect the full page, so wizard state must
-// survive a reload. We persist step + name + sessionId + platform to
-// sessionStorage; draft isn't persisted because it's rebuilt from
-// Privy's user.{twitter,telegram} on re-entry to step 1.
 interface PersistedState {
-  step: number
+  stepIndex: number
   name: string
   sessionId: string | null
   platform: Platform
@@ -36,13 +125,13 @@ function loadPersisted(): PersistedState | null {
     const raw = window.sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedState
-    if (typeof parsed.step !== 'number' || typeof parsed.name !== 'string') return null
+    if (typeof parsed.stepIndex !== 'number' || typeof parsed.name !== 'string') return null
     return {
       // Never resume into the review step — draft is ephemeral and won't exist.
-      step: Math.min(parsed.step, 1),
+      stepIndex: Math.min(parsed.stepIndex, 1),
       name: parsed.name,
       sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
-      platform: parsed.platform === 'org.telegram' ? 'org.telegram' : 'com.x',
+      platform: isPlatform(parsed.platform) ? parsed.platform : 'com.x',
     }
   } catch {
     return null
@@ -51,80 +140,118 @@ function loadPersisted(): PersistedState | null {
 
 export function Wizard() {
   const [hydrated, setHydrated] = useState(false)
-  const [step, setStep] = useState(0)
+  const [stepIndex, setStepIndex] = useState(0)
   const [name, setName] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [platform, setPlatform] = useState<Platform>('com.x')
   const [draft, setDraft] = useState<AnyDraftFullProof | null>(null)
+  const [extraRecords, setExtraRecords] = useState<Record<string, string>>({})
+
+  // Read the URL config once, on mount. Memoised to keep the steps array
+  // and platform default stable between renders.
+  const incomingConfig = useMemo(() => readIncomingConfig(), [])
+  const steps = useMemo(() => computeSteps(incomingConfig), [incomingConfig])
+
+  // Default platform: first allowed if the URL constrained it, else com.x.
+  const initialPlatform: Platform =
+    incomingConfig.allowedPlatforms[0] ?? 'com.x'
+  const [platform, setPlatform] = useState<Platform>(initialPlatform)
 
   useEffect(() => {
     const persisted = loadPersisted()
     if (persisted) {
-      setStep(persisted.step)
-      setName(persisted.name)
+      setStepIndex(persisted.stepIndex)
+      // Only honor a persisted name if the URL didn't pre-fill one.
+      if (!incomingConfig.prefillName) setName(persisted.name)
+      else setName(incomingConfig.prefillName)
       setSessionId(persisted.sessionId)
-      setPlatform(persisted.platform)
+      // Honor the URL platform restriction over a stale persisted value.
+      if (incomingConfig.allowedPlatforms.length > 0) {
+        setPlatform(incomingConfig.allowedPlatforms[0])
+      } else {
+        setPlatform(persisted.platform)
+      }
+    } else if (incomingConfig.prefillName) {
+      setName(incomingConfig.prefillName)
     }
     setHydrated(true)
-  }, [])
+  }, [incomingConfig])
 
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
     window.sessionStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ step, name, sessionId, platform } satisfies PersistedState),
+      JSON.stringify({ stepIndex, name, sessionId, platform } satisfies PersistedState),
     )
-  }, [hydrated, step, name, sessionId, platform])
+  }, [hydrated, stepIndex, name, sessionId, platform])
+
+  const currentStep = steps[stepIndex]
+  const stepLabels = steps.map((s) => s.label)
+  const advance = () => setStepIndex((i) => Math.min(i + 1, steps.length - 1))
+  const back = () => setStepIndex((i) => Math.max(i - 1, 0))
+
+  // Visible platforms in the picker — restricted by the URL or all known.
+  const visiblePlatforms: Platform[] =
+    incomingConfig.allowedPlatforms.length > 0
+      ? incomingConfig.allowedPlatforms
+      : [...KNOWN_PLATFORMS]
+  const showPlatformPicker = visiblePlatforms.length > 1
 
   return (
     <div className="max-w-xl mx-auto w-full">
-      <WizardStepIndicator steps={STEPS} current={step} />
-      {step === 0 && (
+      <WizardStepIndicator steps={stepLabels} current={stepIndex} />
+
+      {currentStep?.kind === 'wallet' && (
         <ConnectWalletStep
+          defaultName={incomingConfig.prefillName ?? undefined}
           onComplete={(n, sid) => {
             setName(n)
             setSessionId(sid)
-            setStep(1)
+            advance()
           }}
         />
       )}
 
-      {step === 1 && sessionId && (
+      {currentStep?.kind === 'social' && sessionId && (
         <div className="space-y-4">
-          {/* Platform picker — small button group above the link card. */}
-          <div className="flex gap-2 max-w-xl mx-auto">
-            <button
-              type="button"
-              onClick={() => setPlatform('com.x')}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                platform === 'com.x'
-                  ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-              }`}
-            >
-              X
-            </button>
-            <button
-              type="button"
-              onClick={() => setPlatform('org.telegram')}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                platform === 'org.telegram'
-                  ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-              }`}
-            >
-              Telegram
-            </button>
-          </div>
+          {showPlatformPicker && (
+            <div className="flex gap-2 max-w-xl mx-auto">
+              {visiblePlatforms.includes('com.x') && (
+                <button
+                  type="button"
+                  onClick={() => setPlatform('com.x')}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    platform === 'com.x'
+                      ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
+                      : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  X
+                </button>
+              )}
+              {visiblePlatforms.includes('org.telegram') && (
+                <button
+                  type="button"
+                  onClick={() => setPlatform('org.telegram')}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    platform === 'org.telegram'
+                      ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
+                      : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  Telegram
+                </button>
+              )}
+            </div>
+          )}
 
           {platform === 'com.x' && (
             <ConnectTwitterStep
               name={name}
               sessionId={sessionId}
-              onBack={() => setStep(0)}
+              onBack={back}
               onComplete={(next) => {
                 setDraft(next)
-                setStep(2)
+                advance()
               }}
             />
           )}
@@ -132,18 +259,38 @@ export function Wizard() {
             <ConnectTelegramStep
               name={name}
               sessionId={sessionId}
-              onBack={() => setStep(0)}
+              onBack={back}
               onComplete={(next) => {
                 setDraft(next)
-                setStep(2)
+                advance()
               }}
             />
           )}
         </div>
       )}
 
-      {step === 2 && draft && sessionId && (
-        <ReviewStep name={name} draft={draft} sessionId={sessionId} onBack={() => setStep(1)} />
+      {currentStep?.kind === 'attrs' && (
+        <EnterAttributesStep
+          name={name}
+          requestedAttrs={incomingConfig.requestedAttrs}
+          classValue={incomingConfig.classValue ?? undefined}
+          schemaUri={incomingConfig.schemaUri ?? undefined}
+          onBack={back}
+          onComplete={(records) => {
+            setExtraRecords(records)
+            advance()
+          }}
+        />
+      )}
+
+      {currentStep?.kind === 'review' && sessionId && (
+        <ReviewStep
+          name={name}
+          draft={draft}
+          extraRecords={extraRecords}
+          sessionId={sessionId}
+          onBack={back}
+        />
       )}
     </div>
   )
