@@ -162,6 +162,10 @@ console.log('attestation method:', full.method)
 
 The `method` field on the full proof document tells you which platform validator the attester used (e.g. `"privy-com.x"`, `"telegram-login-widget"`). A verifier with stricter trust requirements can accept some methods and reject others without changing the on-chain format.
 
+## Trust model for verifiers
+
+There's exactly one cryptographic binding in this scheme, and verifiers — especially *agents* that already know the user's social account from some other context — must understand it explicitly: **`claim.uid` is the binding, not `claim.handle`**. The SDK's `verifyProof` confirms that some attester you trust signed a claim saying "this ENS name is bound to this `uid`". It cannot confirm that the `uid` is *your* user. That comparison is on you. If you're an agent with a Telegram chat context, you already know the user's stable Telegram numeric id from message metadata — compare that to `result.uid` after `verifyProof` returns valid. Without that check, anyone can write a perfectly valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid" for a binding that has nothing to do with your user. Treat `claim.handle` as a display string only; treat `claim.uid` as identity. The same applies to X (`com.x`) — compare against the OAuth `sub` claim, not the @handle, which Twitter lets users release and re-register.
+
 ## Why this design
 
 A few decisions are worth calling out, because they shape what the system can and can't do:
