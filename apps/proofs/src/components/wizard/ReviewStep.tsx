@@ -102,10 +102,15 @@ export function ReviewStep({ name, draft, onBack }: Props) {
   }, [name])
 
   const { claimHex, byteLen } = useMemo(() => {
-    const bytes = encodeClaim(draft.claim)
+    // TODO(phase3): once the attester backend is wired up, the preview will
+    // show the claim returned by the attester. For now we self-attest with
+    // the connected wallet so the preview encodes — this matches the
+    // transitional signing path below.
+    const previewAtt = walletClient?.account?.address ?? draft.claim.addr
+    const bytes = encodeClaim({ ...draft.claim, att: previewAtt })
     const hex = bytesToHex(bytes)
     return { claimHex: hex, byteLen: bytes.length }
-  }, [draft.claim])
+  }, [draft.claim, walletClient])
 
   const openDialog = () => dialogRef.current?.showModal()
   const closeDialog = () => dialogRef.current?.close()

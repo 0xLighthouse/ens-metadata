@@ -1,3 +1,4 @@
+import { CLAIM_VERSION } from '@ensmetadata/sdk'
 import type { Address } from 'viem'
 
 // Backend-neutral module that turns an attestation source into a draft
@@ -64,7 +65,7 @@ export interface PrivyTwitterProofPayload {
  * ReviewStep after the full-proof is pinned to IPFS and the user signs.
  */
 export interface DraftFullProof {
-  /** Schema version, currently 1. */
+  /** Schema version. */
   v: number
   /** Draft on-chain claim, missing `prf` and `sig` until ReviewStep. */
   claim: {
@@ -76,6 +77,7 @@ export interface DraftFullProof {
     prf: string
     name: string
     chainId: number
+    addr: Address
   }
   /** Attestation backend. `'privy-linked'` for Phase 1 Privy OAuth. */
   method: typeof PRIVY_METHOD
@@ -105,7 +107,7 @@ export function buildTwitterProofFromPrivy(args: {
   chainId: number
   nowSeconds?: number
 }): DraftFullProof {
-  const { twitter, ensName, chainId } = args
+  const { twitter, issuerAddress, ensName, chainId } = args
   const nowSeconds = args.nowSeconds ?? Math.floor(Date.now() / 1000)
 
   if (!twitter.subject) {
@@ -118,9 +120,9 @@ export function buildTwitterProofFromPrivy(args: {
   const NINETY_DAYS = 90 * 24 * 60 * 60
 
   return {
-    v: 1,
+    v: CLAIM_VERSION,
     claim: {
-      v: 1,
+      v: CLAIM_VERSION,
       p: TWITTER_PLATFORM,
       h: twitter.username,
       uid: twitter.subject,
@@ -128,6 +130,7 @@ export function buildTwitterProofFromPrivy(args: {
       prf: '',
       name: ensName,
       chainId,
+      addr: issuerAddress,
     },
     method: PRIVY_METHOD,
     issuedAt: nowSeconds,

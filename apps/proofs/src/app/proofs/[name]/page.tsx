@@ -2,8 +2,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { addEnsContracts } from '@ensdomains/ensjs'
 import { type VerifyResult, verifyProof } from '@ensmetadata/sdk'
 import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
-import { http, type PublicClient, createPublicClient } from 'viem'
+import { type Address, http, type PublicClient, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
+
+// Trusted attesters are env-configured. Comma-separated list of EIP-55 hex
+// addresses. Empty by default — phase 2 ships an attester address to plug in
+// here, until then every verify will fail with `untrusted-attester`.
+function readTrustedAttesters(): Address[] {
+  const raw = process.env.NEXT_PUBLIC_TRUSTED_ATTESTERS
+  if (!raw) return []
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => isAddress(s)) as Address[]
+}
 
 interface Props {
   params: Promise<{ name: string }>
@@ -39,7 +51,11 @@ function reasonLabel(reason: VerifyResult['reason']): string {
     case 'bad-signature':
       return 'Signature does not verify'
     case 'wrong-owner':
-      return 'Signed by a non-owner address'
+      return 'Observed wallet is no longer the ENS owner'
+    case 'untrusted-attester':
+      return 'Attester is not in the trusted set'
+    case 'unsupported-version':
+      return 'Claim uses an unsupported schema version'
     case 'handle-changed':
       return 'Handle changed since signing'
     case 'decode-error':
@@ -58,10 +74,12 @@ export default async function ProofsPage({ params }: Props) {
     transport: http(process.env.NEXT_PUBLIC_RPC_URL),
   }) as unknown as PublicClient
 
+  const verifierConfig = { trustedAttesters: readTrustedAttesters() }
+
   const results: PlatformResult[] = await Promise.all(
     PLATFORMS.map(async (platform) => ({
       platform,
-      result: await verifyProof(client, { name: decoded, platform }),
+      result: await verifyProof(client, verifierConfig, { name: decoded, platform }),
     })),
   )
 
