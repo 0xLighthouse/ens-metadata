@@ -96,6 +96,15 @@ export default async function ProofsPage({ params }: Props) {
             <CardDescription>Verifiable social proofs attached to this ENS name.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {verifierConfig.trustedAttesters.length === 0 && (
+              <div className="rounded-md border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-3 text-xs text-yellow-900 dark:text-yellow-100">
+                <span className="font-medium">No trusted attesters configured.</span> Set{' '}
+                <span className="font-mono">NEXT_PUBLIC_TRUSTED_ATTESTERS</span> in{' '}
+                <span className="font-mono">.env.local</span> and restart the dev server. Until
+                then every proof will fail with <span className="font-mono">untrusted-attester</span>.
+              </div>
+            )}
+
             {!anyFound && (
               <div className="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
                 No proofs found for <span className="font-mono">{decoded}</span>.
@@ -168,8 +177,9 @@ export default async function ProofsPage({ params }: Props) {
             <div className="flex items-start gap-2 text-xs text-neutral-500 dark:text-neutral-400 pt-2">
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <span>
-                Verification checks: claim signature recovers to the ENS owner, claim is unexpired,
-                bound to this ENS name and chain. Uses the cheap path (no IPFS fetch).
+                Verification checks: signature recovers to the attester key, attester is in the
+                trusted set, the wallet the attester observed (claim.addr) is still the current ENS
+                owner, and the claim is unexpired. Cheap path — no IPFS fetch.
               </span>
             </div>
           </CardContent>
