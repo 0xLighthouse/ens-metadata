@@ -1,0 +1,19 @@
+# --- Secrets ---
+# Copy this file to .dev.vars (which is gitignored by wrangler) and fill in
+# real values. For deployed environments, use `wrangler secret put <NAME>`
+# instead — the dashboard / CLI stores them outside the source tree.
+
+# Attester signing key. The address derived from this key is what gets
+# stamped into every signed claim. Verifiers must add this address to their
+# trustedAttesters set to accept claims from this instance.
+#
+# For testing only. Production should swap to a KMS-backed signer.
+ATTESTER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000001
+
+# Twitter (via Privy REST). When unset, the validator runs in dev passthrough
+# mode and trusts the client-supplied { uid, handle } directly.
+PRIVY_APP_ID=
+PRIVY_APP_SECRET=
+
+# Telegram. When unset, the validator runs in dev passthrough mode.
+TELEGRAM_BOT_TOKEN=

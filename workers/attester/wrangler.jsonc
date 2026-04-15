@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ensmetadata-attester",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  // Plain config — not secrets. Override per environment in dashboards or
+  // via additional [env.*] blocks.
+  "vars": {
+    "SIWE_DOMAIN": "localhost:3001",
+    "SIWE_ORIGIN": "http://localhost:3001",
+    "SESSION_TTL_SECONDS": "900",
+    "TRUSTED_ORIGIN": "http://localhost:3001"
+  },
+  // Each session is its own Durable Object instance, addressed by session id.
+  // The instance holds the SIWE nonce + bound wallet + bound platform; an
+  // alarm cleans up storage when the session TTL elapses so the DO can be
+  // evicted by Cloudflare's runtime.
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSIONS",
+        "class_name": "SessionStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionStore"]
+    }
+  ]
+  // Secrets — never commit. Set with: wrangler secret put <NAME>
+  // For local dev, populate .dev.vars (see .dev.vars.example):
+  //   ATTESTER_PRIVATE_KEY
+  //   PRIVY_APP_ID
+  //   PRIVY_APP_SECRET
+  //   TELEGRAM_BOT_TOKEN
+}
