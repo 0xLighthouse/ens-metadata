@@ -3,7 +3,9 @@
   "scripts": {
     "build": "turbo run build",
     "build:interface": "turbo run build --filter=interface",
+    "build:proofs": "turbo run build --filter=proofs",
     "interface": "turbo run dev --filter=interface",
+    "proofs": "turbo run dev --filter=proofs",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "biome format --write .",

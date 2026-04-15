@@ -1,0 +1,44 @@
+{
+  "name": "proofs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "clean": "rm -rf .next",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@ensdomains/ensjs": "^4.2.2",
+    "@ensmetadata/sdk": "workspace:*",
+    "@ipld/dag-cbor": "^9.2.6",
+    "@privy-io/react-auth": "^2.23.0",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@x402/evm": "^2.8.0",
+    "@x402/fetch": "^2.8.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.453.0",
+    "next": "15.5.14",
+    "next-themes": "^0.3.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-spinners": "^0.14.1",
+    "sonner": "^1.5.0",
+    "tailwind-merge": "^3.0.2",
+    "tailwind-variants": "^1.0.0",
+    "tailwindcss": "^4.0.16",
+    "tailwindcss-animate": "^1.0.7",
+    "viem": "2.23.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.16",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.4.47",
+    "typescript": "^5"
+  }
+}
