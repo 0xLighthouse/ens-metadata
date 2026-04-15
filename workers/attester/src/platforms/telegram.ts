@@ -2,99 +2,61 @@ import type { Env } from '../env'
 import type { Platform, PlatformValidationResult } from './index'
 
 /**
- * Telegram validator using the Login Widget HMAC scheme, ported to
- * WebCrypto so it runs in a Workers V8 isolate without `node:crypto`.
+ * Telegram validator backed by the Privy REST API — mirrors twitter.ts.
  *
- * Spec: https://core.telegram.org/widgets/login#checking-authorization
+ * Production path: the client posts a Privy access token. We hand it to
+ * the same /api/v1/users/me endpoint as the Twitter validator and look
+ * for a linked account with `type: 'telegram'`. Privy's stable id field
+ * is `telegram_user_id`; the display handle is `username` (nullable —
+ * Telegram users without a public @username can't be attested because
+ * there'd be no stable handle to display).
  *
- * Telegram's Login Widget returns a payload like:
- *   { id, first_name, last_name, username, photo_url, auth_date, hash }
- * The `hash` field is HMAC-SHA256 over a sorted "key=value\n" string of
- * every other field, keyed by SHA-256(bot_token). We recompute the HMAC
- * with crypto.subtle and constant-time compare to detect tampering.
- *
- * `auth_date` is a unix-seconds timestamp. We reject any payload older
- * than the staleness window — the spec recommends an hour but for an
- * attestation flow we can be tighter.
+ * Dev passthrough: when PRIVY_APP_ID/SECRET are unset, we accept a
+ * client-supplied { uid, handle } directly and log a warning. Same shape
+ * as the Twitter validator's dev path, so the frontend uses one client
+ * surface for both platforms.
  */
-
-const STALENESS_WINDOW_SECONDS = 5 * 60
 
 interface TelegramPayload {
-  id?: number | string
-  first_name?: string
-  last_name?: string
-  username?: string
-  photo_url?: string
-  auth_date?: number | string
-  hash?: string
+  /** Privy access token issued to the authenticated user. */
+  privyAccessToken?: string
+  /** Dev-only fallback when Privy creds are unset. */
+  uid?: string
+  /** Dev-only fallback when Privy creds are unset. */
+  handle?: string
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.startsWith('0x') ? hex.slice(2) : hex
-  if (clean.length % 2 !== 0) throw new Error('hex: odd length')
-  const out = new Uint8Array(clean.length / 2)
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16)
-  }
-  return out
+interface PrivyLinkedAccount {
+  type: string
+  telegram_user_id?: string
+  username?: string | null
 }
 
-/**
- * Constant-time byte comparison. Branch-free over equal-length inputs;
- * unequal lengths short-circuit immediately (the lengths themselves are
- * not secret).
- */
-function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) {
-    diff |= a[i] ^ b[i]
-  }
-  return diff === 0
+interface PrivyUser {
+  id: string
+  linked_accounts?: PrivyLinkedAccount[]
 }
 
-async function checkSignature(
-  payload: TelegramPayload,
-  botToken: string,
-): Promise<boolean> {
-  const { hash, ...fields } = payload
-  if (!hash) return false
-
-  // Build the data-check string per Telegram spec: sorted alphabetically,
-  // joined as "key=value" with newlines between.
-  const dataCheckString = Object.entries(fields)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => [k, String(v)] as const)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('\n')
-
-  // Telegram's secret key is SHA-256 of the bot token (raw bytes, not hex).
-  const tokenBytes = new TextEncoder().encode(botToken)
-  const secretKey = await crypto.subtle.digest('SHA-256', tokenBytes)
-
-  const hmacKey = await crypto.subtle.importKey(
-    'raw',
-    secretKey,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const sigBuffer = await crypto.subtle.sign(
-    'HMAC',
-    hmacKey,
-    new TextEncoder().encode(dataCheckString),
-  )
-
-  const expected = new Uint8Array(sigBuffer)
-  let provided: Uint8Array
-  try {
-    provided = hexToBytes(hash)
-  } catch {
-    return false
+async function callPrivy(env: Env, accessToken: string): Promise<PrivyUser> {
+  const appId = env.PRIVY_APP_ID
+  const appSecret = env.PRIVY_APP_SECRET
+  if (!appId || !appSecret) {
+    throw new Error('telegram: Privy creds not configured')
   }
-  return timingSafeEqual(expected, provided)
+  const basicAuth = btoa(`${appId}:${appSecret}`)
+  const res = await fetch('https://auth.privy.io/api/v1/users/me', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'privy-app-id': appId,
+      'X-App-Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  if (!res.ok) {
+    throw new Error(`telegram: Privy returned ${res.status}`)
+  }
+  return (await res.json()) as PrivyUser
 }
 
 async function validate(
@@ -102,39 +64,33 @@ async function validate(
   payload: unknown,
 ): Promise<PlatformValidationResult> {
   const p = (payload ?? {}) as TelegramPayload
-  const botToken = env.TELEGRAM_BOT_TOKEN
 
-  if (!botToken) {
-    if (!p.id || !p.username) {
+  if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
+    if (!p.uid || !p.handle) {
       throw new Error(
-        'telegram: dev passthrough requires { id, username }; set TELEGRAM_BOT_TOKEN for real validation',
+        'telegram: dev passthrough requires { uid, handle }; set PRIVY_APP_ID and PRIVY_APP_SECRET for real validation',
       )
     }
     console.warn('[attester] telegram validator is in dev passthrough mode')
-    return { uid: String(p.id), handle: String(p.username) }
+    return { uid: p.uid, handle: p.handle }
   }
 
-  if (!p.id || !p.auth_date || !p.hash) {
-    throw new Error('telegram: payload missing id, auth_date, or hash')
+  if (!p.privyAccessToken) {
+    throw new Error('telegram: missing privyAccessToken')
   }
 
-  const ok = await checkSignature(p, botToken)
-  if (!ok) {
-    throw new Error('telegram: HMAC mismatch — payload was tampered or signed by a different bot')
+  const user = await callPrivy(env, p.privyAccessToken)
+  const telegram = user.linked_accounts?.find((a) => a.type === 'telegram')
+  if (!telegram) {
+    throw new Error('telegram: privy user has no linked telegram account')
   }
-
-  const authDate = Number(p.auth_date)
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  if (nowSeconds - authDate > STALENESS_WINDOW_SECONDS) {
-    throw new Error(`telegram: auth payload is stale (${nowSeconds - authDate}s old)`)
+  if (!telegram.telegram_user_id || !telegram.username) {
+    // Telegram users without a public @username can't be attested — there's
+    // no stable handle to display. Refuse rather than silently storing the
+    // numeric id as the handle.
+    throw new Error('telegram: privy linked account missing telegram_user_id or username')
   }
-
-  if (!p.username) {
-    // Telegram users without a public @username can't have a stable handle.
-    // Refuse rather than silently storing the numeric id as the handle.
-    throw new Error('telegram: account has no public username')
-  }
-  return { uid: String(p.id), handle: p.username }
+  return { uid: telegram.telegram_user_id, handle: telegram.username }
 }
 
 export const telegramPlatform: Platform = {

@@ -1,6 +1,6 @@
 // Smoke test for the attester worker. Drives all four endpoints with a
-// real SIWE signature and a dev-passthrough Twitter binding, then verifies
-// that the returned signed claim verifies cleanly with the SDK.
+// real SIWE signature for both the X and Telegram dev-passthrough paths,
+// then verifies the returned signed claims with the SDK.
 //
 // Usage:
 //   node workers/attester/scripts/smoke-test.mjs
@@ -8,10 +8,9 @@
 // Pre-requisite: the worker must be running locally on port 8787
 // (`pnpm attester` from the repo root).
 
-import { createSiweMessage } from 'viem/siwe'
-import { privateKeyToAccount } from 'viem/accounts'
 import { decodeClaim, verifyClaim } from '@ensmetadata/sdk'
-import { fromHex } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createSiweMessage } from 'viem/siwe'
 
 const ATTESTER = 'http://localhost:8787'
 // Same test key the SDK tests use — burner, never used outside tests.
@@ -29,13 +28,14 @@ function check(label, ok, detail = '') {
   if (!ok) process.exit(1)
 }
 
-async function main() {
+async function runFlow({ platform, payload }) {
+  console.log(`\n\x1b[1m── ${platform} ──\x1b[0m`)
+
   // 1. Create session
   const sessionRes = await fetch(`${ATTESTER}/api/session`, { method: 'POST' })
-  check('POST /api/session', sessionRes.ok, `status ${sessionRes.status}`)
+  check(`POST /api/session`, sessionRes.ok, `status ${sessionRes.status}`)
   const session = await sessionRes.json()
-  console.log('  sessionId:', session.sessionId)
-  console.log('  nonce:    ', session.nonce)
+  console.log(`  sessionId: ${session.sessionId}`)
 
   // 2. Build + sign SIWE message
   const message = createSiweMessage({
@@ -50,7 +50,7 @@ async function main() {
   })
   const signature = await wallet.signMessage({ message })
 
-  // 3. Bind wallet
+  // 3. Bind wallet via SIWE
   const bindWalletRes = await fetch(`${ATTESTER}/api/session/wallet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -58,23 +58,23 @@ async function main() {
   })
   const bindWalletBody = await bindWalletRes.json().catch(() => ({}))
   check(
-    'POST /api/session/wallet',
+    `POST /api/session/wallet`,
     bindWalletRes.ok,
     bindWalletRes.ok ? `wallet=${bindWalletBody.wallet}` : JSON.stringify(bindWalletBody),
   )
 
   // 4. Bind platform (dev passthrough)
-  const bindPlatformRes = await fetch(`${ATTESTER}/api/session/platform/com.x`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: session.sessionId,
-      payload: { uid: '295218901', handle: 'vitalik' },
-    }),
-  })
+  const bindPlatformRes = await fetch(
+    `${ATTESTER}/api/session/platform/${encodeURIComponent(platform)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: session.sessionId, payload }),
+    },
+  )
   const bindPlatformBody = await bindPlatformRes.json().catch(() => ({}))
   check(
-    'POST /api/session/platform/com.x',
+    `POST /api/session/platform/${platform}`,
     bindPlatformRes.ok,
     bindPlatformRes.ok
       ? `uid=${bindPlatformBody.uid}, handle=${bindPlatformBody.handle}`
@@ -95,10 +95,12 @@ async function main() {
     }),
   })
   const attestBody = await attestRes.json().catch(() => ({}))
-  check('POST /api/attest', attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
+  check(`POST /api/attest`, attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
 
   const claim = attestBody.claim
-  console.log('  claim:', JSON.stringify(claim, null, 2).split('\n').slice(0, 12).join('\n  '))
+  console.log(
+    `  claim.p=${claim.p}  uid=${claim.uid}  h=${claim.h}  addr=${claim.addr}  att=${claim.att}`,
+  )
 
   // 6. Verify the returned signed claim with the SDK
   const verifyResult = await verifyClaim(claim, {
@@ -110,8 +112,20 @@ async function main() {
     verifyResult.valid,
     verifyResult.valid ? 'all checks pass' : JSON.stringify(verifyResult),
   )
+}
 
-  console.log('\n\x1b[32mAll endpoints work.\x1b[0m')
+async function main() {
+  await runFlow({
+    platform: 'com.x',
+    payload: { uid: '295218901', handle: 'vitalik' },
+  })
+
+  await runFlow({
+    platform: 'org.telegram',
+    payload: { uid: '1354735528957124608', handle: 'vbuterin' },
+  })
+
+  console.log('\n\x1b[32mAll platforms work.\x1b[0m')
 }
 
 main().catch((err) => {
