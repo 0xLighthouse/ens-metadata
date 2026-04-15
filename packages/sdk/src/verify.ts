@@ -1,5 +1,7 @@
+import { getOwner } from '@ensdomains/ensjs/public'
 import type { Address, Hex, PublicClient } from 'viem'
 import { isAddress } from 'viem'
+import { getEnsText } from 'viem/actions'
 import { normalize } from 'viem/ens'
 import { decodeClaim, verifyClaim } from './proof'
 import type { Claim, FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof-types'
@@ -43,12 +45,22 @@ async function verifyProofImpl(
   const name = normalize(opts.name)
   const textKey = `${opts.platform}${TEXT_KEY_SUFFIX}`
 
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText/getEnsOwner
-  const anyClient = client as any
-
+  // Use ensjs `getOwner` (the same call the proofs frontend uses) instead
+  // of the resolver's `addr()` record. They diverge for wrapped names: a
+  // NameWrapper-managed name's ownership lives on the wrapper contract,
+  // not in the resolver, so falling back to `addr()` would compare
+  // claim.addr against whatever the user happens to have set as their
+  // primary address — which may not be the registry/wrapper owner.
+  // `getEnsText` is the viem-built-in (no extension required).
+  //
+  // The `as never` cast on the getOwner call is a type-only escape: ensjs
+  // typing wants a `ClientWithEns` (a chain extended via addEnsContracts),
+  // but at runtime any viem PublicClient pointed at mainnet works. The
+  // burden is on the caller to use addEnsContracts(mainnet) — which the
+  // proofs frontend and the verify-proof script both do.
   const [rawTextResult, ownerResult] = await Promise.allSettled([
-    anyClient.getEnsText({ name, key: textKey }),
-    anyClient.getEnsOwner?.({ name }) ?? anyClient.getEnsAddress({ name }),
+    getEnsText(client, { name, key: textKey }),
+    getOwner(client as never, { name }),
   ])
 
   const rawText =
@@ -60,18 +72,10 @@ async function verifyProofImpl(
   }
 
   let ownerAddress: Address | null = null
-  if (ownerResult.status === 'fulfilled' && ownerResult.value) {
-    const raw = ownerResult.value
-    const maybe =
-      typeof raw === 'string'
-        ? raw
-        : raw && typeof raw === 'object' && 'owner' in raw
-          ? ((raw as { owner?: unknown }).owner as string | undefined)
-          : typeof raw === 'object' && raw !== null && 'address' in raw
-            ? ((raw as { address?: unknown }).address as string | undefined)
-            : undefined
-    if (typeof maybe === 'string' && isAddress(maybe)) {
-      ownerAddress = maybe as Address
+  if (ownerResult.status === 'fulfilled' && ownerResult.value?.owner) {
+    const candidate = ownerResult.value.owner
+    if (isAddress(candidate)) {
+      ownerAddress = candidate as Address
     }
   }
   if (!ownerAddress) {
