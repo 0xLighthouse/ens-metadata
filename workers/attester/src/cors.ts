@@ -1,15 +1,23 @@
 import type { Env } from './env'
 
 /**
- * Minimal CORS handling for the attester. We only allow one origin (the
- * proofs frontend, configured via TRUSTED_ORIGIN). Anything else gets a
- * blank Access-Control-Allow-Origin and the browser will block it.
+ * Minimal CORS handling for the attester. The TRUSTED_ORIGIN env var is a
+ * comma-separated allowlist — any origin in the list is reflected back via
+ * Access-Control-Allow-Origin; anything else gets a blank header and the
+ * browser blocks the request.
  *
- * Workers must handle OPTIONS preflight requests explicitly — there's no
- * framework doing it for us.
+ * The list lets you run multiple frontends (localhost and ngrok, say)
+ * without picking one. Workers must handle OPTIONS preflight requests
+ * explicitly — there's no framework doing it for us.
  */
+function allowedOrigins(env: Env): string[] {
+  return env.TRUSTED_ORIGIN.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 export function corsHeaders(env: Env, origin: string | null): HeadersInit {
-  const allowed = origin === env.TRUSTED_ORIGIN ? origin : ''
+  const allowed = origin && allowedOrigins(env).includes(origin) ? origin : ''
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

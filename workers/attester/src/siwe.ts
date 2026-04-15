@@ -8,10 +8,12 @@ import type { Env } from './env'
  *
  * Three checks:
  *   1. The message parses as a valid SIWE payload.
- *   2. `validateSiweMessage` confirms the domain matches our env, the
- *      nonce matches the session-issued one, and the timestamps are sane.
- *   3. `verifyMessage` confirms the signature recovers to the address
- *      named in the SIWE message.
+ *   2. The parsed `domain` field is in the SIWE_DOMAIN allowlist (a comma-
+ *      separated env var so localhost and a tunnel like ngrok or
+ *      cloudflared can both be valid at once without picking one).
+ *   3. `validateSiweMessage` confirms the nonce matches the session-issued
+ *      one and timestamps are sane, then `verifyMessage` confirms the
+ *      signature recovers to the address named in the SIWE message.
  *
  * viem's primitives run in Workers without any Node shims — pure crypto.
  */
@@ -28,13 +30,22 @@ export async function verifySiwe(
     throw new Error('siwe: message has no address')
   }
 
+  const allowedDomains = env.SIWE_DOMAIN.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!parsed.domain || !allowedDomains.includes(parsed.domain)) {
+    throw new Error(
+      `siwe: domain "${parsed.domain ?? ''}" not in allowed list (${allowedDomains.join(', ')})`,
+    )
+  }
+
   const valid = validateSiweMessage({
     message: parsed,
-    domain: env.SIWE_DOMAIN,
+    domain: parsed.domain,
     nonce: args.expectedNonce,
   })
   if (!valid) {
-    throw new Error('siwe: validation failed (domain/nonce/time mismatch)')
+    throw new Error('siwe: validation failed (nonce/time mismatch)')
   }
 
   const recovered = await verifyMessage({

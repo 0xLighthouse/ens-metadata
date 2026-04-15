@@ -5,6 +5,10 @@
   "compatibility_date": "2025-01-01",
   // Plain config — not secrets. Override per environment in dashboards or
   // via additional [env.*] blocks.
+  //
+  // SIWE_DOMAIN and TRUSTED_ORIGIN are comma-separated allowlists. Add a
+  // tunnel URL alongside localhost to test the wizard via ngrok or
+  // cloudflared without ripping out the localhost entry.
   "vars": {
     "SIWE_DOMAIN": "localhost:3001",
     "SIWE_ORIGIN": "http://localhost:3001",
