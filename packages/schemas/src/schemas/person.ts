@@ -1,7 +1,7 @@
 import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
 
-const PERSON_SCHEMA_VERSION = '4.0.0'
+const PERSON_SCHEMA_VERSION = '3.1.0'
 
 export const PERSON_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/person/versions/${PERSON_SCHEMA_VERSION}`,

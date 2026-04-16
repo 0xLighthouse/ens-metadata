@@ -1,7 +1,7 @@
 import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
 
-const AGENT_SCHEMA_VERSION = '4.0.0'
+const AGENT_SCHEMA_VERSION = '3.1.0'
 
 export const AGENT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/agent/versions/${AGENT_SCHEMA_VERSION}`,
