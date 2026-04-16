@@ -3,10 +3,11 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
-import { attest } from '@/lib/attester-client'
+import { attest, evictSession } from '@/lib/attester-client'
 import { metadataWriter } from '@ensmetadata/sdk'
-import { CheckCircle2, FileSignature } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FileSignature } from 'lucide-react'
 import { useState } from 'react'
+import { mainnet } from 'viem/chains'
 import type { AnyDraftFullProof } from './Wizard'
 
 interface Props {
@@ -21,7 +22,7 @@ interface Props {
   onBack: () => void
 }
 
-type Phase = 'idle' | 'attesting' | 'writing' | 'done' | 'error'
+type Phase = 'idle' | 'attesting' | 'writing' | 'confirming' | 'done' | 'error'
 
 function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
@@ -42,7 +43,7 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
 
-  const recordKey = draft ? `${draft.claim.p}.proof` : null
+  const recordKey = draft ? `social-proofs[${draft.claim.p}]` : null
   const hasExtras = Object.keys(extraRecords).length > 0
 
   const runFlow = async () => {
@@ -75,6 +76,9 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
       })
 
       setTxHash(hash)
+      setPhase('confirming')
+      await publicClient.waitForTransactionReceipt({ hash, confirmations: 2 })
+      await evictSession(sessionId).catch(() => {})
       setPhase('done')
     } catch (err) {
       setError(friendlyError(err))
@@ -91,14 +95,19 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
     setPhase('idle')
   }
 
-  const busy = phase === 'attesting' || phase === 'writing'
+  const busy = phase === 'attesting' || phase === 'writing' || phase === 'confirming'
   const phaseLabel: Record<Phase, string> = {
     idle: 'Issue and publish',
     attesting: 'Issuing attestation…',
     writing: 'Writing to ENS…',
+    confirming: 'Waiting for confirmations…',
     done: 'Done',
     error: 'Issue and publish',
   }
+
+  const explorerUrl = txHash
+    ? `${mainnet.blockExplorers.default.url}/tx/${txHash}`
+    : null
 
   const writeSummary = (() => {
     const parts: string[] = []
@@ -136,12 +145,25 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
               </div>
             </div>
           </div>
-          <a
-            href={`/proofs/${name}`}
-            className="inline-flex w-full items-center justify-center rounded-md bg-neutral-900 text-neutral-50 hover:bg-neutral-900/90 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90 h-10 px-4 py-2 text-sm font-medium transition-colors"
-          >
-            View proof
-          </a>
+          <div className="flex gap-2">
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800 h-10 px-4 py-2 text-sm font-medium transition-colors"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Etherscan
+              </a>
+            )}
+            <a
+              href={`/proofs/${name}`}
+              className="inline-flex w-full items-center justify-center rounded-md bg-neutral-900 text-neutral-50 hover:bg-neutral-900/90 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90 h-10 px-4 py-2 text-sm font-medium transition-colors"
+            >
+              View proof
+            </a>
+          </div>
         </CardContent>
       </Card>
     )
@@ -183,10 +205,6 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
                 <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} handle</dt>
                 <dd className="font-mono">@{draft.claim.h}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} user id</dt>
-                <dd className="font-mono">{draft.claim.uid}</dd>
-              </div>
             </>
           )}
 
@@ -206,6 +224,18 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
             </div>
           )}
         </dl>
+
+        {phase === 'confirming' && explorerUrl && (
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View on Etherscan
+          </a>
+        )}
 
         {phase === 'error' && error && (
           <div className="rounded-md border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-900 dark:text-red-100">

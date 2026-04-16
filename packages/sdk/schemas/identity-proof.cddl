@@ -1,7 +1,7 @@
 ; ENS Metadata — Identity Proof Schema (v1 Envelope)
 ;
 ; CDDL (RFC 8610) for the on-chain tagged CBOR envelope written to
-; `<platform>.proof` (e.g. `com.x.proof`, `org.telegram.proof`) as a
+; `social-proofs[<platform>]` (e.g. `social-proofs[com.x]`) as a
 ; hex-encoded blob.
 ;
 ; Standards:
@@ -10,7 +10,7 @@
 ;   - Inner payload:     IPLD DAG-CBOR codec (https://ipld.io/specs/codecs/dag-cbor/spec/)
 ;                        implements RFC 8949 §4.2 Core Deterministic Encoding
 ;   - Outer envelope:    RFC 8949 §3.4 Tags (major type 6) via cborg library
-;   - Tag registration:  RFC 8949 §9.2 — tag 1701737328 falls in the
+;   - Tag registration:  RFC 8949 §9.2 — tag 1635021684 falls in the
 ;                        First Come First Served range (>32767)
 ;   - Signing:           EIP-191 (Ethereum Signed Data Standard)
 ;
@@ -21,7 +21,7 @@
 ;
 ; Detection: first byte is 0xDA (CBOR major type 6 / tag, 4-byte value
 ; follows per RFC 8949 §3.4).
-; Tag value: 1701737328 (0x656e7370 = "ensp" as uint32).
+; Tag value: 1635021684 (0x61747374 = "atst" as uint32).
 ;
 ; Inner payload encoding: DAG-CBOR (RFC 8949 §4.2 deterministic encoding):
 ;   - Map keys sorted by length, then bytewise.
@@ -56,7 +56,7 @@
 ; ---------------------------------------------------------------------------
 ; Written to the ENS text record as `0x` + hex(cborBytes).
 
-v1-envelope = #6.1701737328(v1-envelope-map)
+v1-envelope = #6.1635021684(v1-envelope-map)
 
 v1-envelope-map = {
   v:  1,                      ; always 1 for this format

@@ -87,10 +87,19 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connect Twitter</CardTitle>
+        <CardTitle>{twitter ? 'Twitter linked' : 'Connect Twitter'}</CardTitle>
         <CardDescription>
-          Link a Twitter account to <span className="font-mono">{name}</span>. Privy runs the OAuth
-          flow in a popup; we read the linked account and bind it to your ENS name.
+          {twitter ? (
+            <>
+              <span className="font-mono">@{twitter.username}</span> is linked to{' '}
+              <span className="font-mono">{name}</span>. Continue to review and publish.
+            </>
+          ) : (
+            <>
+              Link a Twitter account to <span className="font-mono">{name}</span>. Privy runs the
+              OAuth flow in a popup; we read the linked account and bind it to your ENS name.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -102,22 +111,14 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
         )}
 
         {twitter && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-mono font-semibold">@{twitter.username}</span>
-                <span className="text-xs text-green-700/80 dark:text-green-400/80">
-                  Twitter account linked via Privy
-                </span>
-              </div>
+          <div className="flex items-center gap-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <div className="flex flex-col">
+              <span className="font-mono font-semibold">@{twitter.username}</span>
+              <span className="text-xs text-green-700/80 dark:text-green-400/80">
+                Twitter account linked via Privy
+              </span>
             </div>
-            <dl className="rounded-md border border-neutral-200 dark:border-neutral-700 p-3 text-xs">
-              <div className="flex justify-between gap-4">
-                <dt className="text-neutral-500 dark:text-neutral-400">Stable user id</dt>
-                <dd className="font-mono truncate">{twitter.subject}</dd>
-              </div>
-            </dl>
           </div>
         )}
 

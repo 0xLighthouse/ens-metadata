@@ -80,3 +80,7 @@ export interface AttestResult {
 export async function attest(args: AttestArgs): Promise<AttestResult> {
   return postJson<AttestResult>('/api/attest', args)
 }
+
+export function evictSession(sessionId: string): Promise<{ ok: true }> {
+  return postJson('/api/session/evict', { sessionId })
+}

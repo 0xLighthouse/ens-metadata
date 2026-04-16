@@ -16,7 +16,7 @@ import type { Env } from '../env'
  *   - name: ENS name being attested
  *
  * The response is the signed v1 envelope ready to write directly to the
- * `<platform>.proof` ENS text record.
+ * `social-proofs[<platform>]` ENS text record.
  */
 export async function handleAttest(env: Env, request: Request): Promise<Response> {
   let body: {

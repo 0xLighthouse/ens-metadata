@@ -17,12 +17,12 @@ export interface ProofVerifierConfig {
   maxAge?: number
 }
 
-const TEXT_KEY_SUFFIX = '.proof'
+const TEXT_KEY_PREFIX = 'social-proofs'
 
 /**
- * Read the ENS text record `<platform>.proof`, decode the v1 envelope,
- * and verify its attester signature + ownership against the current ENS
- * owner.
+ * Read the ENS text record `social-proofs[<platform>]`, decode the v1
+ * envelope, and verify its attester signature + ownership against the
+ * current ENS owner.
  */
 async function verifyProofImpl(
   client: PublicClient,
@@ -30,7 +30,7 @@ async function verifyProofImpl(
   opts: VerifyProofOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
-  const textKey = `${opts.platform}${TEXT_KEY_SUFFIX}`
+  const textKey = `${TEXT_KEY_PREFIX}[${opts.platform}]`
 
   const [rawTextResult, ownerResult] = await Promise.allSettled([
     getEnsText(client, { name, key: textKey }),

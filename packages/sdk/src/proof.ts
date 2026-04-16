@@ -23,13 +23,13 @@ import type {
 export const CLAIM_VERSION = 1
 
 /**
- * CBOR tag for envelopes: "ensp" as big-endian uint32.
- * Bytes: 0x65 0x6E 0x73 0x70 → decimal 1701737328.
+ * CBOR tag for envelopes: "atst" as big-endian uint32.
+ * Bytes: 0x61 0x74 0x73 0x74 → decimal 1635021684.
  *
  * Detection: the first byte of the encoded envelope is 0xDA (CBOR major
  * type 6 / tag, 4-byte additional info).
  */
-export const ENVELOPE_TAG = 1701737328
+export const ENVELOPE_TAG = 1635021684
 
 const PAYLOAD_FIELD_NAMES = ['platform', 'handle', 'uid', 'name', 'issuedAt', 'addr'] as const
 
