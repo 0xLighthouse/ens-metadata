@@ -6,14 +6,14 @@
   // Plain config — not secrets. Override per environment in dashboards or
   // via additional [env.*] blocks.
   //
-  // SIWE_DOMAIN and TRUSTED_ORIGIN are comma-separated allowlists. Add a
-  // tunnel URL alongside localhost to test the wizard via ngrok or
-  // cloudflared without ripping out the localhost entry.
+  // SIWE_DOMAIN and TRUSTED_ORIGIN are comma-separated allowlists. Each
+  // entry is either exact or contains a single `*` wildcard that only
+  // matches hostname-safe characters. The Vercel preview entries are
+  // scoped to the project suffix so only our previews are allowed.
   "vars": {
-    "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app",
-    "SIWE_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app",
+    "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app,*-8640p.vercel.app",
     "SESSION_TTL_SECONDS": "900",
-    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app"
+    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app,https://*-8640p.vercel.app"
   },
   // Each session is its own Durable Object instance, addressed by session id.
   // The instance holds the SIWE nonce + bound wallet + bound platform; an

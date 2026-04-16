@@ -125,11 +125,15 @@ export function encodeEnvelope(envelope: Envelope): Uint8Array {
 }
 
 /**
- * Decode tagged CBOR bytes into a v1 Envelope. Expects a 4-element array
- * [version, payload, attester, sig] and hydrates it into the keyed Envelope
- * type. Throws if the tag doesn't match or required elements are missing.
+ * Decode tagged CBOR bytes into a v1 Envelope. Expects the `atst` tag
+ * (0xDA 0x61 0x74 0x73 0x74) followed by a 4-element array
+ * [version, payload, attester, sig]. The tag prefix is enforced so future
+ * envelope variants can't be silently accepted as v1.
  */
 export function decodeEnvelope(bytes: Uint8Array): Envelope {
+  if (bytes.length < 5 || bytes[0] !== 0xda) {
+    throw new Error('claim: envelope missing CBOR tag prefix')
+  }
   const decoded = cborgDecode(bytes, {
     // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
     tags: { [ENVELOPE_TAG]: (decode: any) => decode() },

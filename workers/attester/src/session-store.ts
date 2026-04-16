@@ -34,6 +34,12 @@ export interface SessionData {
  *
  * TTL: an alarm is scheduled at session creation. When it fires we wipe
  * storage so Cloudflare can evict the instance and reclaim the slot.
+ *
+ * TODO: the sessionId is a bare bearer token — anyone who intercepts it
+ * can bind a wallet/platform to the session. Current mitigations are
+ * short TTL (900s) and origin-locked CORS. For stronger auth, move to an
+ * HttpOnly cookie + double-submit CSRF token, or HMAC-signed session
+ * handle. Acceptable for PoC scope.
  */
 export class SessionStore extends DurableObject<Env> {
   /**

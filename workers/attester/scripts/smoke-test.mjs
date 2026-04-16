@@ -1,9 +1,11 @@
-// Smoke test for the attester worker. Drives all endpoints with a real
-// SIWE signature for both the X and Telegram dev-passthrough paths,
-// then verifies the returned v1 envelopes with the SDK.
+// Smoke test for the attester worker. Drives the session + SIWE flow end-
+// to-end, then exercises the platform/attest endpoints if a real Privy
+// access token is supplied — platform validators hard-error without live
+// Privy creds, so the attest path is opt-in rather than automatic.
 //
 // Usage:
 //   node workers/attester/scripts/smoke-test.mjs
+//   PRIVY_ACCESS_TOKEN=... TWITTER_UID=... TELEGRAM_UID=... node ...
 //
 // Pre-requisite: the worker must be running locally on port 8787
 // (`pnpm attester` from the repo root).
@@ -18,6 +20,7 @@ const WALLET_PK = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b7
 const EXPECTED_ATTESTER_ADDR = privateKeyToAccount(
   '0x0000000000000000000000000000000000000000000000000000000000000001',
 ).address
+const PRIVY_ACCESS_TOKEN = process.env.PRIVY_ACCESS_TOKEN
 
 const wallet = privateKeyToAccount(WALLET_PK)
 
@@ -27,16 +30,14 @@ function check(label, ok, detail = '') {
   if (!ok) process.exit(1)
 }
 
-async function runFlow({ platform, payload }) {
-  console.log(`\n\x1b[1m── ${platform} ──\x1b[0m`)
+async function runSessionFlow() {
+  console.log('\n\x1b[1m── session + SIWE ──\x1b[0m')
 
-  // 1. Create session
   const sessionRes = await fetch(`${ATTESTER}/api/session`, { method: 'POST' })
   check('POST /api/session', sessionRes.ok, `status ${sessionRes.status}`)
   const session = await sessionRes.json()
   console.log(`  sessionId: ${session.sessionId}`)
 
-  // 2. Build + sign SIWE message
   const message = createSiweMessage({
     address: wallet.address,
     chainId: 1,
@@ -49,7 +50,6 @@ async function runFlow({ platform, payload }) {
   })
   const signature = await wallet.signMessage({ message })
 
-  // 3. Bind wallet via SIWE
   const bindWalletRes = await fetch(`${ATTESTER}/api/session/wallet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -62,13 +62,21 @@ async function runFlow({ platform, payload }) {
     bindWalletRes.ok ? `wallet=${bindWalletBody.wallet}` : JSON.stringify(bindWalletBody),
   )
 
-  // 4. Bind platform (dev passthrough)
+  return session
+}
+
+async function runPlatformFlow({ platform, expectedHandle }, session) {
+  console.log(`\n\x1b[1m── ${platform} (requires PRIVY_ACCESS_TOKEN) ──\x1b[0m`)
+
   const bindPlatformRes = await fetch(
     `${ATTESTER}/api/session/platform/${encodeURIComponent(platform)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, payload }),
+      body: JSON.stringify({
+        sessionId: session.sessionId,
+        payload: { privyAccessToken: PRIVY_ACCESS_TOKEN },
+      }),
     },
   )
   const bindPlatformBody = await bindPlatformRes.json().catch(() => ({}))
@@ -80,30 +88,21 @@ async function runFlow({ platform, payload }) {
       : JSON.stringify(bindPlatformBody),
   )
 
-  // 5. Attest — returns v1 envelope hex
   const attestRes = await fetch(`${ATTESTER}/api/attest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: session.sessionId,
-      name: 'alice.eth',
-    }),
+    body: JSON.stringify({ sessionId: session.sessionId, name: 'alice.eth' }),
   })
   const attestBody = await attestRes.json().catch(() => ({}))
   check('POST /api/attest', attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
 
-  // 6. Decode the v1 envelope from hex
   const envelopeBytes = hexToBytes(attestBody.claimHex)
   check('first byte is 0xDA (CBOR tag header)', envelopeBytes[0] === 0xda)
 
   const envelope = decodeEnvelope(envelopeBytes)
   const inner = decodePayload(envelope.payload)
   console.log(`  envelope: v=${envelope.version} attester=${envelope.attester}`)
-  console.log(
-    `  payload:  platform=${inner.platform} handle=${inner.handle} uid=${inner.uid.slice(0, 16)}… addr=${inner.addr} issuedAt=${inner.issuedAt}`,
-  )
 
-  // 7. Verify the envelope with the SDK
   const verifyResult = await verifyClaim(envelope, {
     trustedAttesters: [EXPECTED_ATTESTER_ADDR],
     expectedOwner: wallet.address,
@@ -114,19 +113,9 @@ async function runFlow({ platform, payload }) {
     verifyResult.valid ? 'all checks pass' : JSON.stringify(verifyResult),
   )
 
-  // 8. Verify the uid was blinded — should NOT be the raw value
-  check(
-    'inner.uid is blinded (not raw)',
-    inner.uid !== payload.uid,
-    `got ${inner.uid.slice(0, 16)}…`,
-  )
-
-  // 9. Confirm handle is in the signed payload
-  check('handle is in signed payload', inner.handle === payload.handle)
-
-  // 10. Verify the blinded uid via ecrecover — the uid IS a signature
-  //     over keccak256("platform:rawUid"), recoverable to the attester address
-  const uidHash = keccak256(toBytes(`${platform}:${payload.uid}`))
+  // Blinded uid is a signature over keccak256("platform:rawUid"), recoverable
+  // to the attester address. The raw uid here comes from Privy's response.
+  const uidHash = keccak256(toBytes(`${platform}:${bindPlatformBody.uid}`))
   const recoveredFromUid = await recoverMessageAddress({
     message: { raw: uidHash },
     signature: inner.uid,
@@ -134,22 +123,27 @@ async function runFlow({ platform, payload }) {
   check(
     'ecrecover(u) === attester address',
     recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase(),
-    recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase()
-      ? `recovered=${recoveredFromUid}`
-      : `MISMATCH: got ${recoveredFromUid}`,
+    `recovered=${recoveredFromUid}`,
   )
+
+  if (expectedHandle) {
+    check('handle matches expectation', inner.handle === expectedHandle)
+  }
 }
 
 async function main() {
-  await runFlow({
-    platform: 'com.x',
-    payload: { uid: '295218901', handle: 'vitalik' },
-  })
+  const session = await runSessionFlow()
 
-  await runFlow({
-    platform: 'org.telegram',
-    payload: { uid: '1354735528957124608', handle: 'vbuterin' },
-  })
+  if (!PRIVY_ACCESS_TOKEN) {
+    console.log(
+      '\n\x1b[33m⚠ PRIVY_ACCESS_TOKEN not set — skipping platform + attest flows.\x1b[0m',
+    )
+    console.log('\x1b[32mSession / SIWE paths OK.\x1b[0m')
+    return
+  }
+
+  await runPlatformFlow({ platform: 'com.x' }, session)
+  await runPlatformFlow({ platform: 'org.telegram' }, session)
 
   console.log('\n\x1b[32mAll platforms work.\x1b[0m')
 }

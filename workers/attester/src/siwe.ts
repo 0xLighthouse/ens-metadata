@@ -1,5 +1,6 @@
 import { type Address, verifyMessage } from 'viem'
 import { parseSiweMessage, validateSiweMessage } from 'viem/siwe'
+import { matchesAllowlist, parseAllowlist } from './allowlist'
 import type { Env } from './env'
 
 /**
@@ -16,6 +17,10 @@ import type { Env } from './env'
  *      signature recovers to the address named in the SIWE message.
  *
  * viem's primitives run in Workers without any Node shims — pure crypto.
+ *
+ * TODO: EOA-only. viem's `verifyMessage` does not support contract accounts
+ * (ERC-1271), which excludes Safe / smart-wallet / ERC-4337 users. Switch
+ * to `publicClient.verifyMessage` (with ERC-1271 fallback) to widen support.
  */
 export async function verifySiwe(
   env: Env,
@@ -30,10 +35,8 @@ export async function verifySiwe(
     throw new Error('siwe: message has no address')
   }
 
-  const allowedDomains = env.SIWE_DOMAIN.split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  if (!parsed.domain || !allowedDomains.includes(parsed.domain)) {
+  const allowedDomains = parseAllowlist(env.SIWE_DOMAIN)
+  if (!parsed.domain || !matchesAllowlist(parsed.domain, allowedDomains)) {
     throw new Error(
       `siwe: domain "${parsed.domain ?? ''}" not in allowed list (${allowedDomains.join(', ')})`,
     )

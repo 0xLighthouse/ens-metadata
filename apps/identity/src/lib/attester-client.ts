@@ -6,13 +6,38 @@
 
 const ATTESTER_URL = process.env.NEXT_PUBLIC_ATTESTER_URL ?? 'http://localhost:8787'
 
+/**
+ * Error kinds the attester client can surface:
+ *   - `network`: request never reached the worker (offline, DNS, CORS).
+ *   - `http`:    worker returned a non-2xx; `status` is populated.
+ *   - `parse`:   worker returned 2xx but response body wasn't JSON.
+ */
+export type AttesterErrorKind = 'network' | 'http' | 'parse'
+
+export class AttesterError extends Error {
+  readonly kind: AttesterErrorKind
+  readonly status?: number
+  constructor(kind: AttesterErrorKind, message: string, status?: number) {
+    super(message)
+    this.name = 'AttesterError'
+    this.kind = kind
+    this.status = status
+  }
+}
+
 async function postJson<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${ATTESTER_URL}${path}`, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'omit',
-  })
+  let res: Response
+  try {
+    res = await fetch(`${ATTESTER_URL}${path}`, {
+      method: 'POST',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'omit',
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'network request failed'
+    throw new AttesterError('network', `${path}: ${message}`)
+  }
   if (!res.ok) {
     let message = `${path}: ${res.status}`
     try {
@@ -21,9 +46,14 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
     } catch {
       // body wasn't JSON — fall back to the status-line message
     }
-    throw new Error(message)
+    throw new AttesterError('http', message, res.status)
   }
-  return (await res.json()) as T
+  try {
+    return (await res.json()) as T
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'invalid JSON'
+    throw new AttesterError('parse', `${path}: ${message}`)
+  }
 }
 
 export interface CreateSessionResponse {

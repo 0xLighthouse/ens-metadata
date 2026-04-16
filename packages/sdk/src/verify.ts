@@ -39,7 +39,7 @@ async function verifyProofImpl(
 
   const rawText =
     rawTextResult.status === 'fulfilled' && typeof rawTextResult.value === 'string'
-      ? (rawTextResult.value as string)
+      ? rawTextResult.value
       : null
   if (!rawText || rawText.length === 0) {
     return { valid: false, reason: 'missing' }

@@ -13,11 +13,14 @@ const publicClient = createPublicClient({
   transport: http(process.env.NEXT_PUBLIC_RPC_URL),
 })
 
+// Exposes the ENS-extended PublicClient shape — consumers can pass this to
+// both ensjs actions and viem's base `PublicClient` parameter sites.
+export type EnsPublicClient = typeof publicClient
+
 const noop = async () => {}
 
 interface IWeb3Context {
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
-  publicClient: any
+  publicClient: EnsPublicClient
   walletClient: WalletClient | null
   isInitialized: boolean
   switchChain: (chainId: number) => Promise<void>

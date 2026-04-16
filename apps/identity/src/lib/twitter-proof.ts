@@ -9,9 +9,6 @@ import type { Address } from 'viem'
 /** Platform identifier for the Twitter proof flow. */
 export const TWITTER_PLATFORM = 'com.x'
 
-/** Attestation backend identifier. */
-export const PRIVY_METHOD = 'privy-linked'
-
 /**
  * Privy's `user.twitter` shape. The important field is `subject` — the
  * stable `sub` claim from the Twitter-issued JWT.
@@ -23,18 +20,9 @@ export interface PrivyTwitterAccount {
   profilePictureUrl: string | null
 }
 
-export interface PrivyTwitterProofPayload {
-  source: 'privy'
-  twitter: {
-    subject: string
-    username: string | null
-    name: string | null
-  }
-}
-
 /**
- * Draft proof document. The `claim` fields match the v1 signed payload
- * shape (minus `iat` which is computed by the attester at signing time).
+ * Draft proof document. Fields match the v1 signed payload shape (minus
+ * `iat` which is computed by the attester at signing time).
  */
 export interface DraftFullProof {
   claim: {
@@ -44,10 +32,6 @@ export interface DraftFullProof {
     name: string
     addr: Address
   }
-  method: typeof PRIVY_METHOD
-  issuedAt: number
-  proof: PrivyTwitterProofPayload
-  notes?: string
 }
 
 /**
@@ -58,10 +42,8 @@ export function buildTwitterProofFromPrivy(args: {
   twitter: PrivyTwitterAccount
   issuerAddress: Address
   ensName: string
-  nowSeconds?: number
 }): DraftFullProof {
   const { twitter, issuerAddress, ensName } = args
-  const nowSeconds = args.nowSeconds ?? Math.floor(Date.now() / 1000)
 
   if (!twitter.subject) {
     throw new Error('Privy Twitter account is missing a subject (stable user id).')
@@ -78,16 +60,5 @@ export function buildTwitterProofFromPrivy(args: {
       name: ensName,
       addr: issuerAddress,
     },
-    method: PRIVY_METHOD,
-    issuedAt: nowSeconds,
-    proof: {
-      source: 'privy',
-      twitter: {
-        subject: twitter.subject,
-        username: twitter.username,
-        name: twitter.name,
-      },
-    },
-    notes: 'privy-linked-accounts',
   }
 }

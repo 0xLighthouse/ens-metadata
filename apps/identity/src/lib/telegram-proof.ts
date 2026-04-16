@@ -7,9 +7,6 @@ import type { Address } from 'viem'
 /** Platform identifier for the Telegram proof flow. */
 export const TELEGRAM_PLATFORM = 'org.telegram'
 
-/** Attestation backend identifier. */
-export const PRIVY_METHOD = 'privy-linked'
-
 /**
  * Privy's `user.telegram` shape. The stable id field is `telegramUserId`.
  */
@@ -21,19 +18,7 @@ export interface PrivyTelegramAccount {
   photoUrl: string | null
 }
 
-export interface PrivyTelegramProofPayload {
-  source: 'privy'
-  telegram: {
-    telegramUserId: string
-    username: string | null
-    firstName: string | null
-    lastName: string | null
-  }
-}
-
-/**
- * Draft proof document for a Telegram attestation.
- */
+/** Draft proof document for a Telegram attestation. */
 export interface DraftFullProof {
   claim: {
     p: string
@@ -42,10 +27,6 @@ export interface DraftFullProof {
     name: string
     addr: Address
   }
-  method: typeof PRIVY_METHOD
-  issuedAt: number
-  proof: PrivyTelegramProofPayload
-  notes?: string
 }
 
 /**
@@ -55,10 +36,8 @@ export function buildTelegramProofFromPrivy(args: {
   telegram: PrivyTelegramAccount
   issuerAddress: Address
   ensName: string
-  nowSeconds?: number
 }): DraftFullProof {
   const { telegram, issuerAddress, ensName } = args
-  const nowSeconds = args.nowSeconds ?? Math.floor(Date.now() / 1000)
 
   if (!telegram.telegramUserId) {
     throw new Error('Privy Telegram account is missing a telegramUserId (stable user id).')
@@ -77,17 +56,5 @@ export function buildTelegramProofFromPrivy(args: {
       name: ensName,
       addr: issuerAddress,
     },
-    method: PRIVY_METHOD,
-    issuedAt: nowSeconds,
-    proof: {
-      source: 'privy',
-      telegram: {
-        telegramUserId: telegram.telegramUserId,
-        username: telegram.username,
-        firstName: telegram.firstName,
-        lastName: telegram.lastName,
-      },
-    },
-    notes: 'privy-linked-accounts',
   }
 }

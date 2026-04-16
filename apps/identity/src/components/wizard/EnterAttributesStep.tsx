@@ -96,8 +96,7 @@ export function EnterAttributesStep({
     let cancelled = false
     ;(async () => {
       try {
-        // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
-        const reader = metadataReader()(publicClient as any)
+        const reader = metadataReader()(publicClient)
         const result = await reader.getMetadata({ name, keys: allKeys })
         if (cancelled) return
         const properties = result.properties as Record<string, string | null>

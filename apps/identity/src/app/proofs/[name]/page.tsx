@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { addEnsContracts } from '@ensdomains/ensjs'
 import { type VerifyResult, verifyProof } from '@ensmetadata/sdk'
 import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
-import { http, type Address, type PublicClient, createPublicClient, isAddress } from 'viem'
+import { http, type Address, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
 
 // Trusted attesters are env-configured. Comma-separated list of EIP-55 hex
@@ -72,7 +72,7 @@ export default async function ProofsPage({ params }: Props) {
   const client = createPublicClient({
     chain: addEnsContracts(mainnet),
     transport: http(process.env.NEXT_PUBLIC_RPC_URL),
-  }) as unknown as PublicClient
+  })
 
   const verifierConfig = { trustedAttesters: readTrustedAttesters() }
 

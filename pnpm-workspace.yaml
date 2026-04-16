@@ -2,3 +2,15 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'workers/*'
+
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - '@reown/appkit'
+  - '@tailwindcss/oxide'
+  - bufferutil
+  - core-js-pure
+  - esbuild
+  - msw
+  - sharp
+  - utf-8-validate
+  - workerd

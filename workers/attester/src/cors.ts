@@ -1,3 +1,4 @@
+import { matchesAllowlist, parseAllowlist } from './allowlist'
 import type { Env } from './env'
 
 /**
@@ -6,18 +7,13 @@ import type { Env } from './env'
  * Access-Control-Allow-Origin; anything else gets a blank header and the
  * browser blocks the request.
  *
- * The list lets you run multiple frontends (localhost and ngrok, say)
- * without picking one. Workers must handle OPTIONS preflight requests
- * explicitly — there's no framework doing it for us.
+ * Entries can include a single `*` wildcard (e.g. `https://*-8640p.vercel.app`)
+ * so Vercel preview URLs are covered without per-deployment config. Workers
+ * must handle OPTIONS preflight requests explicitly — there's no framework
+ * doing it for us.
  */
-function allowedOrigins(env: Env): string[] {
-  return env.TRUSTED_ORIGIN.split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
 export function corsHeaders(env: Env, origin: string | null): HeadersInit {
-  const allowed = origin && allowedOrigins(env).includes(origin) ? origin : ''
+  const allowed = origin && matchesAllowlist(origin, parseAllowlist(env.TRUSTED_ORIGIN)) ? origin : ''
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

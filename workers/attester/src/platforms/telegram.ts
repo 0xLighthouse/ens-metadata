@@ -4,26 +4,20 @@ import type { Platform, PlatformValidationResult } from './index'
 /**
  * Telegram validator backed by the Privy REST API — mirrors twitter.ts.
  *
- * Production path: the client posts a Privy access token. We hand it to
- * the same /api/v1/users/me endpoint as the Twitter validator and look
- * for a linked account with `type: 'telegram'`. Privy's stable id field
- * is `telegram_user_id`; the display handle is `username` (nullable —
+ * The client posts a Privy access token. We hand it to the same
+ * /api/v1/users/me endpoint as the Twitter validator and look for a linked
+ * account with `type: 'telegram'`. Privy's stable id field is
+ * `telegram_user_id`; the display handle is `username` (nullable —
  * Telegram users without a public @username can't be attested because
  * there'd be no stable handle to display).
  *
- * Dev passthrough: when PRIVY_APP_ID/SECRET are unset, we accept a
- * client-supplied { uid, handle } directly and log a warning. Same shape
- * as the Twitter validator's dev path, so the frontend uses one client
- * surface for both platforms.
+ * Missing PRIVY_APP_ID / PRIVY_APP_SECRET is a hard error — silent dev
+ * passthrough would let misconfigured prod trust client-supplied identities.
  */
 
 interface TelegramPayload {
   /** Privy access token issued to the authenticated user. */
   privyAccessToken?: string
-  /** Dev-only fallback when Privy creds are unset. */
-  uid?: string
-  /** Dev-only fallback when Privy creds are unset. */
-  handle?: string
 }
 
 interface PrivyLinkedAccount {
@@ -63,13 +57,7 @@ async function validate(env: Env, payload: unknown): Promise<PlatformValidationR
   const p = (payload ?? {}) as TelegramPayload
 
   if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
-    if (!p.uid || !p.handle) {
-      throw new Error(
-        'telegram: dev passthrough requires { uid, handle }; set PRIVY_APP_ID and PRIVY_APP_SECRET for real validation',
-      )
-    }
-    console.warn('[attester] telegram validator is in dev passthrough mode')
-    return { uid: p.uid, handle: p.handle }
+    throw new Error('telegram: PRIVY_APP_ID and PRIVY_APP_SECRET must be set')
   }
 
   if (!p.privyAccessToken) {

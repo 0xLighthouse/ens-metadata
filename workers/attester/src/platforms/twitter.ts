@@ -17,18 +17,13 @@ import type { Platform, PlatformValidationResult } from './index'
  *      and Twitter entries have `type: 'twitter_oauth'` with `subject`
  *      (the stable JWT `sub` claim — what we want for uid) and `username`.
  *
- * Dev passthrough: when PRIVY_APP_ID/SECRET are unset, we accept a
- * client-supplied { uid, handle } directly and log a warning. This is for
- * testing the worker flow without standing up a Privy app.
+ * Missing PRIVY_APP_ID / PRIVY_APP_SECRET is a hard error — silent dev
+ * passthrough would let misconfigured prod trust client-supplied identities.
  */
 
 interface TwitterPayload {
   /** Privy access token issued to the authenticated user. */
   privyAccessToken?: string
-  /** Dev-only fallback when Privy creds are unset. */
-  uid?: string
-  /** Dev-only fallback when Privy creds are unset. */
-  handle?: string
 }
 
 interface PrivyLinkedAccount {
@@ -71,13 +66,7 @@ async function validate(env: Env, payload: unknown): Promise<PlatformValidationR
   const p = (payload ?? {}) as TwitterPayload
 
   if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
-    if (!p.uid || !p.handle) {
-      throw new Error(
-        'twitter: dev passthrough requires { uid, handle }; set PRIVY_APP_ID and PRIVY_APP_SECRET for real validation',
-      )
-    }
-    console.warn('[attester] twitter validator is in dev passthrough mode')
-    return { uid: p.uid, handle: p.handle }
+    throw new Error('twitter: PRIVY_APP_ID and PRIVY_APP_SECRET must be set')
   }
 
   if (!p.privyAccessToken) {
