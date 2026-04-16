@@ -5,122 +5,156 @@ weight: 5
 
 # Linking a social account to your ENS name
 
-This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X (Twitter) and Telegram; the same scheme extends to any platform with a server-verifiable login by adding a new `<platform>.proof` text record and a validator module on the attester. Platform identifiers are reverse-DNS — `com.x` for X, `org.telegram` for Telegram — and the on-chain key is `<platform>.proof`.
+This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X and Telegram; the same scheme extends to any platform with a server-verifiable login by adding a new `<platform>.proof` text record and a validator module on the attester. Platform identifiers use reverse-DNS — `com.x` for X, `org.telegram` for Telegram.
 
 ## Mental model
 
-A social proof is a **claim signed by an attester service**, written to an ENS text record by the name's owner. The claim is small enough to fit in a single text record, so the common-case verification — "is this ENS name still linked to @handle?" — is one RPC call plus a signature check, with no IPFS round-trip and no third-party lookup.
+A social proof is a **tagged CBOR envelope** signed by an attester service, written to an ENS text record by the name's owner. Verification is one RPC call plus two local `ecrecover` operations — no IPFS round-trip, no third-party lookup.
 
 There are four pieces:
 
-1. **The attester** — a backend service (in this repo, a Cloudflare Worker at `workers/attester`) that observes both your wallet and your social account in the same session and signs a claim binding them together. The attester holds the only signing key in this design; verifiers decide which attesters they trust.
-2. **The claim** — a compact CBOR payload describing the link. Detailed below.
-3. **The text record** — `com.x.proof` (or `org.telegram.proof`, etc.) on the ENS name, holding the hex-encoded signed claim. The key is the platform's reverse-DNS namespace plus a `.proof` suffix. This is the cheap path everyone reads.
-4. **The full proof document** — a richer payload pinned to IPFS, with the signed claim plus the upstream evidence the attester collected (the OAuth subject, the Telegram HMAC payload, etc.). The text record's `prf` field holds the CID. Verifiers only fetch this when they want to re-check the upstream evidence themselves.
+1. **The attester** — a backend service (Cloudflare Worker at `workers/attester`) that observes both your wallet (via SIWE) and your social account (via OAuth / login widget) in the same session, then signs the envelope with its key.
+2. **The envelope** — a tagged CBOR structure with unsigned public metadata (handle, platform, method, timestamp) plus a signed inner payload and signature. Detailed below.
+3. **The text record** — `com.x.proof` (or `org.telegram.proof`) on the ENS name, holding the hex-encoded envelope. This is the cheap path everyone reads.
+4. **The full proof document** — a richer payload pinned to IPFS, referenced by the `prf` field in the signed payload. Verifiers only fetch this when they want to inspect the upstream evidence.
 
-The point of separating the attester from the wallet is that the cheap-path verifier learns something stronger than "the current owner asserts this linkage" — it learns "an attester I trust independently confirmed both the wallet and the social account in one session". The wallet's role is reduced to publishing the proof on-chain; the attester carries the trust.
+## Envelope format
 
-## The attester service
+The on-chain value is a CBOR-tagged map. The tag enables instant type detection without decoding the full map.
 
-The attester is small and stateless-ish (sessions live in a Cloudflare Durable Object with an alarm-based TTL). Its only job is to refuse to issue a signed claim unless three things happened in the same session:
+### Detection
 
-1. **Wallet binding via SIWE.** The user signs an EIP-4361 message including a server-issued nonce and the attester's domain. The attester verifies the signature and binds the recovered address to the session.
-2. **Platform binding.** The user authenticates with the platform — OAuth flow for X (validated server-side via Privy), Login Widget HMAC for Telegram (validated against the bot token). The attester pulls the stable user id and current handle and binds them to the session.
-3. **Issue.** The frontend asks the attester to sign a claim for a specific ENS name, chain id, and expiry. The attester checks both bindings exist on the session, builds the claim from the session state (it never trusts client-supplied identity), and signs with its own key.
+```
+First byte: 0xDB (CBOR major type 6 / tag, 8-byte additional info)
+Tag value:  111525057557094 (0x656e73707266 = "ensprf" as big-endian uint48)
+```
 
-The signing key never leaves the worker, runs in a V8 isolate separate from anything serving HTML, and is loaded from a Cloudflare secret. Verifiers configure which attester addresses they trust; the attester address is what gets stamped into every claim's `att` field.
+Any tool reading the text record can check the first byte to know "this is a tagged CBOR envelope" and dispatch accordingly.
 
-## Anatomy of a claim
+### Structure
 
-A claim is a CBOR map with ten signed fields plus the signature itself. Every field is part of the hash, so changing any of them invalidates the signature.
-
-| Field | Type | Purpose |
-| --- | --- | --- |
-| `v` | uint | Schema version. Lets verifiers reject formats they don't understand. |
-| `p` | string | Reverse-DNS platform namespace — `"com.x"`, `"org.telegram"`, etc. Verifiers key off this to pick the right `<platform>.proof` text record. |
-| `h` | string | Handle at the time of attestation — e.g. `"vitalik"`. **Treat as a hint, not identity.** Handles can be released and re-registered by someone else, so anything load-bearing should key off `uid`. |
-| `uid` | string | Platform-stable user id. For X this is the OAuth `sub` claim; for Telegram it's the numeric user id. Never changes when the handle does. |
-| `exp` | uint | Expiry, unix seconds. After this the claim is dead. Forces proofs to be refreshed periodically rather than living forever as stale assertions. |
-| `prf` | string | IPFS CID of the full proof document. Lets a verifier dig into the upstream evidence if they want to. The CID is in the signed payload, so it can't be swapped out after the fact. |
-| `name` | string | ENS name this claim is bound to — `"alice.eth"`. Including it in the hash means a claim signed for one name can't be replayed onto another. |
-| `chainId` | uint | EVM chain id the claim is valid on. Stops a mainnet claim from being replayed to Sepolia (or vice versa). |
-| `addr` | string | EIP-55 checksummed address of the wallet the **attester observed** during the session (via SIWE). Verifiers compare this to the current ENS owner; a mismatch means the name has transferred and the proof is stale. |
-| `att` | string | EIP-55 checksummed address of the **attester key** that signed this claim. Verifiers reject any claim whose `att` is not in their trusted-attester set. |
-| `sig` | bytes | 65-byte EIP-191 signature by the attester over `keccak256(canonical_cbor(fields_without_sig))`. The recovered address must equal `att`. |
-
-A worked example, in the JSON projection that `decodeClaim()` returns:
-
-```json
-{
-  "v": 2,
-  "p": "com.x",
-  "h": "vitalik",
-  "uid": "295218901",
-  "exp": 1798761600,
-  "prf": "bafyreigh2akiscaildc...",
-  "name": "vitalik.eth",
-  "chainId": 1,
-  "addr": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-  "att": "0x1A35e1...",
-  "sig": "0x4e8a..."
+```
+Tag(111525057557094) {
+  v:        3,                          // envelope version
+  p:        "com.x",                    // platform (unsigned, for indexing)
+  h:        "vitalik",                  // handle (unsigned, for display)
+  method:   "privy-linked",             // attestation backend (unsigned)
+  issuedAt: 1776275269,                 // creation time, unix seconds (unsigned)
+  payload:  <bytes>,                    // canonical dag-cbor of signed fields
+  sig:      <bytes 65>,                 // EIP-191 signature over keccak256(payload)
 }
 ```
 
-Encoded that comes out to roughly 280–330 bytes — well within the practical size of a single ENS text record.
+**Unsigned metadata** (`v`, `p`, `h`, `method`, `issuedAt`) — NOT signed. Exists for indexing and display. Can be read without touching any crypto. The handle can be updated without re-attestation.
 
-A few subtleties that aren't obvious from the field list:
+**Signed payload** (`payload` bytes, decoded as dag-cbor) — the security-critical fields:
 
-- **The signed bytes are canonical CBOR, not the JSON projection above.** `dag-cbor` enforces RFC 8949 deterministic encoding (sorted map keys, shortest-form integers, no indefinite-length items), so any compliant decoder reproduces the exact same bytes that were originally signed. JSON has no such guarantee — two equivalent JSON documents can serialize differently, and that's fatal for signature verification.
-- **`sig` is excluded from the hash.** The attester hashes the ten content fields, signs that hash, then attaches `sig` to the same map for transport. The verifier re-encodes without `sig`, re-hashes, and ecrecovers.
-- **`addr` and `att` are different roles.** `att` is the *signer* — its address is what `ecrecover` produces. `addr` is the *subject* — the wallet the attester saw at session time. The verifier checks both: integrity (`recovered === claim.att`) and trust (`claim.att ∈ trustedAttesters`) bind to `att`; the staleness check (`claim.addr === currentOwner`) binds to `addr`.
-- **Tampering with any field invalidates the signature, including tampering with `att`.** Because `att` is in the hashed payload, an attacker who rewrites it to a different address breaks the integrity check before the trust check ever runs. The trust check is a defense against attesters whose keys have leaked or whose policies you've stopped accepting; it is not the only defense against forgery.
-- **`uid` survives handle changes; the on-chain `h` does not.** If `@vitalik` renames to `@vbuterin`, the existing text record still verifies cleanly, but the `h` field is now stale. Consumers that care about freshness should re-resolve the handle from the platform using `uid` rather than trusting `h`.
-- **An ownership transfer invalidates existing proofs.** When the ENS name moves to a new owner, the cheap-path staleness check (`claim.addr === currentOwner`) starts failing with `wrong-owner`. The new owner has to run the attestation flow themselves to re-issue. This is intentional: an ownership change should invalidate identity assertions made under the previous owner.
+```
+{
+  v:       3,                            // schema version
+  p:       "com.x",                      // platform (signed for replay protection)
+  uid:     "0x6fbff7f835de7e...",        // signed uid — see "uid construction" below
+  name:    "alice.eth",                  // ENS name (replay protection)
+  chainId: 1,                            // EVM chain id (replay protection)
+  addr:    "0xd8dA...6045",              // wallet observed via SIWE (staleness check)
+  att:     "0x7E5F...9Bdf",              // attester key address (trust check)
+  exp:     1798761600,                   // expiry, unix seconds
+  prf:     "bafyreigh2akis...",          // reference to full proof document
+}
+```
+
+`p` appears in both the unsigned metadata AND the signed payload. It's signed for replay protection (prevents replaying a `com.x` proof as `org.telegram`), and duplicated unsigned so indexers can read it without decoding the inner payload.
+
+### Why dag-cbor for the inner payload
+
+The inner payload uses `dag-cbor` (RFC 8949 Core Deterministic Encoding) — map keys sorted by length then bytewise, shortest-form integers, no indefinite-length items. This guarantees `decode(encode(x))` produces byte-identical output across implementations and runs. The signature is over `keccak256(payloadBytes)` — if re-encoding produced different bytes, the hash wouldn't match and verification would fail. JSON has no such guarantee.
+
+The outer envelope uses `cborg` with CBOR tags enabled. The tag prefix is what makes the envelope self-describing.
+
+## uid construction
+
+The `uid` field in the signed payload is NOT the raw platform user id. It's a **signature** over the hash of the platform and uid, produced by the attester:
+
+```
+uid = personalSign(keccak256("platform:rawUid"), attesterKey)
+```
+
+For example, for Telegram user `12345` on platform `org.telegram`:
+
+```
+hash = keccak256(toBytes("org.telegram:12345"))
+uid  = attesterKey.signMessage({ message: { raw: hash } })
+```
+
+This is a 65-byte EIP-191 signature, stored as a `0x`-prefixed hex string.
+
+### Why a signature instead of a plain hash
+
+A plain `keccak256("platform:uid")` is brute-forceable — Telegram's uid space is ~10 billion sequential integers, enumerable in seconds on a GPU. Signing the hash with the attester key makes it unforgeable: an attacker can't produce a valid signature without the key, regardless of how small the uid space is.
+
+### How consumers verify the uid binding
+
+The consumer (typically an agent) already knows the raw platform uid from chat context. To confirm the on-chain proof binds to that specific user:
+
+```ts
+import { keccak256, recoverMessageAddress, toBytes } from 'viem'
+
+// 1. Compute the same hash the attester signed
+const hash = keccak256(toBytes(`org.telegram:${knownTgUid}`))
+
+// 2. Recover the signer from the uid signature
+const recovered = await recoverMessageAddress({
+  message: { raw: hash },
+  signature: result.uid as `0x${string}`,
+})
+
+// 3. Check it matches the attester address from the signed payload
+if (recovered.toLowerCase() === attesterAddress.toLowerCase()) {
+  // ✓ The attester endorsed this exact platform:uid pair
+}
+```
+
+No network call, no attester dependency at verify time. Pure local `ecrecover`.
 
 ## Step 1: Create the proof
 
 1. Open the proofs app and connect the wallet that controls the ENS name you want to attest.
-2. Sign the SIWE message your wallet pops up. This proves to the attester that this session controls this wallet — no signature, no claim.
-3. Link your social account in the same session: X via OAuth (handled inline) or Telegram via the Login Widget. The attester validates server-side and binds the resulting `{ uid, handle }` to your session.
-4. Pick the ENS name and confirm the expiry. The attester pins the full proof document to IPFS, then signs the claim committing to that CID, your wallet, your social account, and the name.
+2. Sign the SIWE message. This proves to the attester that this session controls this wallet.
+3. Link your social account in the same session: X via OAuth or Telegram via the Login Widget.
+4. Pick the ENS name and confirm the expiry. The attester signs the envelope and returns the encoded bytes.
 
-You don't sign the claim with your wallet — only the attester does. Your wallet only signed the SIWE message in step 2 and the on-chain transaction in step 5.
+Your wallet only signs the SIWE message and the on-chain write transaction. The envelope itself is signed by the attester.
 
 ## Step 2: Publish the text record
 
-The signed claim gets written to the resolver under `<platform>.proof` — `com.x.proof` for X, `org.telegram.proof` for Telegram, and so on — as a single hex string:
+The encoded envelope gets written to the resolver under `<platform>.proof` as a hex string:
 
 ```
 alice.eth
-  ├── com.x.proof        = "0xa86176..."   # hex(CBOR(signedClaim))
-  └── org.telegram.proof = "0xa86176..."   # different platform, same format
+  ├── com.x.proof        = "0xdb0000656e73707266..."
+  └── org.telegram.proof = "0xdb0000656e73707266..."
 ```
 
-The reverse-DNS prefix groups every record about a given platform under one namespace — the same convention ENS profiles use for `com.twitter` / `com.github` / etc. — and the `.proof` suffix marks this specific record as a proof rather than a profile field.
-
-You can attach proofs for multiple platforms to the same name; each lives at its own key and verifies independently. The proofs app sends one transaction per write; if you'd rather do it manually, the value at each key is just `0x` + the hex of the CBOR-encoded `Claim` returned by the attester.
+The `0xdb` prefix is the CBOR tag header — any reader can detect "this is an ensprf envelope" from the first byte. The reverse-DNS prefix groups all records for a given platform under one namespace, and `.proof` marks the record type.
 
 ## Step 3: Verify the proof
 
-Verification has two depths. Most consumers only need the cheap path.
+### Cheap path (SDK)
 
-**Cheap path** — read the text record and check the attester signature against the trusted set. No IPFS, no upstream platform calls:
+Read the text record, decode the envelope, verify the attester signature and staleness. No IPFS:
 
 ```ts
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { ensSubgraphActions } from '@ensdomains/ensjs/subgraph'
 import { proofVerifier } from '@ensmetadata/sdk'
 
 const client = createPublicClient({
   chain: addEnsContracts(mainnet),
   transport: http(),
-})
-  .extend(ensSubgraphActions)
-  .extend(proofVerifier({
-    trustedAttesters: ['0x...'], // attester key address — see worker README
-  }))
+}).extend(proofVerifier({
+  trustedAttesters: ['0x...'], // the attester key address
+}))
 
 const result = await client.verifyProof({
   name: 'alice.eth',
@@ -128,63 +162,64 @@ const result = await client.verifyProof({
 })
 
 if (result.valid) {
-  console.log('linked handle:', result.handle)
-  console.log('stable user id:', result.uid)
-  console.log('expires at:', new Date(result.expiresAt! * 1000))
-} else {
-  console.log('not valid:', result.reason)
+  console.log('handle:', result.handle)     // from unsigned metadata
+  console.log('uid:', result.uid)           // the signed uid (signature)
+  console.log('method:', result.method)     // from unsigned metadata
+  console.log('expires:', result.expiresAt)
 }
 ```
 
-The `trustedAttesters` array is the only place trust is configured. A consumer who doesn't trust your attester will get the same answer they'd get from a missing record — `untrusted-attester` — and can fall back to the deep path or ignore the proof entirely. That's the right default: every consumer decides for themselves whose attestations to accept.
+The SDK's `verifyProof` runs four checks:
 
-`reason` will be one of:
+| Check | Fails with | Meaning |
+| --- | --- | --- |
+| Decode the envelope + inner payload | `decode-error` | Bytes are corrupt or not a valid envelope |
+| `ecrecover(hash, sig) === payload.att` | `bad-signature` | Envelope was tampered with |
+| `payload.att ∈ trustedAttesters` | `untrusted-attester` | Attester is not in your allow-list |
+| `payload.exp > now` | `expired` | Claim needs re-issuing |
+| `payload.addr === currentEnsOwner` | `wrong-owner` | Name transferred since attestation |
 
-| Reason | Meaning |
-| --- | --- |
-| `missing` | No `proof.<platform>` text record on this name. |
-| `expired` | `claim.exp` is in the past. |
-| `bad-signature` | `ecrecover(hash, sig) !== claim.att`. The claim was tampered with after signing, or the bytes are corrupt. |
-| `untrusted-attester` | Signature is valid, but `claim.att` isn't in `trustedAttesters`. |
-| `wrong-owner` | The wallet the attester observed (`claim.addr`) is no longer the ENS owner. The proof is stale — usually means the name transferred. |
-| `unsupported-version` | `claim.v` is a version this verifier doesn't know. |
-| `decode-error` | The text record bytes don't decode as a valid claim. |
+### uid binding check (consumer's responsibility)
 
-**Deep path** — fetch the full proof document from IPFS and re-validate the upstream evidence. Use this when you care about *how* the link was originally established, not just that an attester certified it:
+The SDK confirms the envelope is structurally valid and signed by a trusted attester. It does NOT check that the uid binds to your specific user — only you know the raw uid. After `verifyProof` returns valid:
+
+```ts
+import { keccak256, recoverMessageAddress, toBytes } from 'viem'
+
+const hash = keccak256(toBytes(`org.telegram:${knownTgUid}`))
+const recovered = await recoverMessageAddress({
+  message: { raw: hash },
+  signature: result.uid as `0x${string}`,
+})
+const isMyUser = recovered.toLowerCase() === attesterAddress.toLowerCase()
+```
+
+Without this check, anyone can write a valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid".
+
+### Deep path
+
+Fetch the full proof document from IPFS to inspect the upstream evidence (the OAuth payload, Login Widget data, etc.):
 
 ```ts
 const full = await client.fetchAndVerifyFullProof(result.cid!, {
-  expectedOwner: '0x...', // optional — re-runs the staleness check against this address
+  expectedOwner: '0x...',
 })
-
 console.log('attestation method:', full.method)
 ```
 
-The `method` field on the full proof document tells you which platform validator the attester used (e.g. `"privy-com.x"`, `"telegram-login-widget"`). A verifier with stricter trust requirements can accept some methods and reject others without changing the on-chain format.
-
-## Trust model for verifiers
-
-There's exactly one cryptographic binding in this scheme, and verifiers — especially *agents* that already know the user's social account from some other context — must understand it explicitly: **`claim.uid` is the binding, not the handle**. The on-chain `uid` field is a **signature** — `personalSign(keccak256("platform:rawUid"), attesterKey)`. An on-chain observer can't reverse it, and unlike a plain hash, brute-forcing the uid space doesn't help because producing a valid signature requires the attester's private key.
-
-To verify the binding, compute `keccak256(toBytes("org.telegram:12345"))` where `12345` is the raw uid you know from your chat context, then call `ecrecover(hash, result.uid)`. If the recovered address equals the attester address (from the signed payload's `att` field), the attester endorsed this exact platform:uid pair — binding confirmed. No attester call needed, pure local `ecrecover`. Without this check, anyone can write a perfectly valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid".
-
-The handle lives in the envelope's unsigned metadata — it's display-only and can be updated without re-attestation. The load-bearing field is always `uid`, verified via signature recovery.
-
 ## Why this design
 
-A few decisions are worth calling out, because they shape what the system can and can't do:
-
-- **The attester is the trust anchor, not the wallet.** The cheap path only learns "the current owner published a claim" from the wallet; it learns "this linkage was actually verified" from the attester. Without the attester signature in the text record, the cheap path would have no choice but to trust whatever the wallet asserts, and the only real check would happen in the IPFS round-trip — which most consumers won't make. Putting the attester signature on-chain shifts the load-bearing trust check into the cheap path.
-- **Verifiers configure trust independently.** There's no global registry of "official" attesters. Each consumer ships its own `trustedAttesters` set, decides which operators it accepts, and gets a clean `untrusted-attester` failure for everything else. New attesters don't need anyone's permission to exist; they just need consumers to add them to their trusted sets.
-- **`addr` separates the consent check from the trust check.** The attester certifies "I observed wallet X linking @handle in one session". The verifier confirms "X is still the current ENS owner". Either check can fail independently — `bad-signature` for tampered claims, `untrusted-attester` for unwanted attesters, `wrong-owner` for transferred names — which gives much sharper diagnostics than collapsing them into a single failure mode.
-- **Replay-bound to `name`, `chainId`, `addr`, and `att`.** All four are in the hashed payload. Without `name`, a claim signed for `alice.eth` could be replayed onto another name. Without `chainId`, mainnet and Sepolia claims are interchangeable. Without `addr`, the verifier has no way to know which wallet was supposed to be the subject without doing ecrecover. Without `att`, the verifier has no way to know which attester key it should expect without already trusting the recovered address.
-- **Canonical CBOR, not JSON.** Signature verification needs byte-identical re-encoding. `dag-cbor` enforces RFC 8949 deterministic encoding so any compliant decoder reproduces the exact same bytes that were originally signed. JSON has no such guarantee.
-- **Stable user id, not handle.** The `uid` field stores the platform's immutable id. Handles can change; ids can't. Verifiers should treat `handle` as a hint and `uid` as the identity.
-- **Layered storage.** The text record carries everything a normal verifier needs. The IPFS document carries everything a *paranoid* verifier needs. Putting the upstream evidence in the text record would either bloat it past the practical size limit or force every reader through IPFS.
-- **Pluggable attestation method per platform.** The attester's per-platform validator can be swapped without touching the on-chain claim format. Today Twitter goes through Privy's REST API and Telegram goes through Login Widget HMAC; tomorrow either could be replaced with a TLSNotary proof or a zk-verified JWT, and the only thing that changes is the `method` field on the IPFS document.
+- **Tagged envelope, not a flat map.** Unsigned metadata (handle, method, issuedAt) lives outside the signed payload, so it can be updated without re-attestation and read without any crypto. The tag prefix (`0xDB` + "ensprf") makes the format self-describing — consistent with the [Objekt envelope](https://docs.objekt.sh/encryption/envelope) pattern.
+- **Signed uid is a signature, not a hash.** Prevents brute-force enumeration of the uid space while remaining locally verifiable via `ecrecover`. The consumer needs only the attester's public key (already in the signed payload as `att`) and the raw uid from their own context.
+- **The attester is the trust anchor, not the wallet.** The cheap path learns "a trusted attester independently confirmed both the wallet and the social account" — not just "the wallet asserted it". The wallet's only role is publishing the envelope on-chain.
+- **Verifiers configure trust independently.** No global registry. Each consumer ships its own `trustedAttesters` set.
+- **`p` is in both layers.** Signed for replay protection (com.x proof can't be replayed as org.telegram), duplicated unsigned for indexing without decoding the inner payload.
+- **Canonical dag-cbor for the inner payload.** Deterministic encoding guarantees byte-identical re-hashing across implementations.
+- **Layered storage.** The text record carries everything a normal verifier needs. The IPFS document carries the upstream evidence for paranoid verifiers.
 
 ## Related
 
 - [`@ensmetadata/sdk` reference](/sdk/documentation)
-- [Claim schema (CDDL)](https://github.com/0xLighthouse/ens-metadata/blob/main/packages/sdk/schemas/identity-proof.cddl)
+- [Envelope CDDL schema](https://github.com/0xLighthouse/ens-metadata/blob/main/packages/sdk/schemas/identity-proof.cddl)
 - [Attester worker source](https://github.com/0xLighthouse/ens-metadata/tree/main/workers/attester)
+- [Objekt envelope format](https://docs.objekt.sh/encryption/envelope)

@@ -1,78 +1,91 @@
-; ENS Metadata — Identity Proof Schema
+; ENS Metadata — Identity Proof Schema (v3 Envelope)
 ;
-; Canonical CDDL for the on-chain CBOR claim and the full IPFS-pinned proof
-; document. The on-chain claim is what gets written to `<platform>.proof`
-; as a hex-encoded blob. The full proof is pinned to IPFS and referenced
-; from the claim via `prf` (a CID).
+; CDDL for the on-chain tagged CBOR envelope and the IPFS-pinned proof
+; document. The envelope is what gets written to `<platform>.proof`
+; (e.g. `com.x.proof`, `org.telegram.proof`) as a hex-encoded blob.
 ;
-; Encoding: dag-cbor (RFC 8949 Core Deterministic Encoding).
+; The envelope separates **unsigned public metadata** (handle, method,
+; issuedAt — readable by indexers without touching crypto) from a
+; **signed inner payload** (the security-critical fields). Consistent
+; with the Objekt envelope pattern (https://docs.objekt.sh/encryption/envelope).
+;
+; Detection: first byte is 0xDB (CBOR tag, 8-byte value follows).
+; Tag value: 111525057557094 (0x656e73707266 = "ensprf" as uint48).
+;
+; Inner payload encoding: dag-cbor (RFC 8949 Core Deterministic Encoding).
 ;   - Map keys sorted by length, then bytewise.
 ;   - Integers use shortest form.
 ;   - No indefinite-length items.
+; This guarantees byte-identical re-encoding across implementations,
+; which is required for signature verification.
 ;
-; Signing: EIP-191 (`"\x19Ethereum Signed Message:\n32" || keccak256(cbor)`).
-; The hashed bytes are the canonical CBOR of the claim map with the `sig`
-; field removed. On verify, the verifier re-encodes without `sig`, re-hashes,
-; and calls ecrecover.
+; Signing: EIP-191 (`"\x19Ethereum Signed Message:\n32" || keccak256(payload)`).
+; The `payload` field is the canonical dag-cbor bytes of the inner map.
+; The verifier hashes payload directly (no re-encoding needed) and
+; calls ecrecover.
+;
+; uid construction: the `uid` field in the signed payload is NOT a raw
+; platform id. It is `personalSign(keccak256("platform:rawUid"), attesterKey)`
+; — a 65-byte EIP-191 signature. Consumers verify by computing the same
+; hash from the raw uid they know and calling ecrecover against `att`.
+; This prevents brute-force enumeration of the uid space while remaining
+; locally verifiable (no attester call at verify time).
 ;
 ; Trust model: the signer is an **attester** — a backend service that
-; observed both the wallet connection (via SIWE) and the platform login
-; (OAuth for Twitter, HMAC-SHA256 for Telegram, etc.) within a single
-; session, then signed a claim binding them together. `att` is the
-; attester's key address; `addr` is the wallet the attester observed.
-; Verifiers reject any claim whose `att` is not in their trusted set.
-;
-; Replay protection: `name`, `chainId`, `addr`, and `att` are all in the
-; signed payload. Tampering with any of them invalidates the signature.
+; observed both the wallet (via SIWE) and the platform login (OAuth,
+; Login Widget, etc.) within a single session. `att` is the attester's
+; key address. Verifiers reject any claim whose `att` is not in their
+; trusted set.
 
 ; ---------------------------------------------------------------------------
-; On-chain claim
+; v3 Envelope (on-chain, tagged)
 ; ---------------------------------------------------------------------------
-; Written to the ENS text record `<platform>.proof` (e.g. `com.x.proof`,
-; `org.telegram.proof`) as `0x` + hex(cborBytes). The `<platform>` segment
-; is the reverse-DNS namespace of the platform, matching `claim.p`.
-; Every field except `sig` participates in the signed hash.
+; Written to the ENS text record as `0x` + hex(cborBytes).
 
-claim = {
-  v:       uint,            ; schema version
-  p:       tstr,            ; reverse-DNS platform namespace, e.g. "com.x", "org.telegram"
-  h:       tstr,            ; handle at time of attestation, e.g. "vitalik"
-  uid:     tstr,            ; platform-stable user id (canonical identity)
-  exp:     uint,            ; expiry, unix seconds
-  prf:     tstr,            ; IPFS CID of the full proof doc (string form)
-  name:    tstr,            ; ENS name this claim is bound to, e.g. "alice.eth"
-  chainId: uint,            ; EVM chain id the claim is valid on
-  addr:    tstr,            ; wallet observed by attester (SIWE), EIP-55 hex
-  att:     tstr,            ; attester key address, EIP-55 hex
-  sig:     bstr .size 65,   ; attester EIP-191 signature over claim-without-sig
+v3-envelope = #6.111525057557094(v3-envelope-map)
+
+v3-envelope-map = {
+  v:        3,                ; always 3 for this format
+  p:        tstr,             ; platform namespace (unsigned, for indexing)
+  h:        tstr,             ; handle (unsigned, display only)
+  method:   tstr,             ; attestation backend, e.g. "privy-linked"
+  issuedAt: uint,             ; creation time, unix seconds
+  payload:  bstr,             ; canonical dag-cbor of v3-signed-payload
+  sig:      bstr .size 65,    ; EIP-191 over keccak256(payload)
 }
 
-; The map that is actually hashed and signed. Identical shape minus `sig`.
-claim-without-sig = {
-  v:       uint,
-  p:       tstr,
-  h:       tstr,
-  uid:     tstr,
-  exp:     uint,
-  prf:     tstr,
-  name:    tstr,
-  chainId: uint,
-  addr:    tstr,
-  att:     tstr,
+; ---------------------------------------------------------------------------
+; Signed inner payload (decoded from `payload` above)
+; ---------------------------------------------------------------------------
+; `p` is duplicated from the envelope for replay protection (must be
+; signed so a com.x proof can't be replayed as org.telegram).
+; `h` is NOT here — it's display-only and lives unsigned in the envelope.
+
+v3-signed-payload = {
+  v:       3,
+  p:       tstr,             ; platform namespace (signed for replay protection)
+  uid:     tstr,             ; signed uid — personalSign(keccak256("p:rawUid"), attesterKey)
+  name:    tstr,             ; ENS name this claim is bound to
+  chainId: uint,             ; EVM chain id
+  addr:    tstr,             ; wallet observed by attester (SIWE), EIP-55
+  att:     tstr,             ; attester key address, EIP-55
+  exp:     uint,             ; expiry, unix seconds
+  prf:     tstr,             ; reference to full proof document (IPFS CID or URL)
 }
 
 ; ---------------------------------------------------------------------------
 ; Full proof document (pinned to IPFS, referenced by `prf` above)
 ; ---------------------------------------------------------------------------
-; This is the "deep path" payload. Bots / deep verifiers fetch it to
-; re-validate the attestation against the underlying notary (Reclaim etc).
-; Not stored on-chain — backend-agnostic on-chain claim keeps it swappable.
+; The "deep path" payload. Verifiers fetch it to inspect the upstream
+; evidence (the OAuth response, Login Widget data, etc.). Not stored
+; on-chain — the on-chain envelope is self-contained for cheap-path
+; verification.
 
 full-proof = {
-  v:          uint,             ; schema version, currently 1
-  claim:      claim,            ; the signed on-chain claim, byte-for-byte
-  method:     tstr,             ; attestation backend, e.g. "reclaim", "privy-linked"
-  issuedAt:   uint,              ; unix seconds
+  v:          uint,             ; schema version
+  method:     tstr,             ; attestation backend, e.g. "privy-linked"
+  issuedAt:   uint,             ; unix seconds
   proof:      any,              ; backend-native attestation payload
+  ? claim:    any,              ; optional draft claim snapshot (legacy)
   ? notes:    tstr,             ; optional free-form notes
 }
