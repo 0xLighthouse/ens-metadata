@@ -11,12 +11,11 @@ This guide explains how to attach a verifiable social-account proof to an ENS na
 
 A social proof is a **tagged CBOR envelope** signed by an attester service, written to an ENS text record by the name's owner. Verification is one RPC call plus two local `ecrecover` operations — no IPFS round-trip, no third-party lookup.
 
-There are four pieces:
+Three pieces:
 
 1. **The attester** — a backend service (Cloudflare Worker at `workers/attester`) that observes both your wallet (via SIWE) and your social account (via OAuth / login widget) in the same session, then signs the envelope with its key.
-2. **The envelope** — a tagged CBOR structure with unsigned public metadata (handle, platform, method, timestamp) plus a signed inner payload and signature. Detailed below.
-3. **The text record** — `com.x.proof` (or `org.telegram.proof`) on the ENS name, holding the hex-encoded envelope. This is the cheap path everyone reads.
-4. **The full proof document** — a richer payload pinned to IPFS, referenced by the `prf` field in the signed payload. Verifiers only fetch this when they want to inspect the upstream evidence.
+2. **The envelope** — a tagged CBOR structure with an unsigned outer shell (version, attester hint, signature) plus a signed inner payload. Detailed below.
+3. **The text record** — `com.x.proof` (or `org.telegram.proof`) on the ENS name, holding the hex-encoded envelope.
 
 ## Envelope format
 
@@ -26,7 +25,7 @@ The on-chain value is a CBOR-tagged map. The tag enables instant type detection 
 
 ```
 First byte: 0xDB (CBOR major type 6 / tag, 8-byte additional info)
-Tag value:  111525057557094 (0x656e73707266 = "ensprf" as big-endian uint48)
+Tag value:  1701737328 (0x656e7370 = "ensp" as big-endian uint32)
 ```
 
 Any tool reading the text record can check the first byte to know "this is a tagged CBOR envelope" and dispatch accordingly.
@@ -34,59 +33,61 @@ Any tool reading the text record can check the first byte to know "this is a tag
 ### Structure
 
 ```
-Tag(111525057557094) {
-  v:        3,                          // envelope version
-  p:        "com.x",                    // platform (unsigned, for indexing)
-  h:        "vitalik",                  // handle (unsigned, for display)
-  method:   "privy-linked",             // attestation backend (unsigned)
-  issuedAt: 1776275269,                 // creation time, unix seconds (unsigned)
-  payload:  <bytes>,                    // canonical dag-cbor of signed fields
-  sig:      <bytes 65>,                 // EIP-191 signature over keccak256(payload)
+Tag(1701737328) {
+  v:  4,                                // envelope version
+  p:  <bytes>,                          // payload — canonical dag-cbor of signed fields
+  a:  <bytes 20>,                       // attester address (unsigned hint)
+  s:  <bytes 65>,                       // sig — EIP-191 over keccak256(p)
 }
 ```
 
-**Unsigned metadata** (`v`, `p`, `h`, `method`, `issuedAt`) — NOT signed. Exists for indexing and display. Can be read without touching any crypto. The handle can be updated without re-attestation.
+**Outer envelope** (`v`, `a`, `s`) — NOT signed. `a` (attester) is an unsigned hint for trusted-set lookup; the canonical attester identity comes from `ecrecover(s, keccak256(p))`. Swapping the `a` field just makes signature verification fail.
 
-**Signed payload** (`payload` bytes, decoded as dag-cbor) — the security-critical fields:
+**Signed payload** (`p` bytes, decoded as dag-cbor):
 
 ```
 {
-  v:       3,                            // schema version
-  p:       "com.x",                      // platform (signed for replay protection)
-  uid:     "0x6fbff7f835de7e...",        // signed uid — see "uid construction" below
-  name:    "alice.eth",                  // ENS name (replay protection)
-  chainId: 1,                            // EVM chain id (replay protection)
-  addr:    "0xd8dA...6045",              // wallet observed via SIWE (staleness check)
-  att:     "0x7E5F...9Bdf",              // attester key address (trust check)
-  exp:     1798761600,                   // expiry, unix seconds
-  prf:     "bafyreigh2akis...",          // reference to full proof document
+  p:  "com.x",                          // platform namespace
+  h:  "vitalik",                        // handle (signed — change triggers re-attestation)
+  u:  <bytes 65>,                       // blinded uid signature
+  n:  "alice.eth",                      // name — ENS name (replay protection)
+  t:  1776275269,                       // time — issued-at, unix seconds
+  a:  <bytes 20>,                       // addr — wallet observed via SIWE
 }
 ```
 
-`p` appears in both the unsigned metadata AND the signed payload. It's signed for replay protection (prevents replaying a `com.x` proof as `org.telegram`), and duplicated unsigned so indexers can read it without decoding the inner payload.
+CBOR map keys are single characters to minimize calldata cost. Binary values (`u`, `a`, `s`) are **raw bytes** — not hex strings. The SDK maps between short CBOR keys and readable TypeScript field names at the encoding boundary.
+
+### Design decisions
+
+- **`h` is signed** — handle changes invalidate the proof and require re-attestation. The handle is part of the identity claim.
+- **No `exp` (expiry)** — freshness is verifier-side. Consumers apply their own policy against `t` (issued-at): e.g., reject if `now - t > 90 days`.
+- **No `prf` (IPFS reference)** — the envelope is self-contained. Verification requires only the text record + ecrecover.
+- **No `chainId`** — proofs are chain-agnostic.
+- **No `method`** — attestation backend is an implementation detail.
 
 ### Why dag-cbor for the inner payload
 
-The inner payload uses `dag-cbor` (RFC 8949 Core Deterministic Encoding) — map keys sorted by length then bytewise, shortest-form integers, no indefinite-length items. This guarantees `decode(encode(x))` produces byte-identical output across implementations and runs. The signature is over `keccak256(payloadBytes)` — if re-encoding produced different bytes, the hash wouldn't match and verification would fail. JSON has no such guarantee.
+The inner payload uses `dag-cbor` (RFC 8949 Core Deterministic Encoding) — map keys sorted by length then bytewise, shortest-form integers, no indefinite-length items. This guarantees `decode(encode(x))` produces byte-identical output across implementations and runs. The signature is over `keccak256(payloadBytes)` — if re-encoding produced different bytes, the hash wouldn't match and verification would fail.
 
 The outer envelope uses `cborg` with CBOR tags enabled. The tag prefix is what makes the envelope self-describing.
 
 ## uid construction
 
-The `uid` field in the signed payload is NOT the raw platform user id. It's a **signature** over the hash of the platform and uid, produced by the attester:
+The `u` field in the signed payload is NOT the raw platform user id. It's a **signature** over the hash of the platform and uid, produced by the attester:
 
 ```
-uid = personalSign(keccak256("platform:rawUid"), attesterKey)
+u = personalSign(keccak256("platform:rawUid"), attesterKey)
 ```
 
 For example, for Telegram user `12345` on platform `org.telegram`:
 
 ```
 hash = keccak256(toBytes("org.telegram:12345"))
-uid  = attesterKey.signMessage({ message: { raw: hash } })
+u    = attesterKey.signMessage({ message: { raw: hash } })
 ```
 
-This is a 65-byte EIP-191 signature, stored as a `0x`-prefixed hex string.
+This is a 65-byte EIP-191 signature, stored as raw bytes in the CBOR payload (hex string in TypeScript).
 
 ### Why a signature instead of a plain hash
 
@@ -108,7 +109,7 @@ const recovered = await recoverMessageAddress({
   signature: result.uid as `0x${string}`,
 })
 
-// 3. Check it matches the attester address from the signed payload
+// 3. Check it matches the attester address
 if (recovered.toLowerCase() === attesterAddress.toLowerCase()) {
   // ✓ The attester endorsed this exact platform:uid pair
 }
@@ -116,12 +117,14 @@ if (recovered.toLowerCase() === attesterAddress.toLowerCase()) {
 
 No network call, no attester dependency at verify time. Pure local `ecrecover`.
 
+The uid (`u`) and the envelope signature (`sig`) both recover to the **same attester address** — this is the dual-ecrecover invariant that replaces having an explicit `att` field in the signed payload.
+
 ## Step 1: Create the proof
 
 1. Open the proofs app and connect the wallet that controls the ENS name you want to attest.
 2. Sign the SIWE message. This proves to the attester that this session controls this wallet.
 3. Link your social account in the same session: X via OAuth or Telegram via the Login Widget.
-4. Pick the ENS name and confirm the expiry. The attester signs the envelope and returns the encoded bytes.
+4. Confirm the ENS name. The attester signs the envelope and returns the encoded bytes.
 
 Your wallet only signs the SIWE message and the on-chain write transaction. The envelope itself is signed by the attester.
 
@@ -135,13 +138,13 @@ alice.eth
   └── org.telegram.proof = "0xdb0000656e73707266..."
 ```
 
-The `0xdb` prefix is the CBOR tag header — any reader can detect "this is an ensprf envelope" from the first byte. The reverse-DNS prefix groups all records for a given platform under one namespace, and `.proof` marks the record type.
+The `0xDA` prefix is the CBOR tag header — any reader can detect "this is an ensp envelope" from the first byte.
 
 ## Step 3: Verify the proof
 
-### Cheap path (SDK)
+### SDK verification
 
-Read the text record, decode the envelope, verify the attester signature and staleness. No IPFS:
+Read the text record, decode the envelope, verify the attester signature and ownership:
 
 ```ts
 import { createPublicClient, http } from 'viem'
@@ -153,7 +156,8 @@ const client = createPublicClient({
   chain: addEnsContracts(mainnet),
   transport: http(),
 }).extend(proofVerifier({
-  trustedAttesters: ['0x...'], // the attester key address
+  trustedAttesters: ['0x...'],
+  maxAge: 90 * 24 * 60 * 60, // optional: reject proofs older than 90 days
 }))
 
 const result = await client.verifyProof({
@@ -162,22 +166,22 @@ const result = await client.verifyProof({
 })
 
 if (result.valid) {
-  console.log('handle:', result.handle)     // from unsigned metadata
-  console.log('uid:', result.uid)           // the signed uid (signature)
-  console.log('method:', result.method)     // from unsigned metadata
-  console.log('expires:', result.expiresAt)
+  console.log('handle:', result.handle)
+  console.log('uid:', result.uid)
+  console.log('attester:', result.attester)
+  console.log('issued:', new Date(result.issuedAt * 1000).toISOString())
 }
 ```
 
-The SDK's `verifyProof` runs four checks:
+The SDK's `verifyProof` runs these checks:
 
 | Check | Fails with | Meaning |
 | --- | --- | --- |
 | Decode the envelope + inner payload | `decode-error` | Bytes are corrupt or not a valid envelope |
-| `ecrecover(hash, sig) === payload.att` | `bad-signature` | Envelope was tampered with |
-| `payload.att ∈ trustedAttesters` | `untrusted-attester` | Attester is not in your allow-list |
-| `payload.exp > now` | `expired` | Claim needs re-issuing |
-| `payload.addr === currentEnsOwner` | `wrong-owner` | Name transferred since attestation |
+| `ecrecover(hash, sig) === envelope.attester` | `bad-signature` | Envelope was tampered with |
+| Recovered attester is in trusted set | `untrusted-attester` | Attester is not in your allow-list |
+| `inner.addr === currentEnsOwner` | `wrong-owner` | Name transferred since attestation |
+| `now - inner.issuedAt` within `maxAge` (if set) | `stale` | Proof is older than your threshold |
 
 ### uid binding check (consumer's responsibility)
 
@@ -196,26 +200,28 @@ const isMyUser = recovered.toLowerCase() === attesterAddress.toLowerCase()
 
 Without this check, anyone can write a valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid".
 
-### Deep path
-
-Fetch the full proof document from IPFS to inspect the upstream evidence (the OAuth payload, Login Widget data, etc.):
-
-```ts
-const full = await client.fetchAndVerifyFullProof(result.cid!, {
-  expectedOwner: '0x...',
-})
-console.log('attestation method:', full.method)
-```
-
 ## Why this design
 
-- **Tagged envelope, not a flat map.** Unsigned metadata (handle, method, issuedAt) lives outside the signed payload, so it can be updated without re-attestation and read without any crypto. The tag prefix (`0xDB` + "ensprf") makes the format self-describing — consistent with the [Objekt envelope](https://docs.objekt.sh/encryption/envelope) pattern.
-- **Signed uid is a signature, not a hash.** Prevents brute-force enumeration of the uid space while remaining locally verifiable via `ecrecover`. The consumer needs only the attester's public key (already in the signed payload as `att`) and the raw uid from their own context.
+- **Tagged envelope, not a flat map.** The tag prefix (`0xDA` + "ensp") makes the format self-describing — consistent with the [Objekt envelope](https://docs.objekt.sh/encryption/envelope) pattern.
+- **Signed uid is a signature, not a hash.** Prevents brute-force enumeration of the uid space while remaining locally verifiable via `ecrecover`. Both `sig` and `u` recover to the same attester address.
 - **The attester is the trust anchor, not the wallet.** The cheap path learns "a trusted attester independently confirmed both the wallet and the social account" — not just "the wallet asserted it". The wallet's only role is publishing the envelope on-chain.
-- **Verifiers configure trust independently.** No global registry. Each consumer ships its own `trustedAttesters` set.
-- **`p` is in both layers.** Signed for replay protection (com.x proof can't be replayed as org.telegram), duplicated unsigned for indexing without decoding the inner payload.
+- **Verifiers configure trust independently.** No global registry. Each consumer ships its own `trustedAttesters` set and `maxAge` threshold.
+- **Binary encoding.** Addresses and signatures are raw bytes in CBOR, not hex strings. A 65-byte signature costs 67 bytes as `bstr` vs 134 bytes as text. Roughly halves calldata cost for binary fields.
 - **Canonical dag-cbor for the inner payload.** Deterministic encoding guarantees byte-identical re-hashing across implementations.
-- **Layered storage.** The text record carries everything a normal verifier needs. The IPFS document carries the upstream evidence for paranoid verifiers.
+- **Self-contained.** No IPFS dependency. The text record carries everything a verifier needs.
+
+## Standards
+
+| Standard | Reference | Usage |
+|----------|-----------|-------|
+| CBOR | [RFC 8949](https://www.rfc-editor.org/rfc/rfc8949) | Core binary encoding for both envelope layers |
+| CDDL | [RFC 8610](https://www.rfc-editor.org/rfc/rfc8610) | Schema definition language for the envelope spec |
+| DAG-CBOR | [IPLD spec](https://ipld.io/specs/codecs/dag-cbor/spec/) | Deterministic encoding (RFC 8949 §4.2) for the signed inner payload |
+| CBOR Tags | [RFC 8949 §3.4](https://www.rfc-editor.org/rfc/rfc8949#section-3.4) | Tag `1701737328` ("ensp") for envelope detection |
+| EIP-191 | [EIP-191](https://eips.ethereum.org/EIPS/eip-191) | Signature scheme over `keccak256(payload)` |
+| EIP-4361 (SIWE) | [EIP-4361](https://eips.ethereum.org/EIPS/eip-4361) | Wallet authentication during attestation |
+
+The CBOR tag `1701737328` falls in the First Come First Served range (>32767) per [RFC 8949 §9.2](https://www.rfc-editor.org/rfc/rfc8949#section-9.2). Implementation uses [`@ipld/dag-cbor`](https://github.com/ipld/js-dag-cbor) for the inner payload and [`cborg`](https://github.com/rvagg/cborg) for the tagged outer envelope.
 
 ## Related
 

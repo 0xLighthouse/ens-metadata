@@ -15,7 +15,6 @@ export {
 export {
   proofVerifier,
   verifyProof,
-  fetchAndVerifyFullProof,
   type ProofVerifierConfig,
 } from './verify'
 
@@ -35,7 +34,6 @@ export type {
 
 export type {
   PayloadFields,
-  EnvelopeMetadata,
   Envelope,
   SignClaimInput,
   VerifyClaimOptions,
@@ -43,5 +41,4 @@ export type {
   VerifyFailureReason,
   VerifyProofOptions,
   VerifyResult,
-  FullVerifyResult,
 } from './proof-types'

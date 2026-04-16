@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { addEnsContracts } from '@ensdomains/ensjs'
 import { type VerifyResult, verifyProof } from '@ensmetadata/sdk'
 import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
-import { type Address, http, type PublicClient, createPublicClient, isAddress } from 'viem'
+import { http, type Address, type PublicClient, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
 
 // Trusted attesters are env-configured. Comma-separated list of EIP-55 hex
@@ -48,8 +48,8 @@ function reasonLabel(reason: VerifyResult['reason']): string {
   switch (reason) {
     case 'missing':
       return 'No proof set'
-    case 'expired':
-      return 'Proof expired'
+    case 'stale':
+      return 'Proof is too old'
     case 'bad-signature':
       return 'Signature does not verify'
     case 'wrong-owner':
@@ -58,8 +58,6 @@ function reasonLabel(reason: VerifyResult['reason']): string {
       return 'Attester is not in the trusted set'
     case 'unsupported-version':
       return 'Claim uses an unsupported schema version'
-    case 'handle-changed':
-      return 'Handle changed since signing'
     case 'decode-error':
       return 'Proof bytes are malformed'
     default:
@@ -100,8 +98,8 @@ export default async function ProofsPage({ params }: Props) {
               <div className="rounded-md border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-3 text-xs text-yellow-900 dark:text-yellow-100">
                 <span className="font-medium">No trusted attesters configured.</span> Set{' '}
                 <span className="font-mono">NEXT_PUBLIC_TRUSTED_ATTESTERS</span> in{' '}
-                <span className="font-mono">.env.local</span> and restart the dev server. Until
-                then every proof will fail with <span className="font-mono">untrusted-attester</span>.
+                <span className="font-mono">.env.local</span> and restart the dev server. Until then
+                every proof will fail with <span className="font-mono">untrusted-attester</span>.
               </div>
             )}
 
@@ -145,27 +143,18 @@ export default async function ProofsPage({ params }: Props) {
                           <span className="font-mono truncate">{result.uid}</span>
                         </div>
                       )}
-                      {result.expiresAt && (
+                      {result.issuedAt && (
                         <div className="flex justify-between gap-4">
-                          <span className="text-neutral-500 dark:text-neutral-400">Expires</span>
-                          <span className="font-mono">{formatExpiry(result.expiresAt)}</span>
+                          <span className="text-neutral-500 dark:text-neutral-400">Issued</span>
+                          <span className="font-mono">{formatExpiry(result.issuedAt)}</span>
                         </div>
                       )}
-                      {result.cid && (
+                      {result.attester && (
                         <div className="flex justify-between gap-4">
-                          <span className="text-neutral-500 dark:text-neutral-400">Proof doc</span>
-                          <a
-                            href={
-                              result.cid.startsWith('http')
-                                ? result.cid
-                                : `https://ipfs.io/ipfs/${result.cid.replace(/^ipfs:\/\//, '')}`
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-xs truncate max-w-[14rem] underline"
-                          >
-                            {result.cid.replace(/^https?:\/\//, '').slice(0, 32)}…
-                          </a>
+                          <span className="text-neutral-500 dark:text-neutral-400">Attester</span>
+                          <span className="font-mono text-xs truncate max-w-[14rem]">
+                            {result.attester}
+                          </span>
                         </div>
                       )}
                     </div>

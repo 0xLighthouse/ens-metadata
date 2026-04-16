@@ -1,18 +1,29 @@
-; ENS Metadata — Identity Proof Schema (v3 Envelope)
+; ENS Metadata — Identity Proof Schema (v4 Envelope)
 ;
-; CDDL for the on-chain tagged CBOR envelope and the IPFS-pinned proof
-; document. The envelope is what gets written to `<platform>.proof`
-; (e.g. `com.x.proof`, `org.telegram.proof`) as a hex-encoded blob.
+; CDDL (RFC 8610) for the on-chain tagged CBOR envelope written to
+; `<platform>.proof` (e.g. `com.x.proof`, `org.telegram.proof`) as a
+; hex-encoded blob.
 ;
-; The envelope separates **unsigned public metadata** (handle, method,
-; issuedAt — readable by indexers without touching crypto) from a
-; **signed inner payload** (the security-critical fields). Consistent
-; with the Objekt envelope pattern (https://docs.objekt.sh/encryption/envelope).
+; Standards:
+;   - CBOR encoding:     RFC 8949 — Concise Binary Object Representation
+;   - Schema language:   RFC 8610 — Concise Data Definition Language (CDDL)
+;   - Inner payload:     IPLD DAG-CBOR codec (https://ipld.io/specs/codecs/dag-cbor/spec/)
+;                        implements RFC 8949 §4.2 Core Deterministic Encoding
+;   - Outer envelope:    RFC 8949 §3.4 Tags (major type 6) via cborg library
+;   - Tag registration:  RFC 8949 §9.2 — tag 1701737328 falls in the
+;                        First Come First Served range (>32767)
+;   - Signing:           EIP-191 (Ethereum Signed Data Standard)
 ;
-; Detection: first byte is 0xDB (CBOR tag, 8-byte value follows).
-; Tag value: 111525057557094 (0x656e73707266 = "ensprf" as uint48).
+; v4 separates an **unsigned outer envelope** (version, attester hint, sig)
+; from a **signed inner payload** (the security-critical fields). Binary
+; values (addresses, uid signature) are encoded as raw bytes — not hex
+; strings — for compactness.
 ;
-; Inner payload encoding: dag-cbor (RFC 8949 Core Deterministic Encoding).
+; Detection: first byte is 0xDA (CBOR major type 6 / tag, 4-byte value
+; follows per RFC 8949 §3.4).
+; Tag value: 1701737328 (0x656e7370 = "ensp" as uint32).
+;
+; Inner payload encoding: DAG-CBOR (RFC 8949 §4.2 deterministic encoding):
 ;   - Map keys sorted by length, then bytewise.
 ;   - Integers use shortest form.
 ;   - No indefinite-length items.
@@ -24,68 +35,47 @@
 ; The verifier hashes payload directly (no re-encoding needed) and
 ; calls ecrecover.
 ;
-; uid construction: the `uid` field in the signed payload is NOT a raw
+; uid construction: the `u` field in the signed payload is NOT a raw
 ; platform id. It is `personalSign(keccak256("platform:rawUid"), attesterKey)`
 ; — a 65-byte EIP-191 signature. Consumers verify by computing the same
-; hash from the raw uid they know and calling ecrecover against `att`.
-; This prevents brute-force enumeration of the uid space while remaining
-; locally verifiable (no attester call at verify time).
+; hash from the raw uid they know and calling ecrecover against the
+; recovered attester address.
 ;
 ; Trust model: the signer is an **attester** — a backend service that
 ; observed both the wallet (via SIWE) and the platform login (OAuth,
-; Login Widget, etc.) within a single session. `att` is the attester's
-; key address. Verifiers reject any claim whose `att` is not in their
-; trusted set.
+; Login Widget, etc.) within a single session. `attester` in the outer
+; envelope is an unsigned hint; the canonical attester identity comes
+; from ecrecover(sig, keccak256(payload)). Verifiers reject any claim
+; whose recovered attester is not in their trusted set.
+;
+; Freshness: there is no `exp` field. Consumers apply their own policy
+; via `iat` (issued-at): e.g. reject if `now - iat > 90 days`.
 
 ; ---------------------------------------------------------------------------
-; v3 Envelope (on-chain, tagged)
+; v4 Envelope (on-chain, tagged)
 ; ---------------------------------------------------------------------------
 ; Written to the ENS text record as `0x` + hex(cborBytes).
 
-v3-envelope = #6.111525057557094(v3-envelope-map)
+v4-envelope = #6.1701737328(v4-envelope-map)
 
-v3-envelope-map = {
-  v:        3,                ; always 3 for this format
-  p:        tstr,             ; platform namespace (unsigned, for indexing)
-  h:        tstr,             ; handle (unsigned, display only)
-  method:   tstr,             ; attestation backend, e.g. "privy-linked"
-  issuedAt: uint,             ; creation time, unix seconds
-  payload:  bstr,             ; canonical dag-cbor of v3-signed-payload
-  sig:      bstr .size 65,    ; EIP-191 over keccak256(payload)
+v4-envelope-map = {
+  v:  4,                      ; always 4 for this format
+  p:  bstr,                   ; payload — canonical dag-cbor of v4-signed-payload
+  a:  bstr .size 20,          ; attester address (unsigned hint)
+  s:  bstr .size 65,          ; sig — EIP-191 over keccak256(p)
 }
 
 ; ---------------------------------------------------------------------------
 ; Signed inner payload (decoded from `payload` above)
 ; ---------------------------------------------------------------------------
-; `p` is duplicated from the envelope for replay protection (must be
-; signed so a com.x proof can't be replayed as org.telegram).
-; `h` is NOT here — it's display-only and lives unsigned in the envelope.
+; `h` is signed — handle changes invalidate the proof and require
+; re-attestation. `u` and `addr` are raw bytes, not hex strings.
 
-v3-signed-payload = {
-  v:       3,
-  p:       tstr,             ; platform namespace (signed for replay protection)
-  uid:     tstr,             ; signed uid — personalSign(keccak256("p:rawUid"), attesterKey)
-  name:    tstr,             ; ENS name this claim is bound to
-  chainId: uint,             ; EVM chain id
-  addr:    tstr,             ; wallet observed by attester (SIWE), EIP-55
-  att:     tstr,             ; attester key address, EIP-55
-  exp:     uint,             ; expiry, unix seconds
-  prf:     tstr,             ; reference to full proof document (IPFS CID or URL)
-}
-
-; ---------------------------------------------------------------------------
-; Full proof document (pinned to IPFS, referenced by `prf` above)
-; ---------------------------------------------------------------------------
-; The "deep path" payload. Verifiers fetch it to inspect the upstream
-; evidence (the OAuth response, Login Widget data, etc.). Not stored
-; on-chain — the on-chain envelope is self-contained for cheap-path
-; verification.
-
-full-proof = {
-  v:          uint,             ; schema version
-  method:     tstr,             ; attestation backend, e.g. "privy-linked"
-  issuedAt:   uint,             ; unix seconds
-  proof:      any,              ; backend-native attestation payload
-  ? claim:    any,              ; optional draft claim snapshot (legacy)
-  ? notes:    tstr,             ; optional free-form notes
+v4-signed-payload = {
+  p:  tstr,                   ; platform namespace, e.g. "com.x"
+  h:  tstr,                   ; handle at time of attestation
+  u:  bstr .size 65,          ; blinded uid — personalSign(keccak256("p:rawUid"), attesterKey)
+  n:  tstr,                   ; name — ENS name this claim is bound to
+  t:  uint,                   ; time — issued-at, unix seconds
+  a:  bstr .size 20,          ; addr — wallet observed by attester (SIWE)
 }

@@ -1,99 +1,68 @@
 import type { Address, Hex, WalletClient } from 'viem'
 
-// --- v3 Envelope types ---
+// --- v4 Envelope types ---
 
 /**
- * Fields inside the signed payload blob of a v3 envelope. These are the
- * security-critical fields that participate in the signature hash. Changing
- * any of them invalidates the signature.
+ * Signed payload fields inside a v4 envelope. Changing any of these
+ * invalidates the signature.
  *
- * `p` is signed for replay protection (prevents replaying a com.x proof
- * as an org.telegram proof). It's also duplicated in the unsigned envelope
- * metadata for indexing convenience.
- *
- * `h` (handle) is NOT here — it's display-only and lives in the unsigned
- * envelope metadata so it can be updated without re-attestation.
+ * Binary values (`uid`, `addr`) are `Hex`/`Address` strings in TypeScript
+ * but encoded as raw bytes (`bstr`) in the canonical dag-cbor payload.
+ * Field names are readable here; the CBOR encoder maps them to single-char
+ * keys internally for compactness.
  */
 export interface PayloadFields {
-  /** Schema version. */
-  v: number
   /** Reverse-DNS platform namespace, e.g. "com.x", "org.telegram". */
-  p: string
-  /** Blinded platform user id. */
-  uid: string
+  platform: string
+  /** Handle at time of attestation — signed, change triggers re-attestation. */
+  handle: string
+  /** Blinded platform user id — personalSign(keccak256("p:rawUid"), attesterKey). */
+  uid: Hex
   /** ENS name this claim is bound to. */
   name: string
-  /** EVM chain id the claim is valid on. */
-  chainId: number
-  /** Wallet the attester observed during the session (via SIWE). EIP-55. */
-  addr: Address
-  /** Attester key address — the signer of `sig`. EIP-55. */
-  att: Address
-  /** Expiry, unix seconds. */
-  exp: number
-  /** Reference to the full proof document (IPFS CID or CDN URL). */
-  prf: string
-}
-
-/**
- * Unsigned metadata in the v3 envelope. NOT signed — exists for
- * indexing/display convenience. Can be updated without re-attestation.
- */
-export interface EnvelopeMetadata {
-  /** Envelope version (3). */
-  v: number
-  /** Platform namespace (duplicated from signed payload for indexing). */
-  p: string
-  /** Handle at time of attestation — display only. */
-  h: string
-  /** Attestation backend, e.g. "privy-linked". */
-  method: string
-  /** When the attestation was created, unix seconds. */
+  /** Issued-at, unix seconds. Consumers apply their own freshness threshold. */
   issuedAt: number
+  /** Wallet the attester observed during the session (via SIWE). */
+  addr: Address
 }
 
 /**
- * The full v3 envelope shape as a TypeScript object (after decode or
- * before encode). `payload` is the raw dag-cbor bytes of PayloadFields.
- * `sig` is the EIP-191 signature over keccak256(payload).
+ * The full v4 envelope shape. `payload` is the raw dag-cbor bytes of
+ * PayloadFields. `sig` is the EIP-191 signature over keccak256(payload).
+ * `attester` is unsigned — the signature cryptographically binds the signer.
  */
-export interface Envelope extends EnvelopeMetadata {
+export interface Envelope {
+  /** Envelope version (4). */
+  version: number
   /** Canonical dag-cbor bytes of the signed PayloadFields. */
   payload: Uint8Array
+  /** Attester address — unsigned hint for trusted-set lookup. */
+  attester: Address
   /** EIP-191 signature over keccak256(payload). */
   sig: Hex
 }
 
 /**
- * Input to `signClaim`. `att` is optional — auto-populated from the
- * attester wallet client. Everything else is required. `h`, `method`,
- * and `issuedAt` end up in the unsigned envelope metadata; the rest
- * goes into the signed payload.
+ * Input to `signClaim`. `issuedAt` is auto-computed (current unix time).
+ * `attester` is auto-populated from the wallet.
  */
 export interface SignClaimInput {
-  p: string
-  h: string
-  uid: string
+  platform: string
+  handle: string
+  uid: Hex
   name: string
-  chainId: number
   addr: Address
-  att?: Address
-  exp: number
-  prf: string
-  method: string
-  issuedAt: number
 }
 
 // --- Verify types ---
 
 export type VerifyFailureReason =
   | 'missing'
-  | 'expired'
+  | 'stale'
   | 'bad-signature'
   | 'wrong-owner'
   | 'untrusted-attester'
   | 'unsupported-version'
-  | 'handle-changed'
   | 'decode-error'
 
 export interface VerifyClaimResult {
@@ -105,6 +74,8 @@ export interface VerifyClaimResult {
 export interface VerifyClaimOptions {
   trustedAttesters: readonly Address[]
   expectedOwner?: Address
+  /** Max age in seconds. If `now - issuedAt > maxAge`, the claim is stale. */
+  maxAge?: number
 }
 
 export interface VerifyProofOptions {
@@ -117,13 +88,8 @@ export interface VerifyResult {
   reason?: VerifyFailureReason
   handle?: string
   uid?: string
-  expiresAt?: number
-  cid?: string
-  method?: string
-}
-
-export interface FullVerifyResult extends VerifyResult {
-  method?: string
+  issuedAt?: number
+  attester?: Address
 }
 
 export interface SignClaimWalletClient {

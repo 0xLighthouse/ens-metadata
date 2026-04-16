@@ -1,6 +1,6 @@
 // Smoke test for the attester worker. Drives all endpoints with a real
 // SIWE signature for both the X and Telegram dev-passthrough paths,
-// then verifies the returned v3 envelopes with the SDK.
+// then verifies the returned v4 envelopes with the SDK.
 //
 // Usage:
 //   node workers/attester/scripts/smoke-test.mjs
@@ -80,33 +80,27 @@ async function runFlow({ platform, payload }) {
       : JSON.stringify(bindPlatformBody),
   )
 
-  // 5. Attest — returns v3 envelope hex
-  const expSeconds = Math.floor(Date.now() / 1000) + 3600
+  // 5. Attest — returns v4 envelope hex
   const attestRes = await fetch(`${ATTESTER}/api/attest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       sessionId: session.sessionId,
       name: 'alice.eth',
-      chainId: 1,
-      expSeconds,
-      prf: 'bafkreigh2akiscaildc6gjl5lxj3y5grqocqgjjylz57hxh2mzicvabcde',
     }),
   })
   const attestBody = await attestRes.json().catch(() => ({}))
   check('POST /api/attest', attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
 
-  // 6. Decode the v3 envelope from hex
+  // 6. Decode the v4 envelope from hex
   const envelopeBytes = hexToBytes(attestBody.claimHex)
-  check('first byte is 0xDB (CBOR tag header)', envelopeBytes[0] === 0xdb)
+  check('first byte is 0xDA (CBOR tag header)', envelopeBytes[0] === 0xda)
 
   const envelope = decodeEnvelope(envelopeBytes)
   const inner = decodePayload(envelope.payload)
+  console.log(`  envelope: v=${envelope.version} attester=${envelope.attester}`)
   console.log(
-    `  envelope: v=${envelope.v} p=${envelope.p} h=${envelope.h} method=${envelope.method}`,
-  )
-  console.log(
-    `  payload:  uid=${inner.uid.slice(0, 16)}… addr=${inner.addr} att=${inner.att}`,
+    `  payload:  platform=${inner.platform} handle=${inner.handle} uid=${inner.uid.slice(0, 16)}… addr=${inner.addr} issuedAt=${inner.issuedAt}`,
   )
 
   // 7. Verify the envelope with the SDK
@@ -121,11 +115,14 @@ async function runFlow({ platform, payload }) {
   )
 
   // 8. Verify the uid was blinded — should NOT be the raw value
-  check('inner.uid is blinded (not raw)', inner.uid !== payload.uid, `got ${inner.uid.slice(0, 16)}…`)
+  check(
+    'inner.uid is blinded (not raw)',
+    inner.uid !== payload.uid,
+    `got ${inner.uid.slice(0, 16)}…`,
+  )
 
-  // 9. Confirm handle is in the unsigned envelope, not in the signed payload
-  check('handle is in envelope (unsigned)', envelope.h === payload.handle)
-  check('handle is NOT in signed payload', !('h' in inner))
+  // 9. Confirm handle is in the signed payload
+  check('handle is in signed payload', inner.handle === payload.handle)
 
   // 10. Verify the blinded uid via ecrecover — the uid IS a signature
   //     over keccak256("platform:rawUid"), recoverable to the attester address
@@ -135,7 +132,7 @@ async function runFlow({ platform, payload }) {
     signature: inner.uid,
   })
   check(
-    'ecrecover(uid) === attester address',
+    'ecrecover(u) === attester address',
     recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase(),
     recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase()
       ? `recovered=${recoveredFromUid}`

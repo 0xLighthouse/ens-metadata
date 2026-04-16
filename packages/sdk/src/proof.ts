@@ -1,11 +1,12 @@
 import { decode as dagCborDecode, encode as dagCborEncode } from '@ipld/dag-cbor'
 import { Tagged, decode as cborgDecode, encode as cborgEncode } from 'cborg'
-import type { Address, Hex, WalletClient } from 'viem'
+import type { Address, Hex } from 'viem'
 import {
   bytesToHex,
   getAddress,
   hexToBytes,
   isAddress,
+  isHex,
   keccak256,
   recoverMessageAddress,
 } from 'viem'
@@ -19,57 +20,46 @@ import type {
 } from './proof-types'
 
 /** Current claim schema version. */
-export const CLAIM_VERSION = 3
+export const CLAIM_VERSION = 4
 
 /**
- * CBOR tag for v3 envelopes: "ensprf" as big-endian uint48.
- * Bytes: 0x65 0x6E 0x73 0x70 0x72 0x66 → decimal 111525057557094.
+ * CBOR tag for envelopes: "ensp" as big-endian uint32.
+ * Bytes: 0x65 0x6E 0x73 0x70 → decimal 1701737328.
  *
- * Detection: the first byte of the encoded envelope is 0xDB (CBOR major
- * type 6 / tag, 8-byte additional info).
+ * Detection: the first byte of the encoded envelope is 0xDA (CBOR major
+ * type 6 / tag, 4-byte additional info).
  */
-export const ENVELOPE_TAG = 111525057557094
+export const ENVELOPE_TAG = 1701737328
 
-const PAYLOAD_FIELDS = ['v', 'p', 'uid', 'name', 'chainId', 'addr', 'att', 'exp', 'prf'] as const
+const PAYLOAD_FIELD_NAMES = ['platform', 'handle', 'uid', 'name', 'issuedAt', 'addr'] as const
 
 function assertPayloadFields(fields: Partial<PayloadFields>): asserts fields is PayloadFields {
-  for (const key of PAYLOAD_FIELDS) {
+  for (const key of PAYLOAD_FIELD_NAMES) {
     if (fields[key] === undefined || fields[key] === null) {
       throw new Error(`claim: missing required payload field "${key}"`)
     }
   }
-  if (typeof fields.v !== 'number' || fields.v !== CLAIM_VERSION) {
-    throw new Error(`claim: unsupported version ${fields.v} (expected ${CLAIM_VERSION})`)
-  }
-  if (typeof fields.exp !== 'number' || !Number.isInteger(fields.exp) || fields.exp < 0) {
-    throw new Error('claim: "exp" must be a non-negative integer')
-  }
-  if (typeof fields.chainId !== 'number' || !Number.isInteger(fields.chainId) || fields.chainId < 0) {
-    throw new Error('claim: "chainId" must be a non-negative integer')
-  }
-  for (const key of ['p', 'uid', 'prf', 'name'] as const) {
-    if (typeof fields[key] !== 'string') {
-      throw new Error(`claim: "${key}" must be a string`)
+  for (const key of ['platform', 'handle', 'name'] as const) {
+    if (typeof fields[key] !== 'string' || fields[key].length === 0) {
+      throw new Error(`claim: "${key}" must be a non-empty string`)
     }
   }
-  for (const key of ['addr', 'att'] as const) {
-    if (typeof fields[key] !== 'string' || !isAddress(fields[key])) {
-      throw new Error(`claim: "${key}" must be a valid 0x-prefixed address`)
-    }
+  if (
+    typeof fields.uid !== 'string' ||
+    !isHex(fields.uid) ||
+    hexToBytes(fields.uid).length !== 65
+  ) {
+    throw new Error('claim: "uid" must be a 65-byte hex string (blinded uid signature)')
   }
-}
-
-function toPayloadRecord(fields: PayloadFields): Record<string, unknown> {
-  return {
-    v: fields.v,
-    p: fields.p,
-    uid: fields.uid,
-    name: fields.name,
-    chainId: fields.chainId,
-    addr: fields.addr,
-    att: fields.att,
-    exp: fields.exp,
-    prf: fields.prf,
+  if (
+    typeof fields.issuedAt !== 'number' ||
+    !Number.isInteger(fields.issuedAt) ||
+    fields.issuedAt < 0
+  ) {
+    throw new Error('claim: "issuedAt" must be a non-negative integer')
+  }
+  if (typeof fields.addr !== 'string' || !isAddress(fields.addr)) {
+    throw new Error('claim: "addr" must be a valid 0x-prefixed address')
   }
 }
 
@@ -77,60 +67,69 @@ function toPayloadRecord(fields: PayloadFields): Record<string, unknown> {
 
 /**
  * Encode the inner signed payload as canonical dag-cbor bytes.
- * The output is what gets hashed + signed.
+ * Maps readable TS field names to single-char CBOR keys and converts
+ * binary values from hex strings to raw bytes.
  */
 export function encodePayload(fields: PayloadFields): Uint8Array {
   assertPayloadFields(fields)
-  return dagCborEncode(toPayloadRecord(fields))
+  return dagCborEncode({
+    p: fields.platform,
+    h: fields.handle,
+    u: hexToBytes(fields.uid),
+    n: fields.name,
+    t: fields.issuedAt,
+    a: hexToBytes(fields.addr),
+  })
 }
 
 /**
  * Decode inner payload bytes back to typed fields.
+ * Maps single-char CBOR keys back to readable TS names and converts
+ * raw bytes back to hex strings.
  */
 export function decodePayload(bytes: Uint8Array): PayloadFields {
   const decoded = dagCborDecode(bytes) as Record<string, unknown>
+  const u = decoded.u
+  const a = decoded.a
+  if (!(u instanceof Uint8Array) || u.length !== 65) {
+    throw new Error('claim: payload "u" must be 65 bytes')
+  }
+  if (!(a instanceof Uint8Array) || a.length !== 20) {
+    throw new Error('claim: payload "a" (addr) must be 20 bytes')
+  }
   const partial: Partial<PayloadFields> = {
-    v: decoded.v as number,
-    p: decoded.p as string,
-    uid: decoded.uid as string,
-    name: decoded.name as string,
-    chainId: decoded.chainId as number,
-    addr: decoded.addr as Address,
-    att: decoded.att as Address,
-    exp: decoded.exp as number,
-    prf: decoded.prf as string,
+    platform: decoded.p as string,
+    handle: decoded.h as string,
+    uid: bytesToHex(u),
+    name: decoded.n as string,
+    issuedAt: decoded.t as number,
+    addr: getAddress(bytesToHex(a)),
   }
   assertPayloadFields(partial)
   return partial
 }
 
 /**
- * Encode a full v3 envelope as tagged CBOR bytes, ready to write to an
+ * Encode a full v4 envelope as tagged CBOR bytes, ready to write to an
  * ENS text record as hex.
  */
 export function encodeEnvelope(envelope: Envelope): Uint8Array {
   const map: Record<string, unknown> = {
-    v: envelope.v,
-    p: envelope.p,
-    h: envelope.h,
-    method: envelope.method,
-    issuedAt: envelope.issuedAt,
-    payload: envelope.payload,
-    sig: hexToBytes(envelope.sig),
+    v: envelope.version,
+    p: envelope.payload,
+    a: hexToBytes(envelope.attester),
+    s: hexToBytes(envelope.sig),
   }
   return cborgEncode(new Tagged(ENVELOPE_TAG, map), { float64: true })
 }
 
 /**
- * Decode tagged CBOR bytes into a v3 Envelope. Throws if the tag doesn't
+ * Decode tagged CBOR bytes into a v4 Envelope. Throws if the tag doesn't
  * match or required fields are missing.
  */
 export function decodeEnvelope(bytes: Uint8Array): Envelope {
-  // cborg v5 tag decoders receive a callable control — call it to decode
-  // the tagged content. The control also has an .entries() for maps, but
-  // we just want the full decoded value.
-  // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
   const decoded = cborgDecode(bytes, {
+    // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
     tags: { [ENVELOPE_TAG]: (decode: any) => decode() },
   })
   if (!decoded || typeof decoded !== 'object') {
@@ -141,29 +140,22 @@ export function decodeEnvelope(bytes: Uint8Array): Envelope {
   if (typeof map.v !== 'number' || map.v !== CLAIM_VERSION) {
     throw new Error(`claim: unsupported envelope version ${map.v}`)
   }
-  for (const key of ['p', 'h', 'method'] as const) {
-    if (typeof map[key] !== 'string') {
-      throw new Error(`claim: envelope missing or invalid "${key}"`)
-    }
+  if (!(map.p instanceof Uint8Array)) {
+    throw new Error('claim: envelope "p" (payload) must be bytes')
   }
-  if (typeof map.issuedAt !== 'number') {
-    throw new Error('claim: envelope missing "issuedAt"')
+  const attesterBytes = map.a
+  if (!(attesterBytes instanceof Uint8Array) || attesterBytes.length !== 20) {
+    throw new Error('claim: envelope "a" (attester) must be 20 bytes')
   }
-  if (!(map.payload instanceof Uint8Array)) {
-    throw new Error('claim: envelope "payload" must be bytes')
-  }
-  const sigBytes = map.sig
+  const sigBytes = map.s
   if (!(sigBytes instanceof Uint8Array) || sigBytes.length !== 65) {
-    throw new Error('claim: envelope "sig" must be 65 bytes')
+    throw new Error('claim: envelope "s" (sig) must be 65 bytes')
   }
 
   return {
-    v: map.v as number,
-    p: map.p as string,
-    h: map.h as string,
-    method: map.method as string,
-    issuedAt: map.issuedAt as number,
-    payload: map.payload as Uint8Array,
+    version: map.v as number,
+    payload: map.p as Uint8Array,
+    attester: getAddress(bytesToHex(attesterBytes)),
     sig: bytesToHex(sigBytes),
   }
 }
@@ -171,37 +163,29 @@ export function decodeEnvelope(bytes: Uint8Array): Envelope {
 // --- Sign / Verify ---
 
 /**
- * Sign a claim as an attester, producing a v3 envelope. The inner payload
- * is encoded as canonical dag-cbor and signed with EIP-191. The unsigned
- * metadata (h, method, issuedAt) is attached to the outer envelope.
+ * Sign a claim as an attester, producing a v4 envelope. The inner payload
+ * is encoded as canonical dag-cbor and signed with EIP-191.
  *
- * `att` is auto-populated from the attester wallet's connected account.
+ * `issuedAt` is auto-computed (current unix time).
+ * `attester` is auto-populated from the wallet's connected account.
  */
 export async function signClaim(
   input: SignClaimInput,
-  attesterWallet: WalletClient | SignClaimWalletClient,
+  attesterWallet: SignClaimWalletClient,
 ): Promise<Envelope> {
   const account = attesterWallet.account
   if (!account) {
     throw new Error('signClaim: attesterWallet has no connected account')
   }
   const attAddr = getAddress(account.address)
-  if (input.att !== undefined && getAddress(input.att) !== attAddr) {
-    throw new Error(
-      `signClaim: claim.att (${input.att}) does not match attester wallet (${attAddr})`,
-    )
-  }
 
   const payloadFields: PayloadFields = {
-    v: CLAIM_VERSION,
-    p: input.p,
+    platform: input.platform,
+    handle: input.handle,
     uid: input.uid,
     name: input.name,
-    chainId: input.chainId,
+    issuedAt: Math.floor(Date.now() / 1000),
     addr: input.addr,
-    att: attAddr,
-    exp: input.exp,
-    prf: input.prf,
   }
 
   const payloadBytes = encodePayload(payloadFields)
@@ -212,19 +196,17 @@ export async function signClaim(
   })) as Hex
 
   return {
-    v: CLAIM_VERSION,
-    p: input.p,
-    h: input.h,
-    method: input.method,
-    issuedAt: input.issuedAt,
+    version: CLAIM_VERSION,
     payload: payloadBytes,
+    attester: attAddr,
     sig,
   }
 }
 
 /**
- * Verify a v3 envelope. Decodes the inner payload, checks expiry,
- * signature integrity, trust, and optional staleness.
+ * Verify a v4 envelope. Decodes the inner payload, checks optional
+ * freshness (maxAge against issuedAt), signature integrity, trust, and
+ * optional owner match.
  */
 export async function verifyClaim(
   envelope: Envelope,
@@ -244,9 +226,11 @@ export async function verifyClaim(
     return { valid: false, reason: 'bad-signature' }
   }
 
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  if (inner.exp <= nowSeconds) {
-    return { valid: false, reason: 'expired' }
+  if (options.maxAge !== undefined) {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    if (nowSeconds - inner.issuedAt > options.maxAge) {
+      return { valid: false, reason: 'stale' }
+    }
   }
 
   let recovered: Address
@@ -260,12 +244,12 @@ export async function verifyClaim(
     return { valid: false, reason: 'bad-signature' }
   }
 
-  if (recovered.toLowerCase() !== inner.att.toLowerCase()) {
+  if (recovered.toLowerCase() !== envelope.attester.toLowerCase()) {
     return { valid: false, reason: 'bad-signature', recovered }
   }
 
   const trustedLower = options.trustedAttesters.map((a) => a.toLowerCase())
-  if (!trustedLower.includes(inner.att.toLowerCase())) {
+  if (!trustedLower.includes(envelope.attester.toLowerCase())) {
     return { valid: false, reason: 'untrusted-attester', recovered }
   }
 

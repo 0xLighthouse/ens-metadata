@@ -1,4 +1,5 @@
-import { http, createWalletClient, keccak256 } from 'viem'
+import { decode as dagCborDecode } from '@ipld/dag-cbor'
+import { http, createWalletClient, keccak256, toBytes } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { describe, expect, it } from 'vitest'
@@ -26,18 +27,23 @@ const ATTESTER_ADDR = privateKeyToAccount(ATTESTER_PRIVATE_KEY).address
 const WALLET_ADDR = privateKeyToAccount(WALLET_PRIVATE_KEY).address
 const STRANGER_ADDR = privateKeyToAccount(STRANGER_PRIVATE_KEY).address
 
+/** Generate a realistic blinded uid (65-byte EIP-191 signature). */
+async function blindUid(platform: string, rawUid: string) {
+  const wallet = makeWalletClient(ATTESTER_PRIVATE_KEY)
+  const hash = keccak256(toBytes(`${platform}:${rawUid}`))
+  return wallet.signMessage({
+    account: privateKeyToAccount(ATTESTER_PRIVATE_KEY),
+    message: { raw: hash },
+  })
+}
+
 function makeInput(overrides: Partial<Parameters<typeof signClaim>[0]> = {}) {
   return {
-    p: 'com.x',
-    h: 'vitalik',
-    uid: 'blinded-uid-abc123',
+    platform: 'com.x',
+    handle: 'vitalik',
+    uid: `0x${'ab'.repeat(65)}` as `0x${string}`,
     name: 'alice.eth',
-    chainId: 1,
     addr: WALLET_ADDR,
-    exp: Math.floor(Date.now() / 1000) + 3600,
-    prf: 'bafkreigh2akiscaildc6gjl5lxj3y5grqocqgjjylz57hxh2mzicvabcde',
-    method: 'privy-linked',
-    issuedAt: Math.floor(Date.now() / 1000),
     ...overrides,
   }
 }
@@ -67,35 +73,48 @@ describe('encodePayload / decodePayload — determinism', () => {
 
   it('two independently constructed identical payloads produce identical bytes', () => {
     const fields: PayloadFields = {
-      v: CLAIM_VERSION,
-      p: 'com.x',
-      uid: 'abc',
+      platform: 'com.x',
+      handle: 'vitalik',
+      uid: `0x${'ab'.repeat(65)}` as `0x${string}`,
       name: 'alice.eth',
-      chainId: 1,
+      issuedAt: 1800000000,
       addr: WALLET_ADDR,
-      att: ATTESTER_ADDR,
-      exp: 1800000000,
-      prf: 'bafk...',
     }
     const a = encodePayload(fields)
     const b = encodePayload({ ...fields })
     expect(Array.from(a)).toEqual(Array.from(b))
   })
+})
 
-  it('rejects unknown schema versions', () => {
-    expect(() =>
-      encodePayload({
-        v: 99,
-        p: 'com.x',
-        uid: 'x',
-        name: 'x.eth',
-        chainId: 1,
-        addr: WALLET_ADDR,
-        att: ATTESTER_ADDR,
-        exp: 9999999999,
-        prf: '',
-      }),
-    ).toThrow(/unsupported version/)
+describe('encodePayload / decodePayload — binary encoding', () => {
+  it('uid is encoded as 65 raw bytes, not a hex string', () => {
+    const fields: PayloadFields = {
+      platform: 'com.x',
+      handle: 'test',
+      uid: `0x${'ab'.repeat(65)}` as `0x${string}`,
+      name: 'test.eth',
+      issuedAt: 1000000,
+      addr: WALLET_ADDR,
+    }
+    const bytes = encodePayload(fields)
+    const raw = dagCborDecode(bytes) as Record<string, unknown>
+    expect(raw.u).toBeInstanceOf(Uint8Array)
+    expect((raw.u as Uint8Array).length).toBe(65)
+  })
+
+  it('addr is encoded as 20 raw bytes (key "a"), not a string', () => {
+    const fields: PayloadFields = {
+      platform: 'com.x',
+      handle: 'test',
+      uid: `0x${'ab'.repeat(65)}` as `0x${string}`,
+      name: 'test.eth',
+      issuedAt: 1000000,
+      addr: WALLET_ADDR,
+    }
+    const bytes = encodePayload(fields)
+    const raw = dagCborDecode(bytes) as Record<string, unknown>
+    expect(raw.a).toBeInstanceOf(Uint8Array)
+    expect((raw.a as Uint8Array).length).toBe(20)
   })
 })
 
@@ -105,32 +124,40 @@ describe('encodeEnvelope / decodeEnvelope — round-trip', () => {
     const envelope = await signClaim(makeInput(), attester)
     const bytes = encodeEnvelope(envelope)
     const decoded = decodeEnvelope(bytes)
-    expect(decoded.v).toBe(envelope.v)
-    expect(decoded.p).toBe(envelope.p)
-    expect(decoded.h).toBe(envelope.h)
-    expect(decoded.method).toBe(envelope.method)
-    expect(decoded.issuedAt).toBe(envelope.issuedAt)
+    expect(decoded.version).toBe(envelope.version)
+    expect(decoded.attester).toBe(envelope.attester)
     expect(decoded.sig).toBe(envelope.sig)
     expect(Array.from(decoded.payload)).toEqual(Array.from(envelope.payload))
   })
 
-  it('first byte is 0xDB (CBOR tag header)', async () => {
+  it('first byte is 0xDA (CBOR tag header, 4-byte value)', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     const bytes = encodeEnvelope(envelope)
-    expect(bytes[0]).toBe(0xdb)
+    expect(bytes[0]).toBe(0xda)
+  })
+
+  it('attester is encoded as 20 raw bytes (key "a") in CBOR', async () => {
+    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
+    const envelope = await signClaim(makeInput(), attester)
+    const bytes = encodeEnvelope(envelope)
+    const { decode } = await import('cborg')
+    const raw = decode(bytes, {
+      // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
+      tags: { [ENVELOPE_TAG]: (d: any) => d() },
+    }) as Record<string, unknown>
+    expect(raw.a).toBeInstanceOf(Uint8Array)
+    expect((raw.a as Uint8Array).length).toBe(20)
   })
 })
 
 describe('signClaim / verifyClaim — happy path', () => {
-  it('signs and verifies a v3 envelope', async () => {
+  it('signs and verifies a v4 envelope', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     expect(envelope.sig).toMatch(/^0x[0-9a-f]{130}$/)
-    expect(envelope.att).toBe(undefined) // att is inside payload, not on envelope
-    expect(envelope.v).toBe(CLAIM_VERSION)
-    expect(envelope.h).toBe('vitalik')
-    expect(envelope.method).toBe('privy-linked')
+    expect(envelope.version).toBe(CLAIM_VERSION)
+    expect(envelope.attester).toBe(ATTESTER_ADDR)
 
     const result = await verifyClaim(envelope, trustedWithOwner)
     expect(result.valid).toBe(true)
@@ -146,7 +173,7 @@ describe('signClaim / verifyClaim — happy path', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('verifies without expectedOwner (skips staleness check)', async () => {
+  it('verifies without expectedOwner (skips owner check)', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     const result = await verifyClaim(envelope, trusted)
@@ -154,19 +181,21 @@ describe('signClaim / verifyClaim — happy path', () => {
   })
 })
 
-describe('signClaim — att binding', () => {
-  it('auto-populates att in the inner payload from the attester wallet', async () => {
+describe('signClaim — attester binding', () => {
+  it('auto-populates attester from the wallet account', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
-    const inner = decodePayload(envelope.payload)
-    expect(inner.att).toBe(ATTESTER_ADDR)
+    expect(envelope.attester).toBe(ATTESTER_ADDR)
   })
 
-  it('throws when the pre-populated att does not match the attester wallet', async () => {
+  it('issuedAt is auto-computed as current unix time', async () => {
+    const before = Math.floor(Date.now() / 1000)
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    await expect(signClaim(makeInput({ att: STRANGER_ADDR }), attester)).rejects.toThrow(
-      /does not match attester wallet/,
-    )
+    const envelope = await signClaim(makeInput(), attester)
+    const after = Math.floor(Date.now() / 1000)
+    const inner = decodePayload(envelope.payload)
+    expect(inner.issuedAt).toBeGreaterThanOrEqual(before)
+    expect(inner.issuedAt).toBeLessThanOrEqual(after)
   })
 })
 
@@ -174,11 +203,10 @@ describe('verifyClaim — tamper detection (signed fields)', () => {
   it('rejects a tampered uid', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
-    // Tamper: re-encode the payload with a different uid
     const inner = decodePayload(envelope.payload)
     const tampered: Envelope = {
       ...envelope,
-      payload: encodePayload({ ...inner, uid: 'different' }),
+      payload: encodePayload({ ...inner, uid: `0x${'cd'.repeat(65)}` as `0x${string}` }),
     }
     const result = await verifyClaim(tampered, trustedWithOwner)
     expect(result.valid).toBe(false)
@@ -198,26 +226,39 @@ describe('verifyClaim — tamper detection (signed fields)', () => {
     expect(result.reason).toBe('bad-signature')
   })
 
-  it('rejects a tampered chainId (replay protection)', async () => {
-    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    const envelope = await signClaim(makeInput(), attester)
-    const inner = decodePayload(envelope.payload)
-    const tampered: Envelope = {
-      ...envelope,
-      payload: encodePayload({ ...inner, chainId: 11155111 }),
-    }
-    const result = await verifyClaim(tampered, trustedWithOwner)
-    expect(result.valid).toBe(false)
-    expect(result.reason).toBe('bad-signature')
-  })
-
   it('rejects a tampered platform (replay protection)', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     const inner = decodePayload(envelope.payload)
     const tampered: Envelope = {
       ...envelope,
-      payload: encodePayload({ ...inner, p: 'org.telegram' }),
+      payload: encodePayload({ ...inner, platform: 'org.telegram' }),
+    }
+    const result = await verifyClaim(tampered, trustedWithOwner)
+    expect(result.valid).toBe(false)
+    expect(result.reason).toBe('bad-signature')
+  })
+
+  it('rejects a tampered handle', async () => {
+    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
+    const envelope = await signClaim(makeInput(), attester)
+    const inner = decodePayload(envelope.payload)
+    const tampered: Envelope = {
+      ...envelope,
+      payload: encodePayload({ ...inner, handle: 'impersonator' }),
+    }
+    const result = await verifyClaim(tampered, trustedWithOwner)
+    expect(result.valid).toBe(false)
+    expect(result.reason).toBe('bad-signature')
+  })
+
+  it('rejects a tampered issuedAt', async () => {
+    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
+    const envelope = await signClaim(makeInput(), attester)
+    const inner = decodePayload(envelope.payload)
+    const tampered: Envelope = {
+      ...envelope,
+      payload: encodePayload({ ...inner, issuedAt: 0 }),
     }
     const result = await verifyClaim(tampered, trustedWithOwner)
     expect(result.valid).toBe(false)
@@ -225,36 +266,50 @@ describe('verifyClaim — tamper detection (signed fields)', () => {
   })
 })
 
-describe('verifyClaim — unsigned fields are NOT signed', () => {
-  it('changing handle does NOT invalidate the signature', async () => {
+describe('verifyClaim — freshness (maxAge)', () => {
+  it('rejects a stale claim when maxAge is set', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
-    const modified: Envelope = { ...envelope, h: 'differenthandle' }
-    const result = await verifyClaim(modified, trustedWithOwner)
+    const inner = decodePayload(envelope.payload)
+    const stalePayload = encodePayload({ ...inner, issuedAt: Math.floor(Date.now() / 1000) - 7200 })
+    const hash = keccak256(stalePayload)
+    const sig = await attester.signMessage({
+      account: privateKeyToAccount(ATTESTER_PRIVATE_KEY),
+      message: { raw: hash },
+    })
+    const staleEnvelope: Envelope = { ...envelope, payload: stalePayload, sig }
+    const result = await verifyClaim(staleEnvelope, { ...trustedWithOwner, maxAge: 3600 })
+    expect(result.valid).toBe(false)
+    expect(result.reason).toBe('stale')
+  })
+
+  it('accepts a fresh claim when maxAge is set', async () => {
+    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
+    const envelope = await signClaim(makeInput(), attester)
+    const result = await verifyClaim(envelope, { ...trustedWithOwner, maxAge: 3600 })
     expect(result.valid).toBe(true)
   })
 
-  it('changing method does NOT invalidate the signature', async () => {
+  it('skips freshness check when maxAge is not set', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
-    const modified: Envelope = { ...envelope, method: 'tlsnotary' }
-    const result = await verifyClaim(modified, trustedWithOwner)
-    expect(result.valid).toBe(true)
-  })
-
-  it('changing issuedAt does NOT invalidate the signature', async () => {
-    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    const envelope = await signClaim(makeInput(), attester)
-    const modified: Envelope = { ...envelope, issuedAt: 0 }
-    const result = await verifyClaim(modified, trustedWithOwner)
+    const inner = decodePayload(envelope.payload)
+    const oldPayload = encodePayload({ ...inner, issuedAt: 1000000000 })
+    const hash = keccak256(oldPayload)
+    const sig = await attester.signMessage({
+      account: privateKeyToAccount(ATTESTER_PRIVATE_KEY),
+      message: { raw: hash },
+    })
+    const oldEnvelope: Envelope = { ...envelope, payload: oldPayload, sig }
+    const result = await verifyClaim(oldEnvelope, trustedWithOwner)
     expect(result.valid).toBe(true)
   })
 })
 
-describe('verifyClaim — trust and staleness', () => {
+describe('verifyClaim — trust and ownership', () => {
   it('rejects a valid signature from an untrusted attester', async () => {
     const stranger = makeWalletClient(STRANGER_PRIVATE_KEY)
-    const envelope = await signClaim(makeInput({ att: STRANGER_ADDR }), stranger)
+    const envelope = await signClaim(makeInput(), stranger)
     const result = await verifyClaim(envelope, trustedWithOwner)
     expect(result.valid).toBe(false)
     expect(result.reason).toBe('untrusted-attester')
@@ -270,15 +325,21 @@ describe('verifyClaim — trust and staleness', () => {
     expect(result.valid).toBe(false)
     expect(result.reason).toBe('wrong-owner')
   })
+})
 
-  it('rejects an expired claim', async () => {
+describe('verifyClaim — uid binding via ecrecover', () => {
+  it('uid field recovers to the attester address', async () => {
+    const blinded = await blindUid('com.x', '123456789')
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    const envelope = await signClaim(
-      makeInput({ exp: Math.floor(Date.now() / 1000) - 10 }),
-      attester,
-    )
-    const result = await verifyClaim(envelope, trustedWithOwner)
-    expect(result.valid).toBe(false)
-    expect(result.reason).toBe('expired')
+    const envelope = await signClaim(makeInput({ uid: blinded }), attester)
+    const inner = decodePayload(envelope.payload)
+
+    const { recoverMessageAddress } = await import('viem')
+    const hash = keccak256(toBytes('com.x:123456789'))
+    const recovered = await recoverMessageAddress({
+      message: { raw: hash },
+      signature: inner.uid,
+    })
+    expect(recovered.toLowerCase()).toBe(ATTESTER_ADDR.toLowerCase())
   })
 })

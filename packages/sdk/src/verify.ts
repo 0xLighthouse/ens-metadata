@@ -4,7 +4,7 @@ import { hexToBytes, isAddress } from 'viem'
 import { getEnsText } from 'viem/actions'
 import { normalize } from 'viem/ens'
 import { decodeEnvelope, decodePayload, verifyClaim } from './proof'
-import type { FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof-types'
+import type { VerifyProofOptions, VerifyResult } from './proof-types'
 
 /**
  * Configuration for the proof verifier extension. The trusted-attester list
@@ -13,19 +13,15 @@ import type { FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof
  */
 export interface ProofVerifierConfig {
   trustedAttesters: readonly Address[]
+  /** Max age in seconds. If `now - issuedAt > maxAge`, the claim is stale. */
+  maxAge?: number
 }
 
 const TEXT_KEY_SUFFIX = '.proof'
 
-// Avoid pulling in the full DOM lib just for fetch.
-declare const fetch: (
-  input: string,
-  init?: unknown,
-) => Promise<{ ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
-
 /**
- * Read the ENS text record `<platform>.proof`, decode the v3 envelope,
- * and verify its attester signature + staleness against the current ENS
+ * Read the ENS text record `<platform>.proof`, decode the v4 envelope,
+ * and verify its attester signature + ownership against the current ENS
  * owner.
  */
 async function verifyProofImpl(
@@ -68,79 +64,34 @@ async function verifyProofImpl(
     const result = await verifyClaim(envelope, {
       trustedAttesters: config.trustedAttesters,
       expectedOwner: ownerAddress,
+      maxAge: config.maxAge,
     })
     if (!result.valid) {
       return {
         valid: false,
         reason: result.reason,
-        handle: envelope.h,
+        handle: inner.handle,
         uid: inner.uid,
-        expiresAt: inner.exp,
-        cid: inner.prf,
-        method: envelope.method,
+        issuedAt: inner.issuedAt,
+        attester: envelope.attester,
       }
     }
 
     return {
       valid: true,
-      handle: envelope.h,
+      handle: inner.handle,
       uid: inner.uid,
-      expiresAt: inner.exp,
-      cid: inner.prf,
-      method: envelope.method,
+      issuedAt: inner.issuedAt,
+      attester: envelope.attester,
     }
   } catch {
     return { valid: false, reason: 'decode-error' }
   }
 }
 
-/**
- * Deep-path verifier. Fetches the full proof document from IPFS, decodes
- * it, and exposes the upstream evidence. The v3 envelope already has
- * `method` in the on-chain metadata, so the deep path is mainly for
- * inspecting the raw platform evidence payload.
- */
-async function fetchAndVerifyFullProofImpl(
-  cid: string,
-  config: ProofVerifierConfig,
-  options: { gatewayUrl?: string; expectedOwner?: Address } = {},
-): Promise<FullVerifyResult> {
-  const gateway = options.gatewayUrl ?? 'https://ipfs.io/ipfs'
-  const url = `${gateway.replace(/\/$/, '')}/${cid}`
-
-  let bytes: Uint8Array
-  try {
-    const res = await fetch(url)
-    if (!res.ok) {
-      return { valid: false, reason: 'missing', cid }
-    }
-    bytes = new Uint8Array(await res.arrayBuffer())
-  } catch {
-    return { valid: false, reason: 'missing', cid }
-  }
-
-  let fullProof: { method?: unknown }
-  try {
-    const { decode } = await import('@ipld/dag-cbor')
-    fullProof = decode(bytes) as { method?: unknown }
-  } catch {
-    return { valid: false, reason: 'decode-error', cid }
-  }
-
-  return {
-    valid: true,
-    cid,
-    method: typeof fullProof.method === 'string' ? fullProof.method : undefined,
-  }
-}
-
 export function proofVerifier(config: ProofVerifierConfig) {
   return (client: PublicClient) => ({
     verifyProof: (opts: VerifyProofOptions) => verifyProofImpl(client, config, opts),
-    fetchAndVerifyFullProof: (
-      cid: string,
-      options?: { gatewayUrl?: string; expectedOwner?: Address },
-    ) => fetchAndVerifyFullProofImpl(cid, config, options),
   })
 }
 
@@ -150,12 +101,4 @@ export function verifyProof(
   opts: VerifyProofOptions,
 ): Promise<VerifyResult> {
   return verifyProofImpl(client, config, opts)
-}
-
-export function fetchAndVerifyFullProof(
-  cid: string,
-  config: ProofVerifierConfig,
-  options?: { gatewayUrl?: string; expectedOwner?: Address },
-): Promise<FullVerifyResult> {
-  return fetchAndVerifyFullProofImpl(cid, config, options)
 }

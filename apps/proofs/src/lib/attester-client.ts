@@ -64,22 +64,17 @@ export function bindPlatform(
 export interface AttestArgs {
   sessionId: string
   name: string
-  chainId: number
-  expSeconds: number
-  prf?: string
 }
 
 export interface AttestResult {
-  /** 0x-prefixed hex of the fully-encoded v3 envelope — write directly to ENS. */
+  /** 0x-prefixed hex of the fully-encoded v4 envelope — write directly to ENS. */
   claimHex: string
-  /** Envelope metadata for display in the review step. */
-  envelope: {
-    v: number
-    p: string
-    h: string
-    method: string
-    issuedAt: number
-  }
+  /** Platform namespace from the session. */
+  platform: string
+  /** Handle from the session. */
+  handle: string
+  /** Attester address. */
+  attester: string
 }
 
 export async function attest(args: AttestArgs): Promise<AttestResult> {

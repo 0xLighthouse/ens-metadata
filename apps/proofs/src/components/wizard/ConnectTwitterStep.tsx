@@ -2,7 +2,6 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useWeb3 } from '@/contexts/Web3Provider'
 import { bindPlatform } from '@/lib/attester-client'
 import {
   type DraftFullProof,
@@ -22,7 +21,6 @@ interface Props {
 }
 
 export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Props) {
-  const { publicClient } = useWeb3()
   const { user, linkTwitter } = usePrivy()
   const { wallets } = useWallets()
   const [error, setError] = useState<string | null>(null)
@@ -58,8 +56,6 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
       if (!issuer) {
         throw new Error('No wallet connected. Go back and reconnect.')
       }
-      const chainId = publicClient?.chain?.id ?? 1
-
       // Send both the Privy access token (for production) and the
       // dev-passthrough fields (uid/handle from the linked account). The
       // worker's twitter validator picks based on whether Privy creds are
@@ -79,7 +75,6 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
         twitter,
         issuerAddress: issuer as `0x${string}`,
         ensName: name,
-        chainId,
       })
       onComplete(draft)
     } catch (err) {
