@@ -99,7 +99,7 @@ async function runFlow({ platform, payload }) {
 
   const claim = attestBody.claim
   console.log(
-    `  claim.p=${claim.p}  uid=${claim.uid}  h=${claim.h}  addr=${claim.addr}  att=${claim.att}`,
+    `  claim.p=${claim.p}  uid=${claim.uid.slice(0, 16)}…  h=${claim.h}  addr=${claim.addr}  att=${claim.att}`,
   )
 
   // 6. Verify the returned signed claim with the SDK
@@ -111,6 +111,25 @@ async function runFlow({ platform, payload }) {
     'SDK verifyClaim against returned claim',
     verifyResult.valid,
     verifyResult.valid ? 'all checks pass' : JSON.stringify(verifyResult),
+  )
+
+  // 7. Verify the uid was blinded — should NOT be the raw value
+  check('claim.uid is blinded (not raw)', claim.uid !== payload.uid, `got ${claim.uid.slice(0, 16)}…`)
+
+  // 8. Call /api/blind to get the expected blinded uid, then compare
+  const blindRes = await fetch(`${ATTESTER}/api/blind`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform, uid: payload.uid }),
+  })
+  const blindBody = await blindRes.json().catch(() => ({}))
+  check('POST /api/blind', blindRes.ok, blindRes.ok ? '' : JSON.stringify(blindBody))
+  check(
+    'claim.uid === blindedUid from /api/blind',
+    claim.uid === blindBody.blindedUid,
+    claim.uid === blindBody.blindedUid
+      ? 'match'
+      : `claim=${claim.uid.slice(0, 16)}… vs blind=${(blindBody.blindedUid ?? '').slice(0, 16)}…`,
   )
 }
 

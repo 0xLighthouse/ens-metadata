@@ -1,6 +1,7 @@
 import { CLAIM_VERSION, signClaim } from '@ensmetadata/sdk'
 import { isAddress } from 'viem'
 import { attesterWallet } from '../attester'
+import { blindUid } from '../blind'
 import { jsonResponse } from '../cors'
 import type { Env } from '../env'
 
@@ -69,13 +70,19 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
   }
 
   try {
+    // Blind the raw uid before it goes into the signed claim. The on-chain
+    // text record will contain the HMAC digest, not the raw platform id.
+    // Agents verify by calling POST /api/blind with the uid they know
+    // from chat context and comparing the result to claim.uid.
+    const blinded = await blindUid(env, session.platform.platform, session.platform.uid)
+
     const wallet = attesterWallet(env)
     const signed = await signClaim(
       {
         v: CLAIM_VERSION,
         p: session.platform.platform,
         h: session.platform.handle,
-        uid: session.platform.uid,
+        uid: blinded,
         exp: expSeconds,
         prf: prf ?? '',
         name,
