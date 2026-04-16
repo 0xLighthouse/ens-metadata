@@ -83,6 +83,10 @@ export class SessionStore extends DurableObject<Env> {
     return data
   }
 
+  async evict(): Promise<void> {
+    await this.ctx.storage.deleteAll()
+  }
+
   /**
    * Alarm handler — runs at session expiry. Deleting all storage signals to
    * the Cloudflare runtime that this DO instance is no longer needed.

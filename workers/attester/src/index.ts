@@ -1,3 +1,5 @@
+import { CLAIM_VERSION, ENVELOPE_TAG } from '@ensmetadata/sdk'
+import { attesterWallet } from './attester'
 import { jsonResponse, preflightResponse } from './cors'
 import type { Env } from './env'
 import { handleAttest } from './handlers/attest'
@@ -17,6 +19,7 @@ export { SessionStore } from './session-store'
  *   POST /api/session                       — create session, get nonce
  *   POST /api/session/wallet                — bind wallet via SIWE
  *   POST /api/session/platform/:platformId  — bind platform account
+ *   POST /api/session/evict                 — evict session after tx confirmed
  *   POST /api/attest                        — issue signed claim
  */
 export default {
@@ -29,8 +32,15 @@ export default {
     const path = url.pathname
 
     if (request.method === 'GET' && path === '/') {
+      let attester: string | undefined
+      try {
+        attester = attesterWallet(env).account.address
+      } catch {}
       return jsonResponse(env, request, {
         service: 'ensmetadata-attester',
+        version: CLAIM_VERSION,
+        tag: ENVELOPE_TAG,
+        attester: attester ?? null,
         endpoints: [
           'POST /api/session',
           'POST /api/session/wallet',
@@ -54,6 +64,21 @@ export default {
 
     if (request.method === 'POST' && path === '/api/attest') {
       return handleAttest(env, request)
+    }
+
+    if (request.method === 'POST' && path === '/api/session/evict') {
+      let body: { sessionId?: string }
+      try {
+        body = await request.json()
+      } catch {
+        return jsonResponse(env, request, { error: 'invalid JSON' }, { status: 400 })
+      }
+      if (!body.sessionId) {
+        return jsonResponse(env, request, { error: 'sessionId is required' }, { status: 400 })
+      }
+      const stub = env.SESSIONS.get(env.SESSIONS.idFromName(body.sessionId))
+      await stub.evict()
+      return jsonResponse(env, request, { ok: true })
     }
     return jsonResponse(env, request, { error: 'not found' }, { status: 404 })
   },
