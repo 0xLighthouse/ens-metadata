@@ -20,10 +20,11 @@ import { mainnet } from 'viem/chains'
 import { verifyProof } from '../src/verify.js'
 
 const DEV_ATTESTER = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf' as Address
+const PROD_ATTESTER = '0xf82A259381f5632A0b12E6720C8C216B7c659783' as Address
 
 function readTrustedAttesters(): Address[] {
   const raw = process.env.TRUSTED_ATTESTERS
-  if (!raw) return [DEV_ATTESTER]
+  if (!raw) return [DEV_ATTESTER, PROD_ATTESTER]
   return raw
     .split(',')
     .map((s) => s.trim())

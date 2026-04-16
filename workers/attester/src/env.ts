@@ -9,8 +9,14 @@ export interface Env {
   // Durable Object namespace for session storage.
   SESSIONS: DurableObjectNamespace<SessionStore>
 
-  // Secrets — required.
-  ATTESTER_PRIVATE_KEY: string
+  // Secrets — one of the two signing modes must be configured.
+  // Local key (dev): raw hex private key.
+  ATTESTER_PRIVATE_KEY?: string
+  // Turnkey (prod): remote signer via Turnkey API.
+  TURNKEY_API_PUBLIC_KEY?: string
+  TURNKEY_API_PRIVATE_KEY?: string
+  TURNKEY_ORGANIZATION_ID?: string
+  TURNKEY_PRIVATE_KEY_ID?: string
 
   // Vars — required (declared in wrangler.jsonc).
   SIWE_DOMAIN: string

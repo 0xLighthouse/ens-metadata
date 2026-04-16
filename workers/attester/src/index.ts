@@ -34,8 +34,11 @@ export default {
     if (request.method === 'GET' && path === '/') {
       let attester: string | undefined
       try {
-        attester = attesterWallet(env).account.address
-      } catch {}
+        const wallet = await attesterWallet(env)
+        attester = wallet.account?.address
+      } catch (err) {
+        console.error('info: failed to resolve attester', err)
+      }
       return jsonResponse(env, request, {
         service: 'ensmetadata-attester',
         version: CLAIM_VERSION,

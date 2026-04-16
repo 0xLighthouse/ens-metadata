@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@ensmetadata/sdk": "workspace:*",
-    "viem": "2.23.15"
+    "@turnkey/api-key-stamper": "^0.6.5",
+    "@turnkey/http": "^3.18.1",
+    "@turnkey/viem": "^0.14.28",
+    "viem": "2.47.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240924.0",

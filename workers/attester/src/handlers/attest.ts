@@ -60,7 +60,7 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
   }
 
   try {
-    const wallet = attesterWallet(env)
+    const wallet = await attesterWallet(env)
     const blinded = await blindUid(session.platform.platform, session.platform.uid, wallet)
     const envelope = await signClaim(
       {

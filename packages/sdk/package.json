@@ -23,7 +23,7 @@
     "@ensdomains/ensjs": "^4.0.2",
     "@ipld/dag-cbor": "^9.2.6",
     "cborg": "^5.1.0",
-    "viem": "2.23.15"
+    "viem": "2.47.6"
   },
   "devDependencies": {
     "@ensmetadata/schemas": "workspace:*",

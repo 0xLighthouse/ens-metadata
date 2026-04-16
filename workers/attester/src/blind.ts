@@ -1,4 +1,4 @@
-import type { WalletClient } from 'viem'
+import type { Hex, WalletClient } from 'viem'
 import { keccak256, toBytes } from 'viem'
 
 /**
@@ -25,10 +25,10 @@ export async function blindUid(
   platform: string,
   uid: string,
   wallet: WalletClient,
-): Promise<string> {
+): Promise<Hex> {
   const account = wallet.account
   if (!account) throw new Error('blindUid: wallet has no connected account')
   const hash = keccak256(toBytes(`${platform}:${uid}`))
   const sig = await wallet.signMessage({ account, message: { raw: hash } })
-  return sig as string
+  return sig as Hex
 }
