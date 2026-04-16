@@ -1,6 +1,6 @@
 // Smoke test for the attester worker. Drives all endpoints with a real
 // SIWE signature for both the X and Telegram dev-passthrough paths,
-// then verifies the returned v4 envelopes with the SDK.
+// then verifies the returned v1 envelopes with the SDK.
 //
 // Usage:
 //   node workers/attester/scripts/smoke-test.mjs
@@ -80,7 +80,7 @@ async function runFlow({ platform, payload }) {
       : JSON.stringify(bindPlatformBody),
   )
 
-  // 5. Attest — returns v4 envelope hex
+  // 5. Attest — returns v1 envelope hex
   const attestRes = await fetch(`${ATTESTER}/api/attest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -92,7 +92,7 @@ async function runFlow({ platform, payload }) {
   const attestBody = await attestRes.json().catch(() => ({}))
   check('POST /api/attest', attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
 
-  // 6. Decode the v4 envelope from hex
+  // 6. Decode the v1 envelope from hex
   const envelopeBytes = hexToBytes(attestBody.claimHex)
   check('first byte is 0xDA (CBOR tag header)', envelopeBytes[0] === 0xda)
 
