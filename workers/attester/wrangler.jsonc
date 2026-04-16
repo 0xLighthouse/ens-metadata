@@ -10,10 +10,10 @@
   // tunnel URL alongside localhost to test the wizard via ngrok or
   // cloudflared without ripping out the localhost entry.
   "vars": {
-    "SIWE_DOMAIN": "localhost:3001",
-    "SIWE_ORIGIN": "http://localhost:3001",
+    "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app",
+    "SIWE_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app",
     "SESSION_TTL_SECONDS": "900",
-    "TRUSTED_ORIGIN": "http://localhost:3001"
+    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app"
   },
   // Each session is its own Durable Object instance, addressed by session id.
   // The instance holds the SIWE nonce + bound wallet + bound platform; an
