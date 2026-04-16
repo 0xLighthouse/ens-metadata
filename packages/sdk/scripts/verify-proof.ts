@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     c('dim', `  verifyProof(client, config, { name: '${name}', platform: '${platform}' })`),
   )
   console.log(c('dim', `  -> reads ENS text record "${platform}.proof"`))
-  console.log(c('dim', '  -> hex-decodes + dag-cbor decodes the v4 envelope'))
+  console.log(c('dim', '  -> hex-decodes + dag-cbor decodes the v1 envelope'))
   console.log(c('dim', '  -> resolves ENS owner'))
   console.log(c('dim', '  -> keccak256(payload), ecrecover'))
   console.log(c('dim', '  -> verifies recovered === envelope.attester, attester in trusted set'))

@@ -152,7 +152,7 @@ describe('encodeEnvelope / decodeEnvelope — round-trip', () => {
 })
 
 describe('signClaim / verifyClaim — happy path', () => {
-  it('signs and verifies a v4 envelope', async () => {
+  it('signs and verifies a v1 envelope', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     expect(envelope.sig).toMatch(/^0x[0-9a-f]{130}$/)

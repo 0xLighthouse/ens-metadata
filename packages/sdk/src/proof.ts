@@ -20,7 +20,7 @@ import type {
 } from './proof-types'
 
 /** Current claim schema version. */
-export const CLAIM_VERSION = 4
+export const CLAIM_VERSION = 1
 
 /**
  * CBOR tag for envelopes: "ensp" as big-endian uint32.
@@ -110,7 +110,7 @@ export function decodePayload(bytes: Uint8Array): PayloadFields {
 }
 
 /**
- * Encode a full v4 envelope as tagged CBOR bytes, ready to write to an
+ * Encode a full v1 envelope as tagged CBOR bytes, ready to write to an
  * ENS text record as hex.
  */
 export function encodeEnvelope(envelope: Envelope): Uint8Array {
@@ -124,7 +124,7 @@ export function encodeEnvelope(envelope: Envelope): Uint8Array {
 }
 
 /**
- * Decode tagged CBOR bytes into a v4 Envelope. Throws if the tag doesn't
+ * Decode tagged CBOR bytes into a v1 Envelope. Throws if the tag doesn't
  * match or required fields are missing.
  */
 export function decodeEnvelope(bytes: Uint8Array): Envelope {
@@ -163,7 +163,7 @@ export function decodeEnvelope(bytes: Uint8Array): Envelope {
 // --- Sign / Verify ---
 
 /**
- * Sign a claim as an attester, producing a v4 envelope. The inner payload
+ * Sign a claim as an attester, producing a v1 envelope. The inner payload
  * is encoded as canonical dag-cbor and signed with EIP-191.
  *
  * `issuedAt` is auto-computed (current unix time).
@@ -204,7 +204,7 @@ export async function signClaim(
 }
 
 /**
- * Verify a v4 envelope. Decodes the inner payload, checks optional
+ * Verify a v1 envelope. Decodes the inner payload, checks optional
  * freshness (maxAge against issuedAt), signature integrity, trust, and
  * optional owner match.
  */

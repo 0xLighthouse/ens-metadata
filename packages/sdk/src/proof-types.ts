@@ -1,9 +1,9 @@
 import type { Address, Hex, WalletClient } from 'viem'
 
-// --- v4 Envelope types ---
+// --- v1 Envelope types ---
 
 /**
- * Signed payload fields inside a v4 envelope. Changing any of these
+ * Signed payload fields inside a v1 envelope. Changing any of these
  * invalidates the signature.
  *
  * Binary values (`uid`, `addr`) are `Hex`/`Address` strings in TypeScript
@@ -27,12 +27,12 @@ export interface PayloadFields {
 }
 
 /**
- * The full v4 envelope shape. `payload` is the raw dag-cbor bytes of
+ * The full v1 envelope shape. `payload` is the raw dag-cbor bytes of
  * PayloadFields. `sig` is the EIP-191 signature over keccak256(payload).
  * `attester` is unsigned — the signature cryptographically binds the signer.
  */
 export interface Envelope {
-  /** Envelope version (4). */
+  /** Envelope version (1). */
   version: number
   /** Canonical dag-cbor bytes of the signed PayloadFields. */
   payload: Uint8Array

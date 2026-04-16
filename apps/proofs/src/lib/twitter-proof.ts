@@ -33,7 +33,7 @@ export interface PrivyTwitterProofPayload {
 }
 
 /**
- * Draft proof document. The `claim` fields match the v4 signed payload
+ * Draft proof document. The `claim` fields match the v1 signed payload
  * shape (minus `iat` which is computed by the attester at signing time).
  */
 export interface DraftFullProof {

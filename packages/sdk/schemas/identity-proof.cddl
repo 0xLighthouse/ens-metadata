@@ -1,4 +1,4 @@
-; ENS Metadata — Identity Proof Schema (v4 Envelope)
+; ENS Metadata — Identity Proof Schema (v1 Envelope)
 ;
 ; CDDL (RFC 8610) for the on-chain tagged CBOR envelope written to
 ; `<platform>.proof` (e.g. `com.x.proof`, `org.telegram.proof`) as a
@@ -14,7 +14,7 @@
 ;                        First Come First Served range (>32767)
 ;   - Signing:           EIP-191 (Ethereum Signed Data Standard)
 ;
-; v4 separates an **unsigned outer envelope** (version, attester hint, sig)
+; v1 separates an **unsigned outer envelope** (version, attester hint, sig)
 ; from a **signed inner payload** (the security-critical fields). Binary
 ; values (addresses, uid signature) are encoded as raw bytes — not hex
 ; strings — for compactness.
@@ -52,15 +52,15 @@
 ; via `iat` (issued-at): e.g. reject if `now - iat > 90 days`.
 
 ; ---------------------------------------------------------------------------
-; v4 Envelope (on-chain, tagged)
+; v1 Envelope (on-chain, tagged)
 ; ---------------------------------------------------------------------------
 ; Written to the ENS text record as `0x` + hex(cborBytes).
 
-v4-envelope = #6.1701737328(v4-envelope-map)
+v1-envelope = #6.1701737328(v1-envelope-map)
 
-v4-envelope-map = {
-  v:  4,                      ; always 4 for this format
-  p:  bstr,                   ; payload — canonical dag-cbor of v4-signed-payload
+v1-envelope-map = {
+  v:  1,                      ; always 1 for this format
+  p:  bstr,                   ; payload — canonical dag-cbor of v1-signed-payload
   a:  bstr .size 20,          ; attester address (unsigned hint)
   s:  bstr .size 65,          ; sig — EIP-191 over keccak256(p)
 }
@@ -71,7 +71,7 @@ v4-envelope-map = {
 ; `h` is signed — handle changes invalidate the proof and require
 ; re-attestation. `u` and `addr` are raw bytes, not hex strings.
 
-v4-signed-payload = {
+v1-signed-payload = {
   p:  tstr,                   ; platform namespace, e.g. "com.x"
   h:  tstr,                   ; handle at time of attestation
   u:  bstr .size 65,          ; blinded uid — personalSign(keccak256("p:rawUid"), attesterKey)

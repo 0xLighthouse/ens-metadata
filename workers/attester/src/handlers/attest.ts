@@ -15,7 +15,7 @@ import type { Env } from '../env'
  * Body: { sessionId, name }
  *   - name: ENS name being attested
  *
- * The response is the signed v4 envelope ready to write directly to the
+ * The response is the signed v1 envelope ready to write directly to the
  * `<platform>.proof` ENS text record.
  */
 export async function handleAttest(env: Env, request: Request): Promise<Response> {

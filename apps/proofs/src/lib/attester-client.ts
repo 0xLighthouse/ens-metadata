@@ -67,7 +67,7 @@ export interface AttestArgs {
 }
 
 export interface AttestResult {
-  /** 0x-prefixed hex of the fully-encoded v4 envelope — write directly to ENS. */
+  /** 0x-prefixed hex of the fully-encoded v1 envelope — write directly to ENS. */
   claimHex: string
   /** Platform namespace from the session. */
   platform: string

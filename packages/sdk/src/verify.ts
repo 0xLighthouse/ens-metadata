@@ -20,7 +20,7 @@ export interface ProofVerifierConfig {
 const TEXT_KEY_SUFFIX = '.proof'
 
 /**
- * Read the ENS text record `<platform>.proof`, decode the v4 envelope,
+ * Read the ENS text record `<platform>.proof`, decode the v1 envelope,
  * and verify its attester signature + ownership against the current ENS
  * owner.
  */
