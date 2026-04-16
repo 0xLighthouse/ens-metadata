@@ -1,4 +1,5 @@
-import { decode as cborDecode, encode as cborEncode } from '@ipld/dag-cbor'
+import { decode as dagCborDecode, encode as dagCborEncode } from '@ipld/dag-cbor'
+import { Tagged, decode as cborgDecode, encode as cborgEncode } from 'cborg'
 import type { Address, Hex, WalletClient } from 'viem'
 import {
   bytesToHex,
@@ -9,9 +10,8 @@ import {
   recoverMessageAddress,
 } from 'viem'
 import type {
-  Claim,
-  ClaimFields,
-  ClaimWithoutSig,
+  Envelope,
+  PayloadFields,
   SignClaimInput,
   SignClaimWalletClient,
   VerifyClaimOptions,
@@ -19,50 +19,35 @@ import type {
 } from './proof-types'
 
 /** Current claim schema version. */
-export const CLAIM_VERSION = 2
+export const CLAIM_VERSION = 3
 
 /**
- * Strict ordered list of claim field names. Used only for runtime validation
- * and readable error messages — dag-cbor sorts map keys itself per
- * RFC 8949 Core Deterministic Encoding, so this list does NOT influence
- * the on-the-wire byte layout.
+ * CBOR tag for v3 envelopes: "ensprf" as big-endian uint48.
+ * Bytes: 0x65 0x6E 0x73 0x70 0x72 0x66 → decimal 111525057557094.
+ *
+ * Detection: the first byte of the encoded envelope is 0xDB (CBOR major
+ * type 6 / tag, 8-byte additional info).
  */
-const CLAIM_FIELDS = [
-  'v',
-  'p',
-  'h',
-  'uid',
-  'exp',
-  'prf',
-  'name',
-  'chainId',
-  'addr',
-  'att',
-] as const
+export const ENVELOPE_TAG = 111525057557094
 
-function assertClaimFields(fields: Partial<ClaimFields>): asserts fields is ClaimFields {
-  for (const key of CLAIM_FIELDS) {
+const PAYLOAD_FIELDS = ['v', 'p', 'uid', 'name', 'chainId', 'addr', 'att', 'exp', 'prf'] as const
+
+function assertPayloadFields(fields: Partial<PayloadFields>): asserts fields is PayloadFields {
+  for (const key of PAYLOAD_FIELDS) {
     if (fields[key] === undefined || fields[key] === null) {
-      throw new Error(`claim: missing required field "${key}"`)
+      throw new Error(`claim: missing required payload field "${key}"`)
     }
   }
-  if (typeof fields.v !== 'number' || !Number.isInteger(fields.v) || fields.v < 0) {
-    throw new Error('claim: "v" must be a non-negative integer')
-  }
-  if (fields.v !== CLAIM_VERSION) {
+  if (typeof fields.v !== 'number' || fields.v !== CLAIM_VERSION) {
     throw new Error(`claim: unsupported version ${fields.v} (expected ${CLAIM_VERSION})`)
   }
   if (typeof fields.exp !== 'number' || !Number.isInteger(fields.exp) || fields.exp < 0) {
     throw new Error('claim: "exp" must be a non-negative integer')
   }
-  if (
-    typeof fields.chainId !== 'number' ||
-    !Number.isInteger(fields.chainId) ||
-    fields.chainId < 0
-  ) {
+  if (typeof fields.chainId !== 'number' || !Number.isInteger(fields.chainId) || fields.chainId < 0) {
     throw new Error('claim: "chainId" must be a non-negative integer')
   }
-  for (const key of ['p', 'h', 'uid', 'prf', 'name'] as const) {
+  for (const key of ['p', 'uid', 'prf', 'name'] as const) {
     if (typeof fields[key] !== 'string') {
       throw new Error(`claim: "${key}" must be a string`)
     }
@@ -74,108 +59,128 @@ function assertClaimFields(fields: Partial<ClaimFields>): asserts fields is Clai
   }
 }
 
-/**
- * Build a plain object containing only the fields that participate in the
- * signed hash. Order-insensitive: dag-cbor canonicalizes at encode time.
- */
-function toUnsignedRecord(claim: ClaimWithoutSig): Record<string, unknown> {
+function toPayloadRecord(fields: PayloadFields): Record<string, unknown> {
   return {
-    v: claim.v,
-    p: claim.p,
-    h: claim.h,
-    uid: claim.uid,
-    exp: claim.exp,
-    prf: claim.prf,
-    name: claim.name,
-    chainId: claim.chainId,
-    addr: claim.addr,
-    att: claim.att,
+    v: fields.v,
+    p: fields.p,
+    uid: fields.uid,
+    name: fields.name,
+    chainId: fields.chainId,
+    addr: fields.addr,
+    att: fields.att,
+    exp: fields.exp,
+    prf: fields.prf,
   }
 }
 
+// --- Encode / Decode ---
+
 /**
- * Encode a claim (signed or unsigned) as canonical dag-cbor bytes.
- *
- * dag-cbor enforces RFC 8949 Core Deterministic Encoding: map keys are
- * sorted by length then bytewise, integers use shortest form, and no
- * indefinite-length items are emitted. This is the property that makes
- * `decode(encode(x))` byte-identical across runs and across implementations
- * — signature verification depends on it.
+ * Encode the inner signed payload as canonical dag-cbor bytes.
+ * The output is what gets hashed + signed.
  */
-export function encodeClaim(fields: ClaimFields | Claim): Uint8Array {
-  assertClaimFields(fields)
-  const record: Record<string, unknown> = toUnsignedRecord(fields)
-  if ('sig' in fields && fields.sig !== undefined) {
-    record.sig = hexToBytes(fields.sig)
-  }
-  return cborEncode(record)
+export function encodePayload(fields: PayloadFields): Uint8Array {
+  assertPayloadFields(fields)
+  return dagCborEncode(toPayloadRecord(fields))
 }
 
 /**
- * Decode canonical dag-cbor bytes into a claim. Accepts both signed and
- * unsigned claims. Throws on malformed input or missing required fields.
+ * Decode inner payload bytes back to typed fields.
  */
-export function decodeClaim(bytes: Uint8Array): Claim | ClaimWithoutSig {
-  const decoded = cborDecode(bytes) as Record<string, unknown>
-  if (decoded === null || typeof decoded !== 'object') {
-    throw new Error('claim: decoded value is not a map')
-  }
-
-  const partial: Partial<ClaimFields> = {
+export function decodePayload(bytes: Uint8Array): PayloadFields {
+  const decoded = dagCborDecode(bytes) as Record<string, unknown>
+  const partial: Partial<PayloadFields> = {
     v: decoded.v as number,
     p: decoded.p as string,
-    h: decoded.h as string,
     uid: decoded.uid as string,
-    exp: decoded.exp as number,
-    prf: decoded.prf as string,
     name: decoded.name as string,
     chainId: decoded.chainId as number,
     addr: decoded.addr as Address,
     att: decoded.att as Address,
+    exp: decoded.exp as number,
+    prf: decoded.prf as string,
   }
-  assertClaimFields(partial)
-
-  if (decoded.sig !== undefined) {
-    const sigBytes = decoded.sig
-    if (!(sigBytes instanceof Uint8Array) || sigBytes.length !== 65) {
-      throw new Error('claim: "sig" must be 65 bytes')
-    }
-    return { ...partial, sig: bytesToHex(sigBytes) }
-  }
+  assertPayloadFields(partial)
   return partial
 }
 
 /**
- * Canonical keccak256 hash of a claim, excluding the `sig` field.
- * This is the value that EIP-191 wraps before signing.
+ * Encode a full v3 envelope as tagged CBOR bytes, ready to write to an
+ * ENS text record as hex.
  */
-export function hashClaim(claim: ClaimWithoutSig): Hex {
-  assertClaimFields(claim)
-  const bytes = cborEncode(toUnsignedRecord(claim))
-  return keccak256(bytes)
+export function encodeEnvelope(envelope: Envelope): Uint8Array {
+  const map: Record<string, unknown> = {
+    v: envelope.v,
+    p: envelope.p,
+    h: envelope.h,
+    method: envelope.method,
+    issuedAt: envelope.issuedAt,
+    payload: envelope.payload,
+    sig: hexToBytes(envelope.sig),
+  }
+  return cborgEncode(new Tagged(ENVELOPE_TAG, map), { float64: true })
 }
 
 /**
- * Sign a claim as an attester. Produces a `Claim` with an EIP-191
- * signature (`"\x19Ethereum Signed Message:\n32" || hash`).
+ * Decode tagged CBOR bytes into a v3 Envelope. Throws if the tag doesn't
+ * match or required fields are missing.
+ */
+export function decodeEnvelope(bytes: Uint8Array): Envelope {
+  // cborg v5 tag decoders receive a callable control — call it to decode
+  // the tagged content. The control also has an .entries() for maps, but
+  // we just want the full decoded value.
+  // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
+  const decoded = cborgDecode(bytes, {
+    tags: { [ENVELOPE_TAG]: (decode: any) => decode() },
+  })
+  if (!decoded || typeof decoded !== 'object') {
+    throw new Error('claim: decoded envelope is not a map')
+  }
+  const map = decoded as Record<string, unknown>
+
+  if (typeof map.v !== 'number' || map.v !== CLAIM_VERSION) {
+    throw new Error(`claim: unsupported envelope version ${map.v}`)
+  }
+  for (const key of ['p', 'h', 'method'] as const) {
+    if (typeof map[key] !== 'string') {
+      throw new Error(`claim: envelope missing or invalid "${key}"`)
+    }
+  }
+  if (typeof map.issuedAt !== 'number') {
+    throw new Error('claim: envelope missing "issuedAt"')
+  }
+  if (!(map.payload instanceof Uint8Array)) {
+    throw new Error('claim: envelope "payload" must be bytes')
+  }
+  const sigBytes = map.sig
+  if (!(sigBytes instanceof Uint8Array) || sigBytes.length !== 65) {
+    throw new Error('claim: envelope "sig" must be 65 bytes')
+  }
+
+  return {
+    v: map.v as number,
+    p: map.p as string,
+    h: map.h as string,
+    method: map.method as string,
+    issuedAt: map.issuedAt as number,
+    payload: map.payload as Uint8Array,
+    sig: bytesToHex(sigBytes),
+  }
+}
+
+// --- Sign / Verify ---
+
+/**
+ * Sign a claim as an attester, producing a v3 envelope. The inner payload
+ * is encoded as canonical dag-cbor and signed with EIP-191. The unsigned
+ * metadata (h, method, issuedAt) is attached to the outer envelope.
  *
- * The wallet client passed in here is the **attester's** wallet — typically
- * a backend-held key, not the end user's wallet. The connected account
- * address is stamped into the claim as `att` and is also the address that
- * `verifyClaim` will recover from `sig`.
- *
- * `addr` (the wallet observed during the session) is required from the
- * caller and is NOT auto-populated — the attester observes it via SIWE
- * during the session and supplies it explicitly. Auto-populating from the
- * signer would silently turn every attestation into a self-attestation.
- *
- * If the caller pre-populates `att`, it must match the connected account
- * or this throws.
+ * `att` is auto-populated from the attester wallet's connected account.
  */
 export async function signClaim(
   input: SignClaimInput,
   attesterWallet: WalletClient | SignClaimWalletClient,
-): Promise<Claim> {
+): Promise<Envelope> {
   const account = attesterWallet.account
   if (!account) {
     throw new Error('signClaim: attesterWallet has no connected account')
@@ -186,83 +191,88 @@ export async function signClaim(
       `signClaim: claim.att (${input.att}) does not match attester wallet (${attAddr})`,
     )
   }
-  const claim: ClaimWithoutSig = { ...input, att: attAddr }
-  assertClaimFields(claim)
-  const hash = hashClaim(claim)
-  // viem's signMessage with `message: { raw }` applies the EIP-191 prefix.
+
+  const payloadFields: PayloadFields = {
+    v: CLAIM_VERSION,
+    p: input.p,
+    uid: input.uid,
+    name: input.name,
+    chainId: input.chainId,
+    addr: input.addr,
+    att: attAddr,
+    exp: input.exp,
+    prf: input.prf,
+  }
+
+  const payloadBytes = encodePayload(payloadFields)
+  const hash = keccak256(payloadBytes)
   const sig = (await attesterWallet.signMessage({
     account,
     message: { raw: hash },
   })) as Hex
-  return { ...claim, sig }
+
+  return {
+    v: CLAIM_VERSION,
+    p: input.p,
+    h: input.h,
+    method: input.method,
+    issuedAt: input.issuedAt,
+    payload: payloadBytes,
+    sig,
+  }
 }
 
 /**
- * Verify an attester-signed claim.
- *
- * Four checks, in order:
- *   1. Version — must equal `CLAIM_VERSION`. (assertClaimFields enforces
- *      this; we surface it as `unsupported-version` rather than letting the
- *      generic decode error bubble up.)
- *   2. Expiry — `exp` must be in the future.
- *   3. Signature integrity — `ecrecover(hash, sig)` must equal `claim.att`.
- *      Because `att` is in the signed payload, tampering with any field
- *      (including `att` itself) breaks this check.
- *   4. Trusted attester — `claim.att` must appear in `options.trustedAttesters`.
- *      This is the substantive trust check: "do I accept claims signed by
- *      this attester?"
- *
- * If `options.expectedOwner` is provided, an additional staleness check
- * runs: `claim.addr` (the wallet the attester observed) must equal the
- * expected owner. Higher-level `verifyProof` resolves the current ENS
- * owner from the chain and supplies this for you.
+ * Verify a v3 envelope. Decodes the inner payload, checks expiry,
+ * signature integrity, trust, and optional staleness.
  */
 export async function verifyClaim(
-  claim: Claim,
+  envelope: Envelope,
   options: VerifyClaimOptions,
 ): Promise<VerifyClaimResult> {
+  let inner: PayloadFields
   try {
-    assertClaimFields(claim)
+    inner = decodePayload(envelope.payload)
   } catch (err) {
     if (err instanceof Error && err.message.includes('unsupported version')) {
       return { valid: false, reason: 'unsupported-version' }
     }
-    throw err
+    return { valid: false, reason: 'decode-error' }
   }
-  if (!claim.sig) {
+
+  if (!envelope.sig) {
     return { valid: false, reason: 'bad-signature' }
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000)
-  if (claim.exp <= nowSeconds) {
+  if (inner.exp <= nowSeconds) {
     return { valid: false, reason: 'expired' }
   }
 
   let recovered: Address
   try {
-    const hash = hashClaim(claim)
+    const hash = keccak256(envelope.payload)
     recovered = await recoverMessageAddress({
       message: { raw: hash },
-      signature: claim.sig,
+      signature: envelope.sig,
     })
   } catch {
     return { valid: false, reason: 'bad-signature' }
   }
 
-  if (recovered.toLowerCase() !== claim.att.toLowerCase()) {
+  if (recovered.toLowerCase() !== inner.att.toLowerCase()) {
     return { valid: false, reason: 'bad-signature', recovered }
   }
 
   const trustedLower = options.trustedAttesters.map((a) => a.toLowerCase())
-  if (!trustedLower.includes(claim.att.toLowerCase())) {
+  if (!trustedLower.includes(inner.att.toLowerCase())) {
     return { valid: false, reason: 'untrusted-attester', recovered }
   }
 
   if (options.expectedOwner) {
-    if (claim.addr.toLowerCase() !== options.expectedOwner.toLowerCase()) {
+    if (inner.addr.toLowerCase() !== options.expectedOwner.toLowerCase()) {
       return { valid: false, reason: 'wrong-owner', recovered }
     }
   }
   return { valid: true, recovered }
 }
-

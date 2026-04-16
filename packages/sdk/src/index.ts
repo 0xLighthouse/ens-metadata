@@ -3,12 +3,14 @@ export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
 export { metadataWriter, MetadataWriteError } from './write'
 export {
-  encodeClaim,
-  decodeClaim,
-  hashClaim,
+  encodePayload,
+  decodePayload,
+  encodeEnvelope,
+  decodeEnvelope,
   signClaim,
   verifyClaim,
   CLAIM_VERSION,
+  ENVELOPE_TAG,
 } from './proof'
 export {
   proofVerifier,
@@ -32,9 +34,9 @@ export type {
 } from './types'
 
 export type {
-  ClaimFields,
-  ClaimWithoutSig,
-  Claim,
+  PayloadFields,
+  EnvelopeMetadata,
+  Envelope,
   SignClaimInput,
   VerifyClaimOptions,
   VerifyClaimResult,

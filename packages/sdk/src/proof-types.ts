@@ -1,73 +1,87 @@
 import type { Address, Hex, WalletClient } from 'viem'
 
-// --- Claim types ---
+// --- v3 Envelope types ---
 
 /**
- * Fields required to construct an on-chain identity claim.
+ * Fields inside the signed payload blob of a v3 envelope. These are the
+ * security-critical fields that participate in the signature hash. Changing
+ * any of them invalidates the signature.
  *
- * Every field participates in the signed payload. The signature is produced
- * by an **attester** — a backend service that observed both the wallet
- * connection and the platform OAuth flow in a single session, then signed
- * a claim binding them together. `att` is the attester's key address; `sig`
- * is the attester's signature.
+ * `p` is signed for replay protection (prevents replaying a com.x proof
+ * as an org.telegram proof). It's also duplicated in the unsigned envelope
+ * metadata for indexing convenience.
  *
- * Replay protection: `name`, `chainId`, `addr`, and `att` are all in the
- * hash. Tampering with any of them invalidates the signature.
+ * `h` (handle) is NOT here — it's display-only and lives in the unsigned
+ * envelope metadata so it can be updated without re-attestation.
  */
-export interface ClaimFields {
+export interface PayloadFields {
   /** Schema version. */
   v: number
   /** Reverse-DNS platform namespace, e.g. "com.x", "org.telegram". */
   p: string
-  /** Handle at time of attestation, e.g. "vitalik". */
-  h: string
-  /** Platform-stable user id (canonical identity across handle changes). */
+  /** Blinded platform user id. */
   uid: string
-  /** Expiry, unix seconds. */
-  exp: number
-  /** IPFS CID of the full proof document (string form). */
-  prf: string
-  /** ENS name this claim is bound to, e.g. "alice.eth". */
+  /** ENS name this claim is bound to. */
   name: string
   /** EVM chain id the claim is valid on. */
   chainId: number
-  /**
-   * Wallet the attester observed during the session — typically via SIWE.
-   * Verifiers compare this to the current ENS owner; a mismatch means the
-   * name has transferred since attestation and the proof is stale.
-   * EIP-55 checksummed.
-   */
+  /** Wallet the attester observed during the session (via SIWE). EIP-55. */
   addr: Address
-  /**
-   * Attester key address. The signer of `sig`. Verifiers reject any claim
-   * whose `att` is not in their trusted-attester set. EIP-55 checksummed.
-   */
+  /** Attester key address — the signer of `sig`. EIP-55. */
   att: Address
+  /** Expiry, unix seconds. */
+  exp: number
+  /** Reference to the full proof document (IPFS CID or CDN URL). */
+  prf: string
 }
 
 /**
- * Input shape accepted by `signClaim`. `att` is optional here — if omitted,
- * it is auto-populated from the attester wallet client's connected account.
- * If provided, it must match the connected account or `signClaim` throws.
- *
- * Note: `addr` is required from the caller. Unlike `att`, it isn't auto-
- * populated — the attester observes it via SIWE during the session and
- * passes it explicitly when issuing the claim.
+ * Unsigned metadata in the v3 envelope. NOT signed — exists for
+ * indexing/display convenience. Can be updated without re-attestation.
  */
-export type SignClaimInput = Omit<ClaimFields, 'att'> & { att?: Address }
+export interface EnvelopeMetadata {
+  /** Envelope version (3). */
+  v: number
+  /** Platform namespace (duplicated from signed payload for indexing). */
+  p: string
+  /** Handle at time of attestation — display only. */
+  h: string
+  /** Attestation backend, e.g. "privy-linked". */
+  method: string
+  /** When the attestation was created, unix seconds. */
+  issuedAt: number
+}
 
 /**
- * A claim that has not yet been signed. Same shape as `ClaimFields` —
- * exported as a distinct type for clarity at call sites.
+ * The full v3 envelope shape as a TypeScript object (after decode or
+ * before encode). `payload` is the raw dag-cbor bytes of PayloadFields.
+ * `sig` is the EIP-191 signature over keccak256(payload).
  */
-export type ClaimWithoutSig = ClaimFields
-
-/**
- * A fully signed on-chain claim.
- */
-export interface Claim extends ClaimFields {
-  /** EIP-191 signature over canonical CBOR of the claim without `sig`. */
+export interface Envelope extends EnvelopeMetadata {
+  /** Canonical dag-cbor bytes of the signed PayloadFields. */
+  payload: Uint8Array
+  /** EIP-191 signature over keccak256(payload). */
   sig: Hex
+}
+
+/**
+ * Input to `signClaim`. `att` is optional — auto-populated from the
+ * attester wallet client. Everything else is required. `h`, `method`,
+ * and `issuedAt` end up in the unsigned envelope metadata; the rest
+ * goes into the signed payload.
+ */
+export interface SignClaimInput {
+  p: string
+  h: string
+  uid: string
+  name: string
+  chainId: number
+  addr: Address
+  att?: Address
+  exp: number
+  prf: string
+  method: string
+  issuedAt: number
 }
 
 // --- Verify types ---
@@ -88,14 +102,6 @@ export interface VerifyClaimResult {
   recovered?: Address
 }
 
-/**
- * Options for low-level `verifyClaim`. The trusted-attester set is required
- * — verifying without one would mean accepting any signer. The expected
- * owner is optional: when present, the verifier additionally checks that
- * the wallet the attester observed (`claim.addr`) is the current ENS owner
- * (the staleness check). Higher-level helpers like `verifyProof` resolve
- * the current owner from the chain and supply this for you.
- */
 export interface VerifyClaimOptions {
   trustedAttesters: readonly Address[]
   expectedOwner?: Address
@@ -113,6 +119,7 @@ export interface VerifyResult {
   uid?: string
   expiresAt?: number
   cid?: string
+  method?: string
 }
 
 export interface FullVerifyResult extends VerifyResult {

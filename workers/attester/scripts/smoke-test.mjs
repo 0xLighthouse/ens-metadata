@@ -1,6 +1,6 @@
-// Smoke test for the attester worker. Drives all four endpoints with a
-// real SIWE signature for both the X and Telegram dev-passthrough paths,
-// then verifies the returned signed claims with the SDK.
+// Smoke test for the attester worker. Drives all endpoints with a real
+// SIWE signature for both the X and Telegram dev-passthrough paths,
+// then verifies the returned v3 envelopes with the SDK.
 //
 // Usage:
 //   node workers/attester/scripts/smoke-test.mjs
@@ -8,14 +8,13 @@
 // Pre-requisite: the worker must be running locally on port 8787
 // (`pnpm attester` from the repo root).
 
-import { decodeClaim, verifyClaim } from '@ensmetadata/sdk'
+import { decodeEnvelope, decodePayload, verifyClaim } from '@ensmetadata/sdk'
+import { hexToBytes } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
 
 const ATTESTER = 'http://localhost:8787'
-// Same test key the SDK tests use — burner, never used outside tests.
 const WALLET_PK = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
-// The default ATTESTER_PRIVATE_KEY in .dev.vars.example is 0x00...01.
 const EXPECTED_ATTESTER_ADDR = privateKeyToAccount(
   '0x0000000000000000000000000000000000000000000000000000000000000001',
 ).address
@@ -33,7 +32,7 @@ async function runFlow({ platform, payload }) {
 
   // 1. Create session
   const sessionRes = await fetch(`${ATTESTER}/api/session`, { method: 'POST' })
-  check(`POST /api/session`, sessionRes.ok, `status ${sessionRes.status}`)
+  check('POST /api/session', sessionRes.ok, `status ${sessionRes.status}`)
   const session = await sessionRes.json()
   console.log(`  sessionId: ${session.sessionId}`)
 
@@ -58,7 +57,7 @@ async function runFlow({ platform, payload }) {
   })
   const bindWalletBody = await bindWalletRes.json().catch(() => ({}))
   check(
-    `POST /api/session/wallet`,
+    'POST /api/session/wallet',
     bindWalletRes.ok,
     bindWalletRes.ok ? `wallet=${bindWalletBody.wallet}` : JSON.stringify(bindWalletBody),
   )
@@ -81,7 +80,7 @@ async function runFlow({ platform, payload }) {
       : JSON.stringify(bindPlatformBody),
   )
 
-  // 5. Attest
+  // 5. Attest — returns v3 envelope hex
   const expSeconds = Math.floor(Date.now() / 1000) + 3600
   const attestRes = await fetch(`${ATTESTER}/api/attest`, {
     method: 'POST',
@@ -95,41 +94,51 @@ async function runFlow({ platform, payload }) {
     }),
   })
   const attestBody = await attestRes.json().catch(() => ({}))
-  check(`POST /api/attest`, attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
+  check('POST /api/attest', attestRes.ok, attestRes.ok ? '' : JSON.stringify(attestBody))
 
-  const claim = attestBody.claim
+  // 6. Decode the v3 envelope from hex
+  const envelopeBytes = hexToBytes(attestBody.claimHex)
+  check('first byte is 0xDB (CBOR tag header)', envelopeBytes[0] === 0xdb)
+
+  const envelope = decodeEnvelope(envelopeBytes)
+  const inner = decodePayload(envelope.payload)
   console.log(
-    `  claim.p=${claim.p}  uid=${claim.uid.slice(0, 16)}…  h=${claim.h}  addr=${claim.addr}  att=${claim.att}`,
+    `  envelope: v=${envelope.v} p=${envelope.p} h=${envelope.h} method=${envelope.method}`,
+  )
+  console.log(
+    `  payload:  uid=${inner.uid.slice(0, 16)}… addr=${inner.addr} att=${inner.att}`,
   )
 
-  // 6. Verify the returned signed claim with the SDK
-  const verifyResult = await verifyClaim(claim, {
+  // 7. Verify the envelope with the SDK
+  const verifyResult = await verifyClaim(envelope, {
     trustedAttesters: [EXPECTED_ATTESTER_ADDR],
     expectedOwner: wallet.address,
   })
   check(
-    'SDK verifyClaim against returned claim',
+    'SDK verifyClaim against returned envelope',
     verifyResult.valid,
     verifyResult.valid ? 'all checks pass' : JSON.stringify(verifyResult),
   )
 
-  // 7. Verify the uid was blinded — should NOT be the raw value
-  check('claim.uid is blinded (not raw)', claim.uid !== payload.uid, `got ${claim.uid.slice(0, 16)}…`)
+  // 8. Verify the uid was blinded — should NOT be the raw value
+  check('inner.uid is blinded (not raw)', inner.uid !== payload.uid, `got ${inner.uid.slice(0, 16)}…`)
 
-  // 8. Call /api/blind to get the expected blinded uid, then compare
+  // 9. Confirm handle is in the unsigned envelope, not in the signed payload
+  check('handle is in envelope (unsigned)', envelope.h === payload.handle)
+  check('handle is NOT in signed payload', !('h' in inner))
+
+  // 10. Call /api/blind and confirm it matches inner.uid
   const blindRes = await fetch(`${ATTESTER}/api/blind`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ platform, uid: payload.uid }),
   })
   const blindBody = await blindRes.json().catch(() => ({}))
-  check('POST /api/blind', blindRes.ok, blindRes.ok ? '' : JSON.stringify(blindBody))
+  check('POST /api/blind', blindRes.ok)
   check(
-    'claim.uid === blindedUid from /api/blind',
-    claim.uid === blindBody.blindedUid,
-    claim.uid === blindBody.blindedUid
-      ? 'match'
-      : `claim=${claim.uid.slice(0, 16)}… vs blind=${(blindBody.blindedUid ?? '').slice(0, 16)}…`,
+    'inner.uid === blindedUid from /api/blind',
+    inner.uid === blindBody.blindedUid,
+    inner.uid === blindBody.blindedUid ? 'match' : 'MISMATCH',
   )
 }
 

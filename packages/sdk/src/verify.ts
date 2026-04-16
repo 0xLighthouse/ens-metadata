@@ -1,10 +1,10 @@
 import { getOwner } from '@ensdomains/ensjs/public'
 import type { Address, Hex, PublicClient } from 'viem'
-import { isAddress } from 'viem'
+import { hexToBytes, isAddress } from 'viem'
 import { getEnsText } from 'viem/actions'
 import { normalize } from 'viem/ens'
-import { decodeClaim, verifyClaim } from './proof'
-import type { Claim, FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof-types'
+import { decodeEnvelope, decodePayload, verifyClaim } from './proof'
+import type { FullVerifyResult, VerifyProofOptions, VerifyResult } from './proof-types'
 
 /**
  * Configuration for the proof verifier extension. The trusted-attester list
@@ -12,30 +12,21 @@ import type { Claim, FullVerifyResult, VerifyProofOptions, VerifyResult } from '
  * added later if needed.
  */
 export interface ProofVerifierConfig {
-  /** Attester key addresses this verifier accepts. EIP-55 or lowercase. */
   trustedAttesters: readonly Address[]
 }
 
-/**
- * Suffix appended to the platform's reverse-DNS namespace to form the ENS
- * text record key. e.g. platform `"com.x"` → key `"com.x.proof"`.
- */
 const TEXT_KEY_SUFFIX = '.proof'
 
-// Avoid pulling in the full DOM lib just for fetch — declare the shape we use.
+// Avoid pulling in the full DOM lib just for fetch.
 declare const fetch: (
   input: string,
   init?: unknown,
 ) => Promise<{ ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
 
 /**
- * Read the ENS text record `<platform>.proof` (e.g. `com.x.proof`), decode
- * the CBOR claim, and verify its attester signature + staleness against
- * the current ENS owner.
- *
- * This is the "cheap path": no IPFS fetch, no upstream attester round-trip.
- * Use `fetchAndVerifyFullProof` for deep checks against the OAuth/HMAC
- * payload stored in IPFS.
+ * Read the ENS text record `<platform>.proof`, decode the v3 envelope,
+ * and verify its attester signature + staleness against the current ENS
+ * owner.
  */
 async function verifyProofImpl(
   client: PublicClient,
@@ -45,19 +36,6 @@ async function verifyProofImpl(
   const name = normalize(opts.name)
   const textKey = `${opts.platform}${TEXT_KEY_SUFFIX}`
 
-  // Use ensjs `getOwner` (the same call the proofs frontend uses) instead
-  // of the resolver's `addr()` record. They diverge for wrapped names: a
-  // NameWrapper-managed name's ownership lives on the wrapper contract,
-  // not in the resolver, so falling back to `addr()` would compare
-  // claim.addr against whatever the user happens to have set as their
-  // primary address — which may not be the registry/wrapper owner.
-  // `getEnsText` is the viem-built-in (no extension required).
-  //
-  // The `as never` cast on the getOwner call is a type-only escape: ensjs
-  // typing wants a `ClientWithEns` (a chain extended via addEnsContracts),
-  // but at runtime any viem PublicClient pointed at mainnet works. The
-  // burden is on the caller to use addEnsContracts(mainnet) — which the
-  // proofs frontend and the verify-proof script both do.
   const [rawTextResult, ownerResult] = await Promise.allSettled([
     getEnsText(client, { name, key: textKey }),
     getOwner(client as never, { name }),
@@ -82,50 +60,45 @@ async function verifyProofImpl(
     return { valid: false, reason: 'wrong-owner' }
   }
 
-  let claim: Claim
   try {
     const bytes = hexToBytes(rawText as Hex)
-    const decoded = decodeClaim(bytes)
-    if (!('sig' in decoded) || !decoded.sig) {
-      return { valid: false, reason: 'bad-signature' }
+    const envelope = decodeEnvelope(bytes)
+    const inner = decodePayload(envelope.payload)
+
+    const result = await verifyClaim(envelope, {
+      trustedAttesters: config.trustedAttesters,
+      expectedOwner: ownerAddress,
+    })
+    if (!result.valid) {
+      return {
+        valid: false,
+        reason: result.reason,
+        handle: envelope.h,
+        uid: inner.uid,
+        expiresAt: inner.exp,
+        cid: inner.prf,
+        method: envelope.method,
+      }
     }
-    claim = decoded as Claim
+
+    return {
+      valid: true,
+      handle: envelope.h,
+      uid: inner.uid,
+      expiresAt: inner.exp,
+      cid: inner.prf,
+      method: envelope.method,
+    }
   } catch {
     return { valid: false, reason: 'decode-error' }
-  }
-
-  const result = await verifyClaim(claim, {
-    trustedAttesters: config.trustedAttesters,
-    expectedOwner: ownerAddress,
-  })
-  if (!result.valid) {
-    return {
-      valid: false,
-      reason: result.reason,
-      handle: claim.h,
-      uid: claim.uid,
-      expiresAt: claim.exp,
-      cid: claim.prf,
-    }
-  }
-
-  return {
-    valid: true,
-    handle: claim.h,
-    uid: claim.uid,
-    expiresAt: claim.exp,
-    cid: claim.prf,
   }
 }
 
 /**
- * Deep-path verifier. Fetches the full proof document from IPFS, decodes it,
- * and re-runs the cheap-path checks over the embedded claim. Backend-specific
- * notary verification is intentionally out of scope — callers plug that in
- * based on the `method` field.
- *
- * Phase 1 note: this uses a public IPFS gateway. Callers can swap in a
- * private gateway by providing `gatewayUrl`.
+ * Deep-path verifier. Fetches the full proof document from IPFS, decodes
+ * it, and exposes the upstream evidence. The v3 envelope already has
+ * `method` in the on-chain metadata, so the deep path is mainly for
+ * inspecting the raw platform evidence payload.
  */
 async function fetchAndVerifyFullProofImpl(
   cid: string,
@@ -146,73 +119,21 @@ async function fetchAndVerifyFullProofImpl(
     return { valid: false, reason: 'missing', cid }
   }
 
-  // Full proof is a dag-cbor map with a nested `claim` field that contains
-  // the exact on-chain claim bytes logic operates on.
-  let fullProof: { claim?: unknown; method?: unknown }
+  let fullProof: { method?: unknown }
   try {
     const { decode } = await import('@ipld/dag-cbor')
-    fullProof = decode(bytes) as { claim?: unknown; method?: unknown }
+    fullProof = decode(bytes) as { method?: unknown }
   } catch {
     return { valid: false, reason: 'decode-error', cid }
-  }
-
-  let claim: Claim
-  try {
-    const inner = fullProof.claim
-    if (inner instanceof Uint8Array) {
-      const decoded = decodeClaim(inner)
-      if (!('sig' in decoded) || !decoded.sig) {
-        return { valid: false, reason: 'bad-signature', cid }
-      }
-      claim = decoded as Claim
-    } else if (inner && typeof inner === 'object') {
-      // Already-decoded nested map. Re-encode via dag-cbor to canonicalize,
-      // then decode through our schema validator so missing fields surface.
-      const { encode } = await import('@ipld/dag-cbor')
-      const decoded = decodeClaim(encode(inner as Record<string, unknown>))
-      if (!('sig' in decoded) || !decoded.sig) {
-        return { valid: false, reason: 'bad-signature', cid }
-      }
-      claim = decoded as Claim
-    } else {
-      return { valid: false, reason: 'decode-error', cid }
-    }
-  } catch {
-    return { valid: false, reason: 'decode-error', cid }
-  }
-
-  const result = await verifyClaim(claim, {
-    trustedAttesters: config.trustedAttesters,
-    expectedOwner: options.expectedOwner,
-  })
-  if (!result.valid) {
-    return {
-      valid: false,
-      reason: result.reason,
-      handle: claim.h,
-      uid: claim.uid,
-      expiresAt: claim.exp,
-      cid,
-      method: typeof fullProof.method === 'string' ? fullProof.method : undefined,
-    }
   }
 
   return {
     valid: true,
-    handle: claim.h,
-    uid: claim.uid,
-    expiresAt: claim.exp,
     cid,
     method: typeof fullProof.method === 'string' ? fullProof.method : undefined,
   }
 }
 
-/**
- * viem extension factory. Slots into `ensMetadataActions()` alongside
- * `getSchema` / `getMetadata`. The trusted-attester set is fixed at
- * extension creation; consumers configure it once based on which
- * attesters they accept.
- */
 export function proofVerifier(config: ProofVerifierConfig) {
   return (client: PublicClient) => ({
     verifyProof: (opts: VerifyProofOptions) => verifyProofImpl(client, config, opts),
@@ -223,7 +144,6 @@ export function proofVerifier(config: ProofVerifierConfig) {
   })
 }
 
-// Standalone wrappers for callers that don't want the extension pattern.
 export function verifyProof(
   client: PublicClient,
   config: ProofVerifierConfig,
@@ -238,20 +158,4 @@ export function fetchAndVerifyFullProof(
   options?: { gatewayUrl?: string; expectedOwner?: Address },
 ): Promise<FullVerifyResult> {
   return fetchAndVerifyFullProofImpl(cid, config, options)
-}
-
-function hexToBytes(hex: Hex | string): Uint8Array {
-  const clean = hex.startsWith('0x') ? hex.slice(2) : hex
-  if (clean.length % 2 !== 0) {
-    throw new Error('hex: odd length')
-  }
-  const out = new Uint8Array(clean.length / 2)
-  for (let i = 0; i < out.length; i++) {
-    const byte = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16)
-    if (Number.isNaN(byte)) {
-      throw new Error('hex: invalid character')
-    }
-    out[i] = byte
-  }
-  return out
 }

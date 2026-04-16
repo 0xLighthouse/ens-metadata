@@ -1,5 +1,5 @@
-import { CLAIM_VERSION, signClaim } from '@ensmetadata/sdk'
-import { isAddress } from 'viem'
+import { CLAIM_VERSION, encodeEnvelope, signClaim } from '@ensmetadata/sdk'
+import { bytesToHex, isAddress } from 'viem'
 import { attesterWallet } from '../attester'
 import { blindUid } from '../blind'
 import { jsonResponse } from '../cors'
@@ -70,16 +70,11 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
   }
 
   try {
-    // Blind the raw uid before it goes into the signed claim. The on-chain
-    // text record will contain the HMAC digest, not the raw platform id.
-    // Agents verify by calling POST /api/blind with the uid they know
-    // from chat context and comparing the result to claim.uid.
     const blinded = await blindUid(env, session.platform.platform, session.platform.uid)
 
     const wallet = attesterWallet(env)
-    const signed = await signClaim(
+    const envelope = await signClaim(
       {
-        v: CLAIM_VERSION,
         p: session.platform.platform,
         h: session.platform.handle,
         uid: blinded,
@@ -88,10 +83,28 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
         name,
         chainId,
         addr: session.wallet,
+        method: 'privy-linked',
+        issuedAt: Math.floor(Date.now() / 1000),
       },
       wallet,
     )
-    return jsonResponse(env, request, { claim: signed })
+
+    // Return the fully-encoded envelope as hex — ready to write directly
+    // to the ENS text record. Also include the envelope metadata for
+    // display in the frontend's review step.
+    const envelopeBytes = encodeEnvelope(envelope)
+    const claimHex = bytesToHex(envelopeBytes)
+
+    return jsonResponse(env, request, {
+      claimHex,
+      envelope: {
+        v: envelope.v,
+        p: envelope.p,
+        h: envelope.h,
+        method: envelope.method,
+        issuedAt: envelope.issuedAt,
+      },
+    })
   } catch (err) {
     return jsonResponse(
       env,

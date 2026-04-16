@@ -5,11 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { attest } from '@/lib/attester-client'
 import { type StorageTier, type UploadProofResult, uploadProof } from '@/lib/ipfs'
-import { type Claim, encodeClaim, metadataWriter } from '@ensmetadata/sdk'
+import { metadataWriter } from '@ensmetadata/sdk'
 import { encode as cborEncode } from '@ipld/dag-cbor'
 import { AlertTriangle, CheckCircle2, FileSignature } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { bytesToHex } from 'viem'
+import { useEffect, useState } from 'react'
 import type { AnyDraftFullProof } from './Wizard'
 
 interface Props {
@@ -73,11 +72,6 @@ function clearPending(ensName: string): void {
   window.sessionStorage.removeItem(pendingKey(ensName))
 }
 
-function truncateHex(hex: string): string {
-  if (hex.length <= 18) return hex
-  return `${hex.slice(0, 10)}…${hex.slice(-6)}`
-}
-
 function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   const lower = raw.toLowerCase()
@@ -93,8 +87,6 @@ function friendlyError(err: unknown): string {
 
 export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Props) {
   const { walletClient, publicClient, switchChain } = useWeb3()
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const [copied, setCopied] = useState(false)
   const [tier, setTier] = useState<StorageTier>('cdn')
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -114,31 +106,10 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
     setPending(readPending(name))
   }, [name])
 
-  const { claimHex, byteLen } = useMemo(() => {
-    if (!draft) return { claimHex: '', byteLen: 0 }
-    // The real claim is signed by the attester after we POST /api/attest;
-    // its `att` field is whatever attester key the worker is running. For
-    // the local preview we use the zero address so the bytes encode and
-    // the byte count is approximately right — the attester address adds
-    // the same number of bytes regardless of which key it is.
-    const previewAtt = '0x0000000000000000000000000000000000000000' as const
-    const bytes = encodeClaim({ ...draft.claim, att: previewAtt })
-    const hex = bytesToHex(bytes)
-    return { claimHex: hex, byteLen: bytes.length }
-  }, [draft])
-
-  const openDialog = () => dialogRef.current?.showModal()
-  const closeDialog = () => dialogRef.current?.close()
-
-  const copyHex = async () => {
-    try {
-      await navigator.clipboard.writeText(claimHex)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // clipboard may be unavailable; ignore
-    }
-  }
+  // With v3 envelopes, the attester returns the fully-encoded hex. We
+  // no longer preview a draft encoding in the frontend — the envelope
+  // includes unsigned metadata (method, issuedAt) that only exist after
+  // the attester signs.
 
   const runFlow = async (useExistingReference: string | null) => {
     if (!walletClient) {
@@ -199,13 +170,12 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
           effectiveTier = pending?.tier ?? tier
         }
 
-        // 3. Ask the attester to sign a claim. The worker checks that the
-        //    session has both a SIWE-bound wallet AND a validated platform
-        //    binding, then constructs the claim from session state (never
-        //    trusts client-supplied uid/handle/addr) and signs with its own
-        //    key. The wallet does not sign the claim.
+        // 3. Ask the attester to sign. The worker builds a v3 envelope
+        //    (signed payload + unsigned metadata), encodes it as tagged
+        //    CBOR, and returns the hex. We write it directly to ENS — no
+        //    client-side encoding needed.
         setPhase('attesting')
-        const signed: Claim = await attest({
+        const { claimHex } = await attest({
           sessionId,
           name,
           chainId: draft.claim.chainId,
@@ -213,11 +183,7 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
           prf: reference,
         })
 
-        // 4. Encode the SIGNED claim. encodeClaim(ClaimFields | Claim)
-        //    handles both branches: when `sig` is present it's included
-        //    as 65 raw bytes in the canonical dag-cbor map.
-        const signedBytes = encodeClaim(signed)
-        recordsToWrite[recordKey] = bytesToHex(signedBytes)
+        recordsToWrite[recordKey] = claimHex
       }
 
       // 5. Write everything (proof + attrs) in a single multicall via the
@@ -392,18 +358,6 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
                 <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
                 <dd className="font-mono">{recordKey}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-neutral-500 dark:text-neutral-400">Claim payload (draft)</dt>
-                <dd>
-                  <button
-                    type="button"
-                    onClick={openDialog}
-                    className="font-mono text-xs rounded-md border border-neutral-200 dark:border-neutral-700 px-2 py-1 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
-                  >
-                    {truncateHex(claimHex)} · {byteLen} B
-                  </button>
-                </dd>
-              </div>
               <div className="flex justify-between">
                 <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} handle</dt>
                 <dd className="font-mono">@{draft.claim.h}</dd>
@@ -472,63 +426,6 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
               </button>
             </div>
           </div>
-        )}
-
-        {draft && (
-          /* biome-ignore lint/a11y/useKeyWithClickEvents: native <dialog> handles Esc via the cancel event; onClick here is only for backdrop-click-to-close */
-          <dialog
-            ref={dialogRef}
-            onClick={(e) => {
-              if (e.target === dialogRef.current) closeDialog()
-            }}
-            className="backdrop:bg-black/60 rounded-lg p-0 max-w-2xl w-full bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xl"
-          >
-            <div className="p-6 space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">Claim payload</h3>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Canonical CBOR (dag-cbor), pre-signature. This is the byte preview of the inner
-                  claim — the real on-chain value differs because{' '}
-                  <span className="font-mono">prf</span>, <span className="font-mono">att</span>,
-                  and <span className="font-mono">sig</span> are all filled in by the attester
-                  worker after this is uploaded.
-                </p>
-              </div>
-
-              <div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                  Fields (JSON view)
-                </div>
-                <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto">
-                  {JSON.stringify(draft.claim, null, 2)}
-                </pre>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                    CBOR bytes ({byteLen} B, hex)
-                  </div>
-                  <button
-                    type="button"
-                    onClick={copyHex}
-                    className="text-xs rounded border border-neutral-200 dark:border-neutral-700 px-2 py-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
-                <pre className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 rounded-md p-3 overflow-x-auto break-all whitespace-pre-wrap">
-                  {claimHex}
-                </pre>
-              </div>
-
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={closeDialog}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          </dialog>
         )}
 
         {phase === 'error' && error && (

@@ -1,7 +1,5 @@
-import type { Claim } from '@ensmetadata/sdk'
-
 /**
- * Typed client for the ENS Metadata attester worker. Four endpoints, all
+ * Typed client for the ENS Metadata attester worker. Five endpoints, all
  * POST, all JSON. The session-id flows through the wizard state and is
  * persisted to sessionStorage so it survives Privy's OAuth redirect.
  */
@@ -71,7 +69,19 @@ export interface AttestArgs {
   prf?: string
 }
 
-export async function attest(args: AttestArgs): Promise<Claim> {
-  const res = await postJson<{ claim: Claim }>('/api/attest', args)
-  return res.claim
+export interface AttestResult {
+  /** 0x-prefixed hex of the fully-encoded v3 envelope — write directly to ENS. */
+  claimHex: string
+  /** Envelope metadata for display in the review step. */
+  envelope: {
+    v: number
+    p: string
+    h: string
+    method: string
+    issuedAt: number
+  }
+}
+
+export async function attest(args: AttestArgs): Promise<AttestResult> {
+  return postJson<AttestResult>('/api/attest', args)
 }

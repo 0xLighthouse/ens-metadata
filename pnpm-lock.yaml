@@ -420,6 +420,9 @@ importers:
       '@ipld/dag-cbor':
         specifier: ^9.2.6
         version: 9.2.6
+      cborg:
+        specifier: ^5.1.0
+        version: 5.1.0
       viem:
         specifier: 2.23.15
         version: 2.23.15(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
@@ -15688,7 +15691,7 @@ snapshots:
     dependencies:
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  isows@1.0.6(ws@8.18.1):
+  isows@1.0.6(ws@8.18.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       ws: 8.18.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
@@ -18900,7 +18903,7 @@ snapshots:
       '@scure/bip32': 1.6.2
       '@scure/bip39': 1.5.4
       abitype: 1.0.8(typescript@5.8.3)(zod@3.25.76)
-      isows: 1.0.6(ws@8.18.1)
+      isows: 1.0.6(ws@8.18.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       ox: 0.6.9(typescript@5.8.3)(zod@3.25.76)
       ws: 8.18.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
