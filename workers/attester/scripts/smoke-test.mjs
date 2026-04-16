@@ -9,7 +9,7 @@
 // (`pnpm attester` from the repo root).
 
 import { decodeEnvelope, decodePayload, verifyClaim } from '@ensmetadata/sdk'
-import { hexToBytes, keccak256, toBytes } from 'viem'
+import { hexToBytes, keccak256, recoverMessageAddress, toBytes } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
 
@@ -127,12 +127,19 @@ async function runFlow({ platform, payload }) {
   check('handle is in envelope (unsigned)', envelope.h === payload.handle)
   check('handle is NOT in signed payload', !('h' in inner))
 
-  // 10. Compute the blinded uid locally — no /api/blind call needed
-  const expectedBlindedUid = keccak256(toBytes(`${platform}:${payload.uid}`))
+  // 10. Verify the blinded uid via ecrecover — the uid IS a signature
+  //     over keccak256("platform:rawUid"), recoverable to the attester address
+  const uidHash = keccak256(toBytes(`${platform}:${payload.uid}`))
+  const recoveredFromUid = await recoverMessageAddress({
+    message: { raw: uidHash },
+    signature: inner.uid,
+  })
   check(
-    'inner.uid === locally computed keccak256',
-    inner.uid === expectedBlindedUid,
-    inner.uid === expectedBlindedUid ? 'match' : 'MISMATCH',
+    'ecrecover(uid) === attester address',
+    recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase(),
+    recoveredFromUid.toLowerCase() === EXPECTED_ATTESTER_ADDR.toLowerCase()
+      ? `recovered=${recoveredFromUid}`
+      : `MISMATCH: got ${recoveredFromUid}`,
   )
 }
 

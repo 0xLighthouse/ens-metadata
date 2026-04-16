@@ -1,19 +1,34 @@
+import type { WalletClient } from 'viem'
 import { keccak256, toBytes } from 'viem'
 
 /**
- * Deterministic one-way blinding of a platform uid. The output is
- * `keccak256("platform:rawUid")` — a 0x-prefixed 66-char hex string.
+ * Blind a platform uid by signing its hash with the attester's key.
  *
- * Both the attester (at sign time) and the consumer (at verify time)
- * compute the same hash from the same inputs. The consumer already knows
- * the raw uid from chat context and can verify locally — no network call
- * to the attester, no key management, no /api/blind endpoint.
+ * Construction: `personalSign(keccak256("platform:uid"), attesterKey)`
  *
- * The trade-off: an observer who reads the on-chain claim can brute-force
- * the uid space (Telegram ids are ~10B sequential integers, seconds on a
- * GPU). This is accepted — the blinding prevents casual observation and
- * bulk indexing, not targeted deanonymisation.
+ * The output is a 65-byte EIP-191 signature (0x-prefixed hex). The
+ * consumer verifies by computing the same hash from the raw uid they
+ * know, then calling `ecrecover(hash, uid)` and checking the recovered
+ * address equals `claim.att` (the attester's public key, which is already
+ * in the signed payload).
+ *
+ * Properties:
+ *   - NOT brute-forceable: producing a valid signature requires the
+ *     attester's private key, regardless of how small the uid space is
+ *   - Verifiable locally: the consumer does ecrecover + address compare,
+ *     no network call, no attester dependency at verify time
+ *   - Deterministic: RFC 6979 makes EIP-191 signatures deterministic for
+ *     a given key + message, so the same attester + platform + uid always
+ *     produces the same blinded value
  */
-export function blindUid(platform: string, uid: string): string {
-  return keccak256(toBytes(`${platform}:${uid}`))
+export async function blindUid(
+  platform: string,
+  uid: string,
+  wallet: WalletClient,
+): Promise<string> {
+  const account = wallet.account
+  if (!account) throw new Error('blindUid: wallet has no connected account')
+  const hash = keccak256(toBytes(`${platform}:${uid}`))
+  const sig = await wallet.signMessage({ account, message: { raw: hash } })
+  return sig as string
 }

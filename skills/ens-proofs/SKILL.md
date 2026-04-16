@@ -41,14 +41,23 @@ Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, plus a mainnet RP
 
 ## Verify a single proof
 
-The on-chain `claim.uid` is **blinded** — it's `keccak256("platform:rawUid")`. You compute the same hash locally from the uid you already know from chat context. No network call, no attester dependency at verify time.
+The on-chain `claim.uid` is a **signature** — `personalSign(keccak256("platform:rawUid"), attesterKey)`. To verify the binding, compute the same hash from the uid you know and `ecrecover` the signature. If the recovered address matches the attester address (`claim.att`), the binding is confirmed. No brute-force path — you can't produce a valid signature without the attester key.
 
 ```ts
 import { verifyProof } from '@ensmetadata/sdk'
-import { keccak256, toBytes } from 'viem'
+import { keccak256, recoverMessageAddress, toBytes } from 'viem'
 
-function blindUid(platform: string, rawUid: string): string {
-  return keccak256(toBytes(`${platform}:${rawUid}`))
+async function verifyUidBinding(
+  uid: string,
+  platform: string,
+  attesterAddr: string,
+): Promise<boolean> {
+  const hash = keccak256(toBytes(`${platform}:${uid}`))
+  const recovered = await recoverMessageAddress({
+    message: { raw: hash },
+    signature: uid as `0x${string}`,
+  })
+  return recovered.toLowerCase() === attesterAddr.toLowerCase()
 }
 
 export async function checkTelegram(ensName: string, expectedTgUid: string) {
@@ -60,8 +69,13 @@ export async function checkTelegram(ensName: string, expectedTgUid: string) {
   if (!result.valid) {
     return { ok: false as const, reason: result.reason }
   }
-  const expected = blindUid('org.telegram', expectedTgUid)
-  if (result.uid !== expected) {
+  // ecrecover the uid signature against the attester's known address
+  const hash = keccak256(toBytes(`org.telegram:${expectedTgUid}`))
+  const recovered = await recoverMessageAddress({
+    message: { raw: hash },
+    signature: result.uid as `0x${string}`,
+  })
+  if (recovered.toLowerCase() !== trustedAttesters[0].toLowerCase()) {
     return { ok: false as const, reason: 'wrong-user' as const }
   }
   return { ok: true as const, handle: result.handle, expiresAt: result.expiresAt }
@@ -101,11 +115,9 @@ These records are **self-asserted** — the user wrote them, no attester involve
 
 ## Trust model — read this once
 
-There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed payload. That field contains `keccak256("platform:rawUid")` — a one-way hash of the raw platform id. An on-chain observer can't read the raw uid directly, which prevents casual/bulk deanonymisation by indexers.
+There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed payload. That field is a **signature** — `personalSign(keccak256("platform:rawUid"), attesterKey)`. An on-chain observer can't reverse it, and unlike a plain hash, brute-forcing the uid space doesn't help because producing a valid signature requires the attester's private key.
 
-Your job as a verifier is to compute `keccak256(toBytes("platform:rawUid"))` from the uid you already know and compare it to `result.uid`. That's the entire binding — pure local computation, no attester call, no network dependency. The result is deterministic so you can cache it.
-
-**Privacy trade-off:** the uid spaces for Telegram (~10B sequential ids) and X are small enough that a motivated attacker can brute-force the hash in seconds on a GPU. The blinding prevents casual observation and bulk indexing, not targeted deanonymisation. This is the accepted trade-off.
+Your job as a verifier is to compute `keccak256(toBytes("platform:rawUid"))` from the uid you know and call `ecrecover(hash, claim.uid)`. If the recovered address equals the attester address (from `claim.att`), the binding is confirmed. Pure local computation — no attester call, no network dependency.
 
 Things that are **not** load-bearing:
 - `envelope.h` (the handle). Display only. Lives in the unsigned envelope metadata. May be stale.

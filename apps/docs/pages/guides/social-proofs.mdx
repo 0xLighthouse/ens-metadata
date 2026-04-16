@@ -164,11 +164,11 @@ The `method` field on the full proof document tells you which platform validator
 
 ## Trust model for verifiers
 
-There's exactly one cryptographic binding in this scheme, and verifiers — especially *agents* that already know the user's social account from some other context — must understand it explicitly: **`claim.uid` is the binding, not the handle**. The on-chain `uid` field is **blinded** — it's `keccak256("platform:rawUid")`, not the raw platform id. An on-chain observer can't read the raw uid directly, which prevents casual observation and bulk indexing by chain scrapers.
+There's exactly one cryptographic binding in this scheme, and verifiers — especially *agents* that already know the user's social account from some other context — must understand it explicitly: **`claim.uid` is the binding, not the handle**. The on-chain `uid` field is a **signature** — `personalSign(keccak256("platform:rawUid"), attesterKey)`. An on-chain observer can't reverse it, and unlike a plain hash, brute-forcing the uid space doesn't help because producing a valid signature requires the attester's private key.
 
-To verify the binding, compute the same hash locally: `keccak256(toBytes("org.telegram:12345"))` where `12345` is the raw uid you know from your chat context. Compare the result to `result.uid`. No attester call needed — the hash is deterministic and computable by anyone who knows the raw uid. Without this check, anyone can write a perfectly valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid" for a binding that has nothing to do with your user.
+To verify the binding, compute `keccak256(toBytes("org.telegram:12345"))` where `12345` is the raw uid you know from your chat context, then call `ecrecover(hash, result.uid)`. If the recovered address equals the attester address (from the signed payload's `att` field), the attester endorsed this exact platform:uid pair — binding confirmed. No attester call needed, pure local `ecrecover`. Without this check, anyone can write a perfectly valid `org.telegram.proof` linking some other Telegram account to their ENS name and the SDK will happily say "valid".
 
-The handle lives in the envelope's unsigned metadata — it's display-only and can be updated without re-attestation. The load-bearing field is always `uid`, compared in its blinded form.
+The handle lives in the envelope's unsigned metadata — it's display-only and can be updated without re-attestation. The load-bearing field is always `uid`, verified via signature recovery.
 
 ## Why this design
 
