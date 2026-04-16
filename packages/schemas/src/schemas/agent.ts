@@ -1,7 +1,7 @@
 import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
 
-const AGENT_SCHEMA_VERSION = '3.0.1'
+const AGENT_SCHEMA_VERSION = '4.0.0'
 
 export const AGENT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/agent/versions/${AGENT_SCHEMA_VERSION}`,
@@ -72,7 +72,7 @@ export const AGENT_SCHEMA: Schema = {
     },
   },
   patternProperties: {
-    '^registrations([[^]]+])?$': {
+    '^registrations(\\[[^\\]]+\\])?$': {
       type: 'string',
       // format: 'caip-29', // TODO: Research adding custom `format` values, like CAIP-29
       parameterType: 'array',
@@ -80,16 +80,22 @@ export const AGENT_SCHEMA: Schema = {
         'An array of ERC-8004 registrations belonging to the agent, following CAIP-19 format',
       examples: ['eip155:1/erc721:0x1111111111111111111111111111111111111111/0'],
     },
-    '^services([[^]]+])?$': {
+    '^services(\\[[^\\]]+\\])?$': {
       type: 'string',
       parameterType: 'map',
       format: 'uri',
       description: 'A map of service names to their endpoints',
     },
-    '^supported-trust([[^]]+])?$': {
+    '^supported-trust(\\[[^\\]]+\\])?$': {
       type: 'string',
       parameterType: 'array',
       description: 'An array of trust models supported by the agent',
+    },
+    '^social-proofs(\\[[^\\]]+\\])?$': {
+      type: 'string',
+      parameterType: 'map',
+      description:
+        'An attestation of ownership for a social media account',
     },
   },
   required: ['class', 'schema'],

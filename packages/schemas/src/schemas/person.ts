@@ -1,7 +1,7 @@
 import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
 
-const PERSON_SCHEMA_VERSION = '3.0.1'
+const PERSON_SCHEMA_VERSION = '4.0.0'
 
 export const PERSON_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/person/versions/${PERSON_SCHEMA_VERSION}`,
@@ -61,6 +61,14 @@ export const PERSON_SCHEMA: Schema = {
       type: 'string',
       description: 'Mailing address where the person can be reached',
       examples: ['123 Main St, Anytown, USA'],
+    },
+  },
+  patternProperties: {
+    '^social-proofs(\\[[^\\]]+\\])?$': {
+      type: 'string',
+      parameterType: 'map',
+      description:
+        'An attestation of ownership for a social media account',
     },
   },
   required: ['class', 'schema'],

@@ -1,7 +1,7 @@
 import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
 
-const ORGANIZATION_SCHEMA_VERSION = '3.0.1'
+const ORGANIZATION_SCHEMA_VERSION = '4.0.0'
 
 export const ORGANIZATION_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/org/versions/${ORGANIZATION_SCHEMA_VERSION}`,
@@ -39,6 +39,14 @@ export const ORGANIZATION_SCHEMA: Schema = {
       format: 'uri',
       description: 'URL pointing to information about the organization',
       examples: ['https://www.example.com/'],
+    },
+  },
+  patternProperties: {
+    '^social-proofs(\\[[^\\]]+\\])?$': {
+      type: 'string',
+      parameterType: 'map',
+      description:
+        'An attestation of ownership for a social media account',
     },
   },
   required: ['class', 'schema'],

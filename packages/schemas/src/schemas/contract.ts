@@ -1,7 +1,7 @@
 import { GITHUB_URL } from '../config/constants'
 import type { Schema } from '../types'
 
-const CONTRACT_SCHEMA_VERSION = '3.0.1'
+const CONTRACT_SCHEMA_VERSION = '3.0.2'
 
 export const CONTRACT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/contract/versions/${CONTRACT_SCHEMA_VERSION}`,
@@ -80,7 +80,7 @@ export const CONTRACT_SCHEMA: Schema = {
     },
   },
   patternProperties: {
-    '^audits([[^]]+])?$': {
+    '^audits(\\[[^\\]]+\\])?$': {
       type: 'string',
       parameterType: 'array',
       description: 'A URI pointing to an audit report',
