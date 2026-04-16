@@ -10,10 +10,7 @@
       "type": "string",
       "default": "Grant",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Grant",
-        "GrantProgram"
-      ]
+      "examples": ["Grant", "GrantProgram"]
     },
     "name": {
       "type": "string",
@@ -31,13 +28,7 @@
     "status": {
       "type": "string",
       "description": "Grant status",
-      "enum": [
-        "Active",
-        "Incomplete",
-        "Pending",
-        "Completed",
-        "Cancelled"
-      ]
+      "enum": ["Active", "Incomplete", "Pending", "Completed", "Cancelled"]
     },
     "budget": {
       "type": "string",
@@ -48,15 +39,6 @@
       "description": "Token expressed as ERC-20 token address eg. \"0x0000000000000000000000000000000000000000\""
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "name",
-    "description",
-    "url",
-    "status",
-    "budget",
-    "token"
-  ]
+  "required": ["class"],
+  "recommended": ["name", "description", "url", "status", "budget", "token"]
 }

@@ -31,14 +31,7 @@
     "category": {
       "type": "string",
       "description": "The category of the contract",
-      "examples": [
-        "defi",
-        "gaming",
-        "dao",
-        "utility",
-        "proxy",
-        "factory"
-      ]
+      "examples": ["defi", "gaming", "dao", "utility", "proxy", "factory"]
     },
     "license": {
       "type": "string",
@@ -59,12 +52,6 @@
       "description": "Third-party audit reports (URI or inline data"
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "description"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "description"]
 }

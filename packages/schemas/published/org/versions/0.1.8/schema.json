@@ -10,11 +10,7 @@
       "type": "string",
       "default": "Organization",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Organization",
-        "Foundation",
-        "OPCo"
-      ]
+      "examples": ["Organization", "Foundation", "OPCo"]
     },
     "name": {
       "type": "string",
@@ -34,13 +30,6 @@
       "description": "URL of the organization"
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "name",
-    "avatar",
-    "description",
-    "url"
-  ]
+  "required": ["class"],
+  "recommended": ["name", "avatar", "description", "url"]
 }

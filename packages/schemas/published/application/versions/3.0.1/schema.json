@@ -10,12 +10,7 @@
       "type": "string",
       "default": "Application",
       "description": "Class identifier for this node",
-      "examples": [
-        "Application",
-        "Service",
-        "Website",
-        "API"
-      ]
+      "examples": ["Application", "Service", "Website", "API"]
     },
     "schema": {
       "type": "string",
@@ -39,17 +34,12 @@
       "type": "string",
       "format": "uri",
       "description": "URL where the application is hosted or accessed",
-      "examples": [
-        "https://example.com",
-        "https://app.example.com"
-      ]
+      "examples": ["https://example.com", "https://app.example.com"]
     },
     "repository": {
       "type": "string",
       "description": "URL pointing to the source code repository",
-      "examples": [
-        "https://github.com/example/example"
-      ],
+      "examples": ["https://github.com/example/example"],
       "inherit": true
     },
     "version": {
@@ -59,20 +49,9 @@
     "status": {
       "type": "string",
       "description": "The current status of the application",
-      "enum": [
-        "Active",
-        "Development",
-        "Deprecated"
-      ]
+      "enum": ["Active", "Development", "Deprecated"]
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "description",
-    "url"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "description", "url"]
 }

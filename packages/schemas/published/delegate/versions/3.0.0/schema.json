@@ -19,17 +19,13 @@
     "alias": {
       "type": "string",
       "description": "Display name of the delegate",
-      "examples": [
-        "JDoe"
-      ],
+      "examples": ["JDoe"],
       "inherit": true
     },
     "description": {
       "type": "string",
       "description": "Profile or introduction of the delegate",
-      "examples": [
-        "John Doe is a delegate for the DAO"
-      ],
+      "examples": ["John Doe is a delegate for the DAO"],
       "inherit": true
     },
     "avatar": {
@@ -46,9 +42,7 @@
     "legal-name": {
       "type": "string",
       "description": "Legal name of the delegate",
-      "examples": [
-        "John Doe"
-      ],
+      "examples": ["John Doe"],
       "inherit": true
     },
     "statement": {
@@ -64,9 +58,7 @@
     "forum-handle": {
       "type": "string",
       "description": "The delegate's default forum handle",
-      "examples": [
-        "johndoe"
-      ],
+      "examples": ["johndoe"],
       "inherit": true
     }
   },
@@ -74,36 +66,22 @@
     "^statement(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Delegate statements written for specific organizations, labeled by the organization's ENS name",
-      "examples": [
-        "statement[dao.eth] = \"I am a delegate for the DAO\""
-      ],
+      "examples": ["statement[dao.eth] = \"I am a delegate for the DAO\""],
       "inherit": true
     },
     "^conflict-of-interest(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Conflict of interest declarations written for specific organizations, labeled by the organization's ENS name",
-      "examples": [
-        "conflict-of-interest[dao.eth] = \"I have no conflicts of interest\""
-      ],
+      "examples": ["conflict-of-interest[dao.eth] = \"I have no conflicts of interest\""],
       "inherit": true
     },
     "^forum-handle(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Specific forum handles the delegate uses for each organization, labeled by the organization's ENS name",
-      "examples": [
-        "forum-handle[dao.eth] = \"johndoe\""
-      ],
+      "examples": ["forum-handle[dao.eth] = \"johndoe\""],
       "inherit": true
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "statement",
-    "conflict-of-interest",
-    "forum-handle"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "statement", "conflict-of-interest", "forum-handle"]
 }

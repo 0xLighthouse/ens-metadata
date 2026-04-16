@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const GROUP_SCHEMA_VERSION = '3.0.1';
+const GROUP_SCHEMA_VERSION = '3.0.1'
 
 export const GROUP_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/group/versions/${GROUP_SCHEMA_VERSION}`,
@@ -28,11 +28,11 @@ export const GROUP_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'URI pointing to the group\'s avatar',
+      description: "URI pointing to the group's avatar",
     },
     description: {
       type: 'string',
-      description: 'Short description of the group\'s purpose and responsibility',
+      description: "Short description of the group's purpose and responsibility",
     },
     url: {
       type: 'string',
@@ -48,15 +48,15 @@ export const GROUP_SCHEMA: Schema = {
       type: 'string',
       description: 'Title or role of the group leader',
       examples: ['Lead Steward', 'Chair', 'Manager', 'Owner'],
-      inherit: true
+      inherit: true,
     },
     'members-title': {
       type: 'string',
       description: 'Title or role of the group members',
       examples: ['Member', 'Steward', 'Contributor', 'Participant'],
-      inherit: true
+      inherit: true,
     },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'lead', 'avatar', 'url', 'description']
+  recommended: ['alias', 'lead', 'avatar', 'url', 'description'],
 }

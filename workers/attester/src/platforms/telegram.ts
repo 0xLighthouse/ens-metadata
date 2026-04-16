@@ -59,10 +59,7 @@ async function callPrivy(env: Env, accessToken: string): Promise<PrivyUser> {
   return (await res.json()) as PrivyUser
 }
 
-async function validate(
-  env: Env,
-  payload: unknown,
-): Promise<PlatformValidationResult> {
+async function validate(env: Env, payload: unknown): Promise<PlatformValidationResult> {
   const p = (payload ?? {}) as TelegramPayload
 
   if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {

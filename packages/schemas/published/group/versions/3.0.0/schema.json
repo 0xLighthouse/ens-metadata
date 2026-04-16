@@ -10,14 +10,7 @@
       "type": "string",
       "default": "Group",
       "description": "Class identifier for this node",
-      "examples": [
-        "Group",
-        "Committee",
-        "Council",
-        "Workgroup",
-        "Team",
-        "Department"
-      ]
+      "examples": ["Group", "Committee", "Council", "Workgroup", "Team", "Department"]
     },
     "schema": {
       "type": "string",
@@ -40,9 +33,7 @@
       "type": "string",
       "format": "uri",
       "description": "URL pointing to information about the group",
-      "examples": [
-        "https://www.example.com/groups/example-group"
-      ]
+      "examples": ["https://www.example.com/groups/example-group"]
     },
     "lead": {
       "type": "string",
@@ -51,35 +42,16 @@
     "lead-title": {
       "type": "string",
       "description": "Title or role of the group leader",
-      "examples": [
-        "Lead Steward",
-        "Chair",
-        "Manager",
-        "Owner"
-      ],
+      "examples": ["Lead Steward", "Chair", "Manager", "Owner"],
       "inherit": true
     },
     "members-title": {
       "type": "string",
       "description": "Title or role of the group members",
-      "examples": [
-        "Member",
-        "Steward",
-        "Contributor",
-        "Participant"
-      ],
+      "examples": ["Member", "Steward", "Contributor", "Participant"],
       "inherit": true
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "lead",
-    "avatar",
-    "url",
-    "description"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "lead", "avatar", "url", "description"]
 }

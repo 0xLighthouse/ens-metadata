@@ -10,11 +10,7 @@
       "type": "string",
       "default": "Application",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Application",
-        "Service",
-        "Website"
-      ]
+      "examples": ["Application", "Service", "Website"]
     },
     "name": {
       "type": "string",
@@ -40,20 +36,9 @@
     "status": {
       "type": "string",
       "description": "Application status",
-      "enum": [
-        "Active",
-        "Development",
-        "Deprecated"
-      ]
+      "enum": ["Active", "Development", "Deprecated"]
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "name",
-    "description",
-    "url",
-    "status"
-  ]
+  "required": ["class"],
+  "recommended": ["name", "description", "url", "status"]
 }

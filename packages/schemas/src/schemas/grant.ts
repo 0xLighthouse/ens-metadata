@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const GRANT_SCHEMA_VERSION = '3.0.1';
+const GRANT_SCHEMA_VERSION = '3.0.1'
 
 export const GRANT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/grant/versions/${GRANT_SCHEMA_VERSION}`,
@@ -32,8 +32,8 @@ export const GRANT_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'URI pointing to the grant\'s avatar',
-      inherit: true
+      description: "URI pointing to the grant's avatar",
+      inherit: true,
     },
     url: {
       type: 'string',
@@ -53,8 +53,8 @@ export const GRANT_SCHEMA: Schema = {
     token: {
       type: 'string',
       description: 'The address of the ERC-20 token used to fund the grant',
-    }
+    },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'description', 'url', 'status', 'budget', 'token']
+  recommended: ['alias', 'description', 'url', 'status', 'budget', 'token'],
 }

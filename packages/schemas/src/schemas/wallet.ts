@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const WALLET_SCHEMA_VERSION = '3.0.1';
+const WALLET_SCHEMA_VERSION = '3.0.1'
 
 export const WALLET_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/wallet/versions/${WALLET_SCHEMA_VERSION}`,
@@ -28,9 +28,9 @@ export const WALLET_SCHEMA: Schema = {
     },
     description: {
       type: 'string',
-      description: 'Description of the wallet\'s purpose',
+      description: "Description of the wallet's purpose",
     },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'description']
+  recommended: ['alias', 'description'],
 }

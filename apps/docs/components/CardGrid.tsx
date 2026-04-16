@@ -5,10 +5,5 @@ interface CardGridProps {
 }
 
 export function CardGrid({ children }: CardGridProps) {
-  return (
-    <div className="card-grid">
-      {children}
-      
-    </div>
-  )
+  return <div className="card-grid">{children}</div>
 }

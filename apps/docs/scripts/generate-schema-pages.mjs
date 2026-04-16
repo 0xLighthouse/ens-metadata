@@ -10,9 +10,7 @@ const registryPath = path.join(repoRoot, 'packages/schemas/published/_registry.j
 const pagesDir = path.join(repoRoot, 'apps/docs/pages/schemas')
 
 function toTitleCase(value) {
-  return value
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  return value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function sortVersionsDescending(versions) {
@@ -101,7 +99,11 @@ function buildPage({
   const pageTitle = schema?.title || toTitleCase(schemaId)
   const source = schema?.source || 'N/A'
   const description = schema?.description || 'No description provided.'
-  const attributesTable = renderAttributesTable(schema?.properties, schema?.required, schema?.recommended)
+  const attributesTable = renderAttributesTable(
+    schema?.properties,
+    schema?.required,
+    schema?.recommended,
+  )
   const versionHistoryTable = renderVersionHistory(versions, publishedByVersion, latestVersion)
 
   return `---
@@ -142,14 +144,15 @@ function buildGlobalsPage({
 }) {
   const versionHistoryTable = renderVersionHistory(versions, publishedByVersion, latestVersion)
 
-  const schemaSections = Object.entries(schema.schemas || {}).map(([key, sub]) => {
-    const sectionTitle = sub.title || toTitleCase(key)
-    const description = sub.description || 'No description provided.'
-    const source = sub.source || sub.$id
-    const sourceLink = source ? `[${source}](${source})` : 'N/A'
-    const attributesTable = renderAttributesTable(sub.properties, sub.required, sub.recommended)
+  const schemaSections = Object.entries(schema.schemas || {})
+    .map(([key, sub]) => {
+      const sectionTitle = sub.title || toTitleCase(key)
+      const description = sub.description || 'No description provided.'
+      const source = sub.source || sub.$id
+      const sourceLink = source ? `[${source}](${source})` : 'N/A'
+      const attributesTable = renderAttributesTable(sub.properties, sub.required, sub.recommended)
 
-    return `## ${sectionTitle}
+      return `## ${sectionTitle}
 
 ${description}
 
@@ -158,7 +161,8 @@ Source: ${sourceLink}
 ### Attributes
 
 ${attributesTable}`
-  }).join('\n')
+    })
+    .join('\n')
 
   return `---
 title: Globals
@@ -221,7 +225,9 @@ function main() {
     fs.writeFileSync(path.join(pagesDir, `${schemaId}.mdx`), page, 'utf8')
   })
 
-  console.log(`Generated ${entries.length} schema page(s) from ${path.relative(repoRoot, registryPath)}`)
+  console.log(
+    `Generated ${entries.length} schema page(s) from ${path.relative(repoRoot, registryPath)}`,
+  )
 }
 
 main()

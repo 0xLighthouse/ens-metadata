@@ -10,15 +10,7 @@
       "type": "string",
       "default": "Person",
       "description": "Class identifier for this node",
-      "examples": [
-        "Person",
-        "Human",
-        "Signer",
-        "Signatory",
-        "Officer",
-        "Employee",
-        "Secretary"
-      ]
+      "examples": ["Person", "Human", "Signer", "Signatory", "Officer", "Employee", "Secretary"]
     },
     "schema": {
       "type": "string",
@@ -32,9 +24,7 @@
     "description": {
       "type": "string",
       "description": "Profile or introduction of the person",
-      "examples": [
-        "John Doe is a software engineer at Example Inc."
-      ]
+      "examples": ["John Doe is a software engineer at Example Inc."]
     },
     "avatar": {
       "type": "string",
@@ -43,9 +33,7 @@
     "legal-name": {
       "type": "string",
       "description": "Legal name of the person",
-      "examples": [
-        "John Doe"
-      ]
+      "examples": ["John Doe"]
     },
     "title": {
       "type": "string",
@@ -64,33 +52,20 @@
       "type": "string",
       "format": "email",
       "description": "Email address of the person",
-      "examples": [
-        "john.doe@example.com"
-      ]
+      "examples": ["john.doe@example.com"]
     },
     "phone": {
       "type": "string",
       "format": "tel",
       "description": "Phone number of the person",
-      "examples": [
-        "+1234567890"
-      ]
+      "examples": ["+1234567890"]
     },
     "mail": {
       "type": "string",
       "description": "Mailing address where the person can be reached",
-      "examples": [
-        "123 Main St, Anytown, USA"
-      ]
+      "examples": ["123 Main St, Anytown, USA"]
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "legal-name",
-    "title"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "legal-name", "title"]
 }

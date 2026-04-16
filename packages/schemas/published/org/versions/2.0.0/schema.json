@@ -10,14 +10,7 @@
       "type": "string",
       "default": "Organization",
       "description": "Class identifier for this node",
-      "examples": [
-        "Organization",
-        "Foundation",
-        "OPCo",
-        "DAO",
-        "DUNA",
-        "LLC"
-      ]
+      "examples": ["Organization", "Foundation", "OPCo", "DAO", "DUNA", "LLC"]
     },
     "schema": {
       "type": "string",
@@ -40,18 +33,9 @@
       "type": "string",
       "format": "uri",
       "description": "URL pointing to information about the organization",
-      "examples": [
-        "https://www.example.com/"
-      ]
+      "examples": ["https://www.example.com/"]
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "name",
-    "description",
-    "url"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["name", "description", "url"]
 }

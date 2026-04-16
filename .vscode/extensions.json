@@ -1,7 +1,7 @@
 {
-    "recommendations": [
-        "ms-python.vscode-pylance",
-        "shd101wyy.markdown-preview-enhanced",
-        "bradlc.vscode-tailwindcss"
-    ]
+  "recommendations": [
+    "ms-python.vscode-pylance",
+    "shd101wyy.markdown-preview-enhanced",
+    "bradlc.vscode-tailwindcss"
+  ]
 }

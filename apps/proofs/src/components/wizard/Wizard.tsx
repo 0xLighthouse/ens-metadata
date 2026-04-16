@@ -103,8 +103,7 @@ function computeSteps(config: IncomingConfig): StepEntry[] {
   }
 
   // Show the attributes step if the URL asks for any text records.
-  const wantsAttrs =
-    config.requestedAttrs.length > 0 || !!config.classValue || !!config.schemaUri
+  const wantsAttrs = config.requestedAttrs.length > 0 || !!config.classValue || !!config.schemaUri
   if (wantsAttrs) {
     steps.push({ kind: 'attrs', label: 'Profile' })
   }
@@ -166,8 +165,7 @@ export function Wizard() {
   } = useSchema(incomingConfig.schemaUri, incomingConfig.requestedAttrs)
 
   // Default platform: first allowed if the URL constrained it, else com.x.
-  const initialPlatform: Platform =
-    incomingConfig.allowedPlatforms[0] ?? 'com.x'
+  const initialPlatform: Platform = incomingConfig.allowedPlatforms[0] ?? 'com.x'
   const [platform, setPlatform] = useState<Platform>(initialPlatform)
 
   useEffect(() => {

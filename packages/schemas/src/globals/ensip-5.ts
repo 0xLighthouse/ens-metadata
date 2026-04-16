@@ -1,11 +1,12 @@
-import type { Schema } from "../types";
+import type { Schema } from '../types'
 
 export const ENSIP5: Schema = {
   $id: 'https://docs.ens.domains/ensip/5',
   source: 'https://docs.ens.domains/ensip/5',
   title: 'ENSIP-5',
   version: '1.0.0',
-  description: 'A group of entities that have been empowered by a larger organization to undertake some activity.',
+  description:
+    'A group of entities that have been empowered by a larger organization to undertake some activity.',
   type: 'object' as const,
   properties: {
     avatar: {
@@ -18,7 +19,8 @@ export const ENSIP5: Schema = {
     },
     display: {
       type: 'string',
-      description: 'A canonical display name for the ENS name; this MUST match the ENS name when its case is folded, and clients should ignore this value if it does not (e.g. "ricmoo.eth" could set this to "RicMoo.eth")',
+      description:
+        'A canonical display name for the ENS name; this MUST match the ENS name when its case is folded, and clients should ignore this value if it does not (e.g. "ricmoo.eth" could set this to "RicMoo.eth")',
     },
     email: {
       type: 'string',
@@ -26,7 +28,8 @@ export const ENSIP5: Schema = {
     },
     keywords: {
       type: 'string',
-      description: 'A list of comma-separated keywords, ordered by most significant first; clients that interpresent this field may choose a threshold beyond which to ignore',
+      description:
+        'A list of comma-separated keywords, ordered by most significant first; clients that interpresent this field may choose a threshold beyond which to ignore',
     },
     mail: {
       type: 'string',
@@ -48,5 +51,5 @@ export const ENSIP5: Schema = {
       type: 'string',
       description: 'A website URL',
     },
-  }
+  },
 }

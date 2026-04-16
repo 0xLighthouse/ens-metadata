@@ -68,9 +68,7 @@
       "type": "string",
       "parameterType": "array",
       "description": "An array of ERC-8004 registrations belonging to the agent, following CAIP-19 format",
-      "examples": [
-        "eip155:1/erc721:0x1111111111111111111111111111111111111111/0"
-      ]
+      "examples": ["eip155:1/erc721:0x1111111111111111111111111111111111111111/0"]
     },
     "^services([[^]]+])?$": {
       "type": "string",
@@ -84,14 +82,6 @@
       "description": "An array of trust models supported by the agent"
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "agent-uri",
-    "alias",
-    "description",
-    "avatar"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["agent-uri", "alias", "description", "avatar"]
 }

@@ -45,11 +45,6 @@
       "description": "JSON array of third-party audit reports"
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "alias",
-    "description"
-  ]
+  "required": ["class"],
+  "recommended": ["alias", "description"]
 }

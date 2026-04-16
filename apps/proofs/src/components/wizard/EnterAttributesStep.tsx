@@ -148,9 +148,8 @@ export function EnterAttributesStep({
         <CardTitle>{schema?.title ? `${schema.title} profile` : 'Profile attributes'}</CardTitle>
         <CardDescription>
           {schema?.description ? <>{schema.description} </> : null}
-          Fill in the records the agent asked for on{' '}
-          <span className="font-mono">{name}</span>. Existing values are pre-loaded; only fields
-          you change will get written.
+          Fill in the records the agent asked for on <span className="font-mono">{name}</span>.
+          Existing values are pre-loaded; only fields you change will get written.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -206,9 +205,7 @@ export function EnterAttributesStep({
                   id={`attr-${key}`}
                   type={inputType}
                   value={current}
-                  onChange={(e) =>
-                    setValues((prev) => ({ ...prev, [key]: e.target.value }))
-                  }
+                  onChange={(e) => setValues((prev) => ({ ...prev, [key]: e.target.value }))}
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}

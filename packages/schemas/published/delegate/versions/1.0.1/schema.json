@@ -51,14 +51,6 @@
       "description": "Forum handle per organization (e.g. forum-handle[dao.eth])"
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "address",
-    "display-name",
-    "statement",
-    "conflict-of-interest",
-    "forum-handle"
-  ]
+  "required": ["class"],
+  "recommended": ["address", "display-name", "statement", "conflict-of-interest", "forum-handle"]
 }

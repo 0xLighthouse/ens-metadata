@@ -10,10 +10,7 @@
       "type": "string",
       "default": "Treasury",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Treasury",
-        "Vault"
-      ]
+      "examples": ["Treasury", "Vault"]
     },
     "name": {
       "type": "string",
@@ -24,11 +21,6 @@
       "description": "A description of the name"
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "name",
-    "description"
-  ]
+  "required": ["class"],
+  "recommended": ["name", "description"]
 }

@@ -10,14 +10,7 @@
       "type": "string",
       "default": "Person",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Person",
-        "Human",
-        "Signer",
-        "Officer",
-        "Employee",
-        "Secretary"
-      ]
+      "examples": ["Person", "Human", "Signer", "Officer", "Employee", "Secretary"]
     },
     "full-name": {
       "type": "string",

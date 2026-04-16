@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const PERSON_SCHEMA_VERSION = '3.0.1';
+const PERSON_SCHEMA_VERSION = '3.0.1'
 
 export const PERSON_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/person/versions/${PERSON_SCHEMA_VERSION}`,
@@ -33,7 +33,7 @@ export const PERSON_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'URI pointing to the person\'s avatar'
+      description: "URI pointing to the person's avatar",
     },
     'legal-name': {
       type: 'string',
@@ -62,8 +62,7 @@ export const PERSON_SCHEMA: Schema = {
       description: 'Mailing address where the person can be reached',
       examples: ['123 Main St, Anytown, USA'],
     },
-
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'legal-name', 'title']
+  recommended: ['alias', 'legal-name', 'title'],
 }

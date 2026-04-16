@@ -42,10 +42,7 @@ interface PrivyUser {
   linked_accounts?: PrivyLinkedAccount[]
 }
 
-async function callPrivy(
-  env: Env,
-  accessToken: string,
-): Promise<PrivyUser> {
+async function callPrivy(env: Env, accessToken: string): Promise<PrivyUser> {
   const appId = env.PRIVY_APP_ID
   const appSecret = env.PRIVY_APP_SECRET
   if (!appId || !appSecret) {
@@ -70,10 +67,7 @@ async function callPrivy(
   return (await res.json()) as PrivyUser
 }
 
-async function validate(
-  env: Env,
-  payload: unknown,
-): Promise<PlatformValidationResult> {
+async function validate(env: Env, payload: unknown): Promise<PlatformValidationResult> {
   const p = (payload ?? {}) as TwitterPayload
 
   if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {

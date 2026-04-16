@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const APPLICATION_SCHEMA_VERSION = '3.0.1';
+const APPLICATION_SCHEMA_VERSION = '3.0.1'
 
 export const APPLICATION_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/application/versions/${APPLICATION_SCHEMA_VERSION}`,
@@ -32,9 +32,9 @@ export const APPLICATION_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'URI pointing to the application\'s avatar',
+      description: "URI pointing to the application's avatar",
       // NOTE: Can inherit the logo of the organization
-      inherit: true
+      inherit: true,
     },
     url: {
       type: 'string',
@@ -46,7 +46,7 @@ export const APPLICATION_SCHEMA: Schema = {
       type: 'string',
       description: 'URL pointing to the source code repository',
       examples: ['https://github.com/example/example'],
-      inherit: true
+      inherit: true,
     },
     version: {
       type: 'string',
@@ -59,5 +59,5 @@ export const APPLICATION_SCHEMA: Schema = {
     },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'description', 'url']
+  recommended: ['alias', 'description', 'url'],
 }

@@ -10,15 +10,7 @@
       "type": "string",
       "default": "Person",
       "description": "Class identifier for this node",
-      "examples": [
-        "Person",
-        "Human",
-        "Signer",
-        "Signatory",
-        "Officer",
-        "Employee",
-        "Secretary"
-      ]
+      "examples": ["Person", "Human", "Signer", "Signatory", "Officer", "Employee", "Secretary"]
     },
     "schema": {
       "type": "string",
@@ -28,9 +20,7 @@
     "full-name": {
       "type": "string",
       "description": "Full legal or preferred name of the person",
-      "examples": [
-        "John Doe"
-      ]
+      "examples": ["John Doe"]
     },
     "title": {
       "type": "string",
@@ -46,12 +36,6 @@
       ]
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "full-name",
-    "title"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["full-name", "title"]
 }

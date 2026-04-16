@@ -38,24 +38,13 @@
     "category": {
       "type": "string",
       "description": "The category of the contract",
-      "examples": [
-        "defi",
-        "gaming",
-        "dao",
-        "utility",
-        "proxy",
-        "factory"
-      ],
+      "examples": ["defi", "gaming", "dao", "utility", "proxy", "factory"],
       "inherit": true
     },
     "license": {
       "type": "string",
       "description": "Software license for the source code in SPDX format",
-      "examples": [
-        "MIT",
-        "GPL-3.0-only",
-        "Apache-2.0"
-      ],
+      "examples": ["MIT", "GPL-3.0-only", "Apache-2.0"],
       "inherit": true
     },
     "docs": {
@@ -93,12 +82,6 @@
       "inherit": true
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "description"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "description"]
 }

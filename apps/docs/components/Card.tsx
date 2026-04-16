@@ -10,13 +10,13 @@ interface CardProps {
   moreText?: string
 }
 
-export function Card({ 
-  title, 
-  description, 
-  icon, 
-  tokenIcon, 
-  href = '#', 
-  moreText = 'More' 
+export function Card({
+  title,
+  description,
+  icon,
+  tokenIcon,
+  href = '#',
+  moreText = 'More',
 }: CardProps) {
   return (
     <div className="card">
@@ -24,8 +24,8 @@ export function Card({
         <h3 className="card-title">{title}</h3>
         <div className="card-icon">
           {tokenIcon ? (
-            <img 
-              src={`https://tokenicons.io/api/icon/${tokenIcon}`} 
+            <img
+              src={`https://tokenicons.io/api/icon/${tokenIcon}`}
               alt={title}
               width={24}
               height={24}
@@ -35,13 +35,12 @@ export function Card({
           )}
         </div>
       </div>
-      
+
       <p className="card-description">{description}</p>
-      
+
       <a href={href} className="card-link">
         {moreText} <ArrowRight size={16} />
       </a>
-      
     </div>
   )
 }

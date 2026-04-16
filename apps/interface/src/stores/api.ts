@@ -10,11 +10,7 @@ import { resolveApiError } from '@/lib/api/utils/resolveApiError'
  * Transforms an upstream service error into a user-friendly error.
  * Logs the original error for debugging and returns a sanitized error for the UI.
  */
-function handleUpstreamError(
-  error: unknown,
-  serviceName: string,
-  errorCode?: ErrorCode,
-): Error {
+function handleUpstreamError(error: unknown, serviceName: string, errorCode?: ErrorCode): Error {
   // Always log the original error for debugging
   console.error(`[${serviceName}] Upstream service error:`, error)
 

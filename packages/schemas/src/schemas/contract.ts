@@ -1,20 +1,20 @@
-import { GITHUB_URL } from "../config/constants";
-import type { Schema } from "../types";
+import { GITHUB_URL } from '../config/constants'
+import type { Schema } from '../types'
 
-const CONTRACT_SCHEMA_VERSION = '3.0.1';
+const CONTRACT_SCHEMA_VERSION = '3.0.1'
 
 export const CONTRACT_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/contract/versions/${CONTRACT_SCHEMA_VERSION}`,
   source: GITHUB_URL,
   title: 'Contract',
   version: CONTRACT_SCHEMA_VERSION,
-  description: 'An on-chain smart contract found at this node\'s resolved address.',
+  description: "An on-chain smart contract found at this node's resolved address.",
   type: 'object' as const,
   properties: {
     class: {
       type: 'string',
       default: 'Contract',
-      description: 'Class identifier for this node'
+      description: 'Class identifier for this node',
     },
     schema: {
       type: 'string',
@@ -31,62 +31,62 @@ export const CONTRACT_SCHEMA: Schema = {
     },
     avatar: {
       type: 'string',
-      description: 'URI pointing to the contract\'s or owner\'s avatar',
-      inherit: true
+      description: "URI pointing to the contract's or owner's avatar",
+      inherit: true,
     },
     url: {
       type: 'string',
       format: 'uri',
-      description: 'URL pointing to the project\'s website',
-      inherit: true
+      description: "URL pointing to the project's website",
+      inherit: true,
     },
     category: {
       type: 'string',
       description: 'The category of the contract',
       examples: ['defi', 'gaming', 'dao', 'utility', 'proxy', 'factory'],
-      inherit: true
+      inherit: true,
     },
     license: {
       type: 'string',
       description: 'Software license for the source code in SPDX format',
       examples: ['MIT', 'GPL-3.0-only', 'Apache-2.0'],
-      inherit: true
+      inherit: true,
     },
     docs: {
       type: 'string',
       description: 'Primary documentation URL for developers and users',
       format: 'uri',
-      inherit: true
+      inherit: true,
     },
     audits: {
       type: 'string',
       description: 'URI pointing to third-party audit reports',
-      inherit: true
+      inherit: true,
     },
-    "com.github": {
+    'com.github': {
       type: 'string',
       description: 'GitHub repository',
-      inherit: true
+      inherit: true,
     },
     'com.twitter': {
       type: 'string',
       description: 'X/Twitter handle',
-      inherit: true
+      inherit: true,
     },
     'org.telegram': {
       type: 'string',
       description: 'Telegram handle',
-      inherit: true
-    }
+      inherit: true,
+    },
   },
   patternProperties: {
-    '^audits(\[[^\]]+\])?$': {
+    '^audits([[^]]+])?$': {
       type: 'string',
       parameterType: 'array',
       description: 'A URI pointing to an audit report',
-      inherit: true
+      inherit: true,
     },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'description']
-};
+  recommended: ['alias', 'description'],
+}

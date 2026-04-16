@@ -10,10 +10,7 @@
       "type": "string",
       "default": "Wallet",
       "description": "Class identifier for this node",
-      "examples": [
-        "Wallet",
-        "Account"
-      ]
+      "examples": ["Wallet", "Account"]
     },
     "schema": {
       "type": "string",
@@ -29,12 +26,6 @@
       "description": "Description of the wallet's purpose"
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "description"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "description"]
 }

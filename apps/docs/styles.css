@@ -4,11 +4,11 @@
   --card-gap-mobile: 20px;
   --card-padding: 24px;
   --card-margin-vertical: 40px;
-  
+
   /* Custom border radius */
   --card-border-radius: 8px;
   --card-icon-border-radius: 8px;
-  
+
   /* Custom card colors */
   --card-border: rgba(255, 255, 255, 0.08);
   --card-background: rgba(255, 255, 255, 0.02);

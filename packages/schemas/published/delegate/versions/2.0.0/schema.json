@@ -19,16 +19,12 @@
     "legal-name": {
       "type": "string",
       "description": "The full name of the delegate",
-      "examples": [
-        "John Doe"
-      ]
+      "examples": ["John Doe"]
     },
     "display-name": {
       "type": "string",
       "description": "Display name or username of the delegate",
-      "examples": [
-        "JDoe"
-      ]
+      "examples": ["JDoe"]
     },
     "statement": {
       "type": "string",
@@ -41,42 +37,26 @@
     "forum-handle": {
       "type": "string",
       "description": "The delegate's default forum handle",
-      "examples": [
-        "johndoe"
-      ]
+      "examples": ["johndoe"]
     }
   },
   "patternProperties": {
     "^statement(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Delegate statements written for specific organizations, labeled by the organization's ENS name",
-      "examples": [
-        "statement[dao.eth] = \"I am a delegate for the DAO\""
-      ]
+      "examples": ["statement[dao.eth] = \"I am a delegate for the DAO\""]
     },
     "^conflict-of-interest(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Conflict of interest declarations written for specific organizations, labeled by the organization's ENS name",
-      "examples": [
-        "conflict-of-interest[dao.eth] = \"I have no conflicts of interest\""
-      ]
+      "examples": ["conflict-of-interest[dao.eth] = \"I have no conflicts of interest\""]
     },
     "^forum-handle(\\[[^\\]]+\\])?$": {
       "type": "string",
       "description": "Specific forum handles the delegate uses for each organization, labeled by the organization's ENS name",
-      "examples": [
-        "forum-handle[dao.eth] = \"johndoe\""
-      ]
+      "examples": ["forum-handle[dao.eth] = \"johndoe\""]
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "display-name",
-    "statement",
-    "conflict-of-interest",
-    "forum-handle"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["display-name", "statement", "conflict-of-interest", "forum-handle"]
 }

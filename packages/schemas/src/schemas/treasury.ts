@@ -1,7 +1,7 @@
-import type { Schema } from "../types";
-import { GITHUB_URL } from "../config/constants";
+import type { Schema } from '../types'
+import { GITHUB_URL } from '../config/constants'
 
-const TREASURY_SCHEMA_VERSION = '3.0.1';
+const TREASURY_SCHEMA_VERSION = '3.0.1'
 
 export const TREASURY_SCHEMA: Schema = {
   $id: `${GITHUB_URL}/tree/main/packages/schemas/published/treasury/versions/${TREASURY_SCHEMA_VERSION}`,
@@ -32,5 +32,5 @@ export const TREASURY_SCHEMA: Schema = {
     },
   },
   required: ['class', 'schema'],
-  recommended: ['alias', 'description']
+  recommended: ['alias', 'description'],
 }

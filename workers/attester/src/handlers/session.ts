@@ -14,7 +14,12 @@ export async function handleSession(env: Env, request: Request): Promise<Respons
 
   const ttl = Number(env.SESSION_TTL_SECONDS)
   if (!Number.isFinite(ttl) || ttl <= 0) {
-    return jsonResponse(env, request, { error: 'SESSION_TTL_SECONDS misconfigured' }, { status: 500 })
+    return jsonResponse(
+      env,
+      request,
+      { error: 'SESSION_TTL_SECONDS misconfigured' },
+      { status: 500 },
+    )
   }
 
   const stub = env.SESSIONS.get(env.SESSIONS.idFromName(sessionId))

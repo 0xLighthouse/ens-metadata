@@ -10,20 +10,13 @@
       "type": "string",
       "default": "Wallet",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Wallet",
-        "Account"
-      ]
+      "examples": ["Wallet", "Account"]
     },
     "description": {
       "type": "string",
       "description": "Indicates the purpose of the wallet"
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "description"
-  ]
+  "required": ["class"],
+  "recommended": ["description"]
 }

@@ -10,10 +10,7 @@
       "type": "string",
       "default": "Treasury",
       "description": "Class identifier for this node",
-      "examples": [
-        "Treasury",
-        "Vault"
-      ]
+      "examples": ["Treasury", "Vault"]
     },
     "schema": {
       "type": "string",
@@ -29,12 +26,6 @@
       "description": "Description of the treasury"
     }
   },
-  "required": [
-    "class",
-    "schema"
-  ],
-  "recommended": [
-    "alias",
-    "description"
-  ]
+  "required": ["class", "schema"],
+  "recommended": ["alias", "description"]
 }

@@ -10,13 +10,7 @@
       "type": "string",
       "default": "Group",
       "description": "High-level identifier of this node type",
-      "examples": [
-        "Group",
-        "Committee",
-        "Council",
-        "Workgroup",
-        "Team"
-      ]
+      "examples": ["Group", "Committee", "Council", "Workgroup", "Team"]
     },
     "name": {
       "type": "string",
@@ -42,32 +36,14 @@
     "lead-title": {
       "type": "string",
       "description": "Title or role of the group leader",
-      "examples": [
-        "Lead Steward",
-        "Chair",
-        "Manager",
-        "Owner"
-      ]
+      "examples": ["Lead Steward", "Chair", "Manager", "Owner"]
     },
     "members-title": {
       "type": "string",
       "description": "Title or role of the group members",
-      "examples": [
-        "Member",
-        "Steward",
-        "Contributor",
-        "Participant"
-      ]
+      "examples": ["Member", "Steward", "Contributor", "Participant"]
     }
   },
-  "required": [
-    "class"
-  ],
-  "recommended": [
-    "name",
-    "lead",
-    "avatar",
-    "url",
-    "description"
-  ]
+  "required": ["class"],
+  "recommended": ["name", "lead", "avatar", "url", "description"]
 }
