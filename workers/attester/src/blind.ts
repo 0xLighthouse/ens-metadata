@@ -1,61 +1,19 @@
-import type { Env } from './env'
+import { keccak256, toBytes } from 'viem'
 
 /**
- * Deterministic one-way blinding of a platform uid. The output is a
- * hex-encoded HMAC-SHA256 digest keyed by the attester's private key.
+ * Deterministic one-way blinding of a platform uid. The output is
+ * `keccak256("platform:rawUid")` — a 0x-prefixed 66-char hex string.
  *
- * Properties:
- *   - Same attester key + same platform + same uid → same output, always.
- *     Agents can cache the result and poll without re-calling /api/blind.
- *   - One-way: an observer who reads the on-chain claim can't recover the
- *     raw uid without the attester key. Unlike a plain hash, brute-forcing
- *     the uid space doesn't help because the key is unknown.
- *   - Platform-scoped: the same uid on two different platforms produces
- *     different blinded values, preventing cross-platform linkage.
+ * Both the attester (at sign time) and the consumer (at verify time)
+ * compute the same hash from the same inputs. The consumer already knows
+ * the raw uid from chat context and can verify locally — no network call
+ * to the attester, no key management, no /api/blind endpoint.
  *
- * The key is imported once per isolate lifetime and cached. Each subsequent
- * call is a single `crypto.subtle.sign` — sub-millisecond on Cloudflare.
+ * The trade-off: an observer who reads the on-chain claim can brute-force
+ * the uid space (Telegram ids are ~10B sequential integers, seconds on a
+ * GPU). This is accepted — the blinding prevents casual observation and
+ * bulk indexing, not targeted deanonymisation.
  */
-
-let cachedKey: CryptoKey | undefined
-let cachedKeySource: string | undefined
-
-async function getHmacKey(env: Env): Promise<CryptoKey> {
-  // Re-import only if the key material changed (shouldn't happen in a
-  // single isolate, but handles wrangler dev hot-reload).
-  if (cachedKey && cachedKeySource === env.ATTESTER_PRIVATE_KEY) {
-    return cachedKey
-  }
-  const raw = env.ATTESTER_PRIVATE_KEY
-  const keyBytes = new TextEncoder().encode(raw)
-  cachedKey = await crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  cachedKeySource = raw
-  return cachedKey
-}
-
-function bytesToHex(buf: ArrayBuffer): string {
-  const view = new Uint8Array(buf)
-  let out = ''
-  for (const b of view) out += b.toString(16).padStart(2, '0')
-  return out
-}
-
-/**
- * Blind a platform uid. Returns a deterministic 64-char hex string.
- */
-export async function blindUid(
-  env: Env,
-  platform: string,
-  uid: string,
-): Promise<string> {
-  const key = await getHmacKey(env)
-  const data = new TextEncoder().encode(`${platform}:${uid}`)
-  const sig = await crypto.subtle.sign('HMAC', key, data)
-  return bytesToHex(sig)
+export function blindUid(platform: string, uid: string): string {
+  return keccak256(toBytes(`${platform}:${uid}`))
 }

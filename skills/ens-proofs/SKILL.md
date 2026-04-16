@@ -41,22 +41,14 @@ Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, plus a mainnet RP
 
 ## Verify a single proof
 
-The on-chain `claim.uid` is **blinded** — it's an HMAC-SHA256 digest of the raw platform uid, keyed by the attester's secret. To compare against the uid you know from chat context, call the attester's `/api/blind` endpoint once per user to get the blinded form, then cache it and compare locally going forward.
+The on-chain `claim.uid` is **blinded** — it's `keccak256("platform:rawUid")`. You compute the same hash locally from the uid you already know from chat context. No network call, no attester dependency at verify time.
 
 ```ts
 import { verifyProof } from '@ensmetadata/sdk'
+import { keccak256, toBytes } from 'viem'
 
-const ATTESTER_URL = 'https://attester.example.com' // or http://localhost:8787
-
-// Call once per user, cache forever — the output is deterministic.
-async function getBlindedUid(platform: string, rawUid: string): Promise<string> {
-  const res = await fetch(`${ATTESTER_URL}/api/blind`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform, uid: rawUid }),
-  })
-  const json = await res.json() as { blindedUid: string }
-  return json.blindedUid
+function blindUid(platform: string, rawUid: string): string {
+  return keccak256(toBytes(`${platform}:${rawUid}`))
 }
 
 export async function checkTelegram(ensName: string, expectedTgUid: string) {
@@ -68,9 +60,8 @@ export async function checkTelegram(ensName: string, expectedTgUid: string) {
   if (!result.valid) {
     return { ok: false as const, reason: result.reason }
   }
-  // Compare the blinded form — NOT the raw uid
-  const blindedUid = await getBlindedUid('org.telegram', expectedTgUid)
-  if (result.uid !== blindedUid) {
+  const expected = blindUid('org.telegram', expectedTgUid)
+  if (result.uid !== expected) {
     return { ok: false as const, reason: 'wrong-user' as const }
   }
   return { ok: true as const, handle: result.handle, expiresAt: result.expiresAt }
@@ -110,16 +101,18 @@ These records are **self-asserted** — the user wrote them, no attester involve
 
 ## Trust model — read this once
 
-There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed CBOR claim. That field contains a **blinded** form of the platform's stable user id — `HMAC-SHA256(attesterKey, "platform:rawUid")`. An on-chain observer can't recover the raw uid without the attester key, which prevents bulk deanonymisation of social accounts from the chain.
+There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed payload. That field contains `keccak256("platform:rawUid")` — a one-way hash of the raw platform id. An on-chain observer can't read the raw uid directly, which prevents casual/bulk deanonymisation by indexers.
 
-Your job as a verifier is to get the blinded form of the uid you know (via `POST /api/blind { platform, uid }` on the attester) and compare it to `result.uid`. That comparison IS the trust check. Cache the blinded uid the first time you compute it — it's deterministic for a given attester key, platform, and raw uid.
+Your job as a verifier is to compute `keccak256(toBytes("platform:rawUid"))` from the uid you already know and compare it to `result.uid`. That's the entire binding — pure local computation, no attester call, no network dependency. The result is deterministic so you can cache it.
+
+**Privacy trade-off:** the uid spaces for Telegram (~10B sequential ids) and X are small enough that a motivated attacker can brute-force the hash in seconds on a GPU. The blinding prevents casual observation and bulk indexing, not targeted deanonymisation. This is the accepted trade-off.
 
 Things that are **not** load-bearing:
-- `claim.h` (the handle). Display only. Stored in the clear because handles are already public on the platform. May be stale.
-- `claim.addr` (the wallet the attester observed). Used internally for the staleness check; not for identity.
-- Anything in the IPFS proof document (`claim.prf` resolves there). Used for forensic investigation, not for cheap-path verification. The raw uid MAY appear in the IPFS doc for deep-path use.
+- `envelope.h` (the handle). Display only. Lives in the unsigned envelope metadata. May be stale.
+- `payload.addr` (the wallet the attester observed). Used for the staleness check; not for identity.
+- Anything in the IPFS proof document (`payload.prf` resolves there). Forensic use only.
 
-The signer of the on-chain claim is the **attester service**, not the wallet. The wallet's only role is publishing the signed claim to the resolver. Verifiers must allow-list the attester address(es) they accept; `claim.att` is the field to allow-list against.
+The signer is the **attester service**, not the wallet. The wallet's only role is publishing the signed envelope to the resolver. Verifiers allow-list the attester address(es) they accept; `payload.att` is the field to check against.
 
 ## Requesting setup
 

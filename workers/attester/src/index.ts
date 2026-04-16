@@ -1,7 +1,6 @@
 import { jsonResponse, preflightResponse } from './cors'
 import type { Env } from './env'
 import { handleAttest } from './handlers/attest'
-import { handleBlind } from './handlers/blind'
 import { handlePlatform } from './handlers/platform'
 import { handleSession } from './handlers/session'
 import { handleWallet } from './handlers/wallet'
@@ -19,7 +18,6 @@ export { SessionStore } from './session-store'
  *   POST /api/session/wallet                — bind wallet via SIWE
  *   POST /api/session/platform/:platformId  — bind platform account
  *   POST /api/attest                        — issue signed claim
- *   POST /api/blind                         — compute blinded uid for verification
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -38,7 +36,6 @@ export default {
           'POST /api/session/wallet',
           'POST /api/session/platform/:platform',
           'POST /api/attest',
-          'POST /api/blind',
         ],
       })
     }
@@ -58,10 +55,6 @@ export default {
     if (request.method === 'POST' && path === '/api/attest') {
       return handleAttest(env, request)
     }
-    if (request.method === 'POST' && path === '/api/blind') {
-      return handleBlind(env, request)
-    }
-
     return jsonResponse(env, request, { error: 'not found' }, { status: 404 })
   },
 } satisfies ExportedHandler<Env>

@@ -9,7 +9,7 @@
 // (`pnpm attester` from the repo root).
 
 import { decodeEnvelope, decodePayload, verifyClaim } from '@ensmetadata/sdk'
-import { hexToBytes } from 'viem'
+import { hexToBytes, keccak256, toBytes } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { createSiweMessage } from 'viem/siwe'
 
@@ -127,18 +127,12 @@ async function runFlow({ platform, payload }) {
   check('handle is in envelope (unsigned)', envelope.h === payload.handle)
   check('handle is NOT in signed payload', !('h' in inner))
 
-  // 10. Call /api/blind and confirm it matches inner.uid
-  const blindRes = await fetch(`${ATTESTER}/api/blind`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform, uid: payload.uid }),
-  })
-  const blindBody = await blindRes.json().catch(() => ({}))
-  check('POST /api/blind', blindRes.ok)
+  // 10. Compute the blinded uid locally — no /api/blind call needed
+  const expectedBlindedUid = keccak256(toBytes(`${platform}:${payload.uid}`))
   check(
-    'inner.uid === blindedUid from /api/blind',
-    inner.uid === blindBody.blindedUid,
-    inner.uid === blindBody.blindedUid ? 'match' : 'MISMATCH',
+    'inner.uid === locally computed keccak256',
+    inner.uid === expectedBlindedUid,
+    inner.uid === expectedBlindedUid ? 'match' : 'MISMATCH',
   )
 }
 
