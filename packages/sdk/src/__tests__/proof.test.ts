@@ -137,7 +137,7 @@ describe('encodeEnvelope / decodeEnvelope — round-trip', () => {
     expect(bytes[0]).toBe(0xda)
   })
 
-  it('attester is encoded as 20 raw bytes (key "a") in CBOR', async () => {
+  it('attester is encoded as 20 raw bytes at array index 2 in CBOR', async () => {
     const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
     const envelope = await signClaim(makeInput(), attester)
     const bytes = encodeEnvelope(envelope)
@@ -145,9 +145,9 @@ describe('encodeEnvelope / decodeEnvelope — round-trip', () => {
     const raw = decode(bytes, {
       // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
       tags: { [ENVELOPE_TAG]: (d: any) => d() },
-    }) as Record<string, unknown>
-    expect(raw.a).toBeInstanceOf(Uint8Array)
-    expect((raw.a as Uint8Array).length).toBe(20)
+    }) as unknown[]
+    expect(raw[2]).toBeInstanceOf(Uint8Array)
+    expect((raw[2] as Uint8Array).length).toBe(20)
   })
 })
 

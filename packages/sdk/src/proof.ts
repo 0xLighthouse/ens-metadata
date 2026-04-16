@@ -111,50 +111,51 @@ export function decodePayload(bytes: Uint8Array): PayloadFields {
 
 /**
  * Encode a full v1 envelope as tagged CBOR bytes, ready to write to an
- * ENS text record as hex.
+ * ENS text record as hex. On the wire the envelope is a 4-element array:
+ * [version, payload, attester (20 bytes), sig (65 bytes)].
  */
 export function encodeEnvelope(envelope: Envelope): Uint8Array {
-  const map: Record<string, unknown> = {
-    v: envelope.version,
-    p: envelope.payload,
-    a: hexToBytes(envelope.attester),
-    s: hexToBytes(envelope.sig),
-  }
-  return cborgEncode(new Tagged(ENVELOPE_TAG, map), { float64: true })
+  const arr = [
+    envelope.version,
+    envelope.payload,
+    hexToBytes(envelope.attester),
+    hexToBytes(envelope.sig),
+  ]
+  return cborgEncode(new Tagged(ENVELOPE_TAG, arr), { float64: true })
 }
 
 /**
- * Decode tagged CBOR bytes into a v1 Envelope. Throws if the tag doesn't
- * match or required fields are missing.
+ * Decode tagged CBOR bytes into a v1 Envelope. Expects a 4-element array
+ * [version, payload, attester, sig] and hydrates it into the keyed Envelope
+ * type. Throws if the tag doesn't match or required elements are missing.
  */
 export function decodeEnvelope(bytes: Uint8Array): Envelope {
   const decoded = cborgDecode(bytes, {
     // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
     tags: { [ENVELOPE_TAG]: (decode: any) => decode() },
   })
-  if (!decoded || typeof decoded !== 'object') {
-    throw new Error('claim: decoded envelope is not a map')
+  if (!Array.isArray(decoded) || decoded.length !== 4) {
+    throw new Error('claim: decoded envelope is not a 4-element array')
   }
-  const map = decoded as Record<string, unknown>
 
-  if (typeof map.v !== 'number' || map.v !== CLAIM_VERSION) {
-    throw new Error(`claim: unsupported envelope version ${map.v}`)
+  const [version, payload, attesterBytes, sigBytes] = decoded
+
+  if (typeof version !== 'number' || version !== CLAIM_VERSION) {
+    throw new Error(`claim: unsupported envelope version ${version}`)
   }
-  if (!(map.p instanceof Uint8Array)) {
-    throw new Error('claim: envelope "p" (payload) must be bytes')
+  if (!(payload instanceof Uint8Array)) {
+    throw new Error('claim: envelope element 1 (payload) must be bytes')
   }
-  const attesterBytes = map.a
   if (!(attesterBytes instanceof Uint8Array) || attesterBytes.length !== 20) {
-    throw new Error('claim: envelope "a" (attester) must be 20 bytes')
+    throw new Error('claim: envelope element 2 (attester) must be 20 bytes')
   }
-  const sigBytes = map.s
   if (!(sigBytes instanceof Uint8Array) || sigBytes.length !== 65) {
-    throw new Error('claim: envelope "s" (sig) must be 65 bytes')
+    throw new Error('claim: envelope element 3 (sig) must be 65 bytes')
   }
 
   return {
-    version: map.v as number,
-    payload: map.p as Uint8Array,
+    version,
+    payload,
     attester: getAddress(bytesToHex(attesterBytes)),
     sig: bytesToHex(sigBytes),
   }
