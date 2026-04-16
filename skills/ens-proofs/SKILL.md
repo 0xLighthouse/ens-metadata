@@ -41,8 +41,23 @@ Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, plus a mainnet RP
 
 ## Verify a single proof
 
+The on-chain `claim.uid` is **blinded** — it's an HMAC-SHA256 digest of the raw platform uid, keyed by the attester's secret. To compare against the uid you know from chat context, call the attester's `/api/blind` endpoint once per user to get the blinded form, then cache it and compare locally going forward.
+
 ```ts
 import { verifyProof } from '@ensmetadata/sdk'
+
+const ATTESTER_URL = 'https://attester.example.com' // or http://localhost:8787
+
+// Call once per user, cache forever — the output is deterministic.
+async function getBlindedUid(platform: string, rawUid: string): Promise<string> {
+  const res = await fetch(`${ATTESTER_URL}/api/blind`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform, uid: rawUid }),
+  })
+  const json = await res.json() as { blindedUid: string }
+  return json.blindedUid
+}
 
 export async function checkTelegram(ensName: string, expectedTgUid: string) {
   const result = await verifyProof(
@@ -53,18 +68,20 @@ export async function checkTelegram(ensName: string, expectedTgUid: string) {
   if (!result.valid) {
     return { ok: false as const, reason: result.reason }
   }
-  if (result.uid !== expectedTgUid) {
+  // Compare the blinded form — NOT the raw uid
+  const blindedUid = await getBlindedUid('org.telegram', expectedTgUid)
+  if (result.uid !== blindedUid) {
     return { ok: false as const, reason: 'wrong-user' as const }
   }
   return { ok: true as const, handle: result.handle, expiresAt: result.expiresAt }
 }
 ```
 
-Same shape for X — pass `platform: 'com.x'` and compare against the X stable user id (the OAuth `sub` claim).
+Same shape for X — pass `platform: 'com.x'` and the X OAuth `sub` claim as `rawUid`.
 
 The verifier runs four checks in order: (1) signature integrity — `ecrecover(hash, sig) === claim.att`; (2) trust — `claim.att` is in your `trustedAttesters` set; (3) expiry — `claim.exp` is in the future; (4) staleness — the wallet the attester observed (`claim.addr`) is still the current ENS owner. If any of those fails you get a `valid: false` with a `reason` field naming the failure: `missing`, `expired`, `bad-signature`, `untrusted-attester`, `wrong-owner`, `unsupported-version`, `decode-error`, or `handle-changed`.
 
-The `result.uid` comparison against your known platform id is **separate** from the SDK's checks — you do that yourself, because only you know what the expected uid is. Without it, anyone can write an `org.telegram.proof` linking *some other* Telegram account to their ENS name and the SDK will happily say "valid". The uid match is the actual binding.
+The uid comparison is **separate** from the SDK's checks — you do it yourself via `/api/blind`, because only you know the raw uid. Without it, anyone can write a valid `org.telegram.proof` linking *some other* Telegram account to their ENS name and the SDK will happily say "valid". The blinded-uid match is the actual binding.
 
 ## Read profile attributes
 
@@ -93,14 +110,14 @@ These records are **self-asserted** — the user wrote them, no attester involve
 
 ## Trust model — read this once
 
-There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed CBOR claim. That field contains the platform's stable user id (X's OAuth `sub`, Telegram's numeric user id) — never the handle, which can change.
+There is exactly one cryptographic binding in the proof system: **`claim.uid`** in the signed CBOR claim. That field contains a **blinded** form of the platform's stable user id — `HMAC-SHA256(attesterKey, "platform:rawUid")`. An on-chain observer can't recover the raw uid without the attester key, which prevents bulk deanonymisation of social accounts from the chain.
 
-Your job as a verifier is to compare `result.uid` to a user id you independently know from your own context (e.g. the Telegram user id the chat platform gave you in the message metadata). That comparison IS the trust check. The SDK only verifies that an attester you trust said "this ENS name is bound to this uid" — it can't verify that the uid is *your* user without your help.
+Your job as a verifier is to get the blinded form of the uid you know (via `POST /api/blind { platform, uid }` on the attester) and compare it to `result.uid`. That comparison IS the trust check. Cache the blinded uid the first time you compute it — it's deterministic for a given attester key, platform, and raw uid.
 
 Things that are **not** load-bearing:
-- `claim.h` (the handle). Display only. May be stale.
+- `claim.h` (the handle). Display only. Stored in the clear because handles are already public on the platform. May be stale.
 - `claim.addr` (the wallet the attester observed). Used internally for the staleness check; not for identity.
-- Anything in the IPFS proof document (`claim.prf` resolves there). Used for forensic investigation, not for cheap-path verification.
+- Anything in the IPFS proof document (`claim.prf` resolves there). Used for forensic investigation, not for cheap-path verification. The raw uid MAY appear in the IPFS doc for deep-path use.
 
 The signer of the on-chain claim is the **attester service**, not the wallet. The wallet's only role is publishing the signed claim to the resolver. Verifiers must allow-list the attester address(es) they accept; `claim.att` is the field to allow-list against.
 
