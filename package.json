@@ -3,9 +3,9 @@
   "scripts": {
     "build": "turbo run build",
     "build:interface": "turbo run build --filter=interface",
-    "build:proofs": "turbo run build --filter=proofs",
+    "build:identity": "turbo run build --filter=identity",
     "interface": "turbo run dev --filter=interface",
-    "proofs": "turbo run dev --filter=proofs",
+    "identity": "turbo run dev --filter=identity",
     "attester": "pnpm --dir workers/attester dev",
     "attester:deploy": "pnpm --dir workers/attester deploy",
     "dev": "turbo run dev",
