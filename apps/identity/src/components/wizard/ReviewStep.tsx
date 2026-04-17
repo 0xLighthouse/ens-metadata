@@ -33,7 +33,7 @@ function friendlyError(err: unknown): string {
     lower.includes('user denied') ||
     lower.includes('rejected the request')
   ) {
-    return 'You rejected the signature — try again.'
+    return 'Transaction cancelled, please try again.'
   }
   return raw
 }
@@ -98,12 +98,12 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props
 
   const busy = phase === 'attesting' || phase === 'writing' || phase === 'confirming'
   const phaseLabel: Record<Phase, string> = {
-    idle: 'Issue and publish',
+    idle: 'Publish profile',
     attesting: 'Issuing attestation…',
     writing: 'Writing to ENS…',
     confirming: 'Waiting for confirmations…',
     done: 'Done',
-    error: 'Issue and publish',
+    error: 'Publish profile',
   }
 
   const explorerUrl = txHash
@@ -176,10 +176,10 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Review changes</CardTitle>
+        <CardTitle>Final review</CardTitle>
         <CardDescription>
-          Changes to <span className="font-mono">{name}</span> shown below. The wallet transaction
-          will apply them in a single multicall.
+          The following records will be written to the on-chain profile for{' '}
+          <span className="font-mono">{name}</span>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

@@ -164,24 +164,26 @@ export function EnterAttributesStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{schema?.title ? `${schema.title} profile` : 'Profile attributes'}</CardTitle>
+        <CardTitle>
+          {schema?.title ? `Complete your ${schema.title} profile` : 'Complete your profile'}
+        </CardTitle>
         <CardDescription>
           {schema?.description ? <>{schema.description} </> : null}
-          Fill in the records the agent asked for on <span className="font-mono">{name}</span>.
-          Existing values are pre-loaded; only fields you change will get written.
+          Enter the values below to be added to <span className="font-mono">{name}</span>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isLoading && (
           <div className="rounded-md border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
-            Loading existing records from <span className="font-mono">{name}</span>…
+            Checking <span className="font-mono">{name}</span> for existing records...
           </div>
         )}
 
         {loadError && (
           <div className="rounded-md border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-3 text-xs text-yellow-900 dark:text-yellow-100">
             Couldn&apos;t load existing records (<span className="font-mono">{loadError}</span>).
-            Continuing without pre-fill — anything you enter will be written as new.
+            Warning! Submitting new records risks overwriting existing data. It is okay to continue
+            if this is what you want to do.
           </div>
         )}
 

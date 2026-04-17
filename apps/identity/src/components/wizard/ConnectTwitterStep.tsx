@@ -91,13 +91,14 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
         <CardDescription>
           {twitter ? (
             <>
-              <span className="font-mono">@{twitter.username}</span> is linked to{' '}
+              <span className="font-mono">@{twitter.username}</span> will be linked to{' '}
               <span className="font-mono">{name}</span>. Continue to review and publish.
             </>
           ) : (
             <>
-              Link a Twitter account to <span className="font-mono">{name}</span>. Privy runs the
-              OAuth flow in a popup; we read the linked account and bind it to your ENS name.
+              Connect your Twitter account, and we will publish an attestation to your ENS name.
+              This will trustlessly prove that your ENS name and Twitter handle are linked. Your
+              Twitter handle is the only data that will be made public.
             </>
           )}
         </CardDescription>
@@ -105,8 +106,8 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
       <CardContent className="space-y-6">
         {!twitter && (
           <div className="rounded-md border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-600 dark:text-neutral-400">
-            Clicking below opens Privy's Twitter OAuth flow. Log in to Twitter, approve the app, and
-            Privy returns the linked account here.
+            Log in to Twitter and approve access to continue. This will only be used to verify
+            ownership of your Twitter account.
           </div>
         )}
 
@@ -116,7 +117,7 @@ export function ConnectTwitterStep({ name, sessionId, onBack, onComplete }: Prop
             <div className="flex flex-col">
               <span className="font-mono font-semibold">@{twitter.username}</span>
               <span className="text-xs text-green-700/80 dark:text-green-400/80">
-                Twitter account linked via Privy
+                Twitter account linked successfully
               </span>
             </div>
           </div>

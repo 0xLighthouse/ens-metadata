@@ -130,17 +130,17 @@ function computeSteps(config: IncomingConfig): StepEntry[] {
     config.platformsRequested ||
     (totalAttrs === 0 && config.classValues.length === 0 && config.schemaUris.length === 0)
   if (wantsSocial) {
-    steps.push({ kind: 'social', label: 'Connect account' })
+    steps.push({ kind: 'social', label: 'Link accounts' })
   }
 
   // Show the attributes step if the URL asks for any text records.
   const wantsAttrs =
     totalAttrs > 0 || config.classValues.length > 0 || config.schemaUris.length > 0
   if (wantsAttrs) {
-    steps.push({ kind: 'attrs', label: 'Profile' })
+    steps.push({ kind: 'attrs', label: 'Complete profile' })
   }
 
-  steps.push({ kind: 'review', label: 'Review and write' })
+  steps.push({ kind: 'review', label: 'Review and publish' })
   return steps
 }
 

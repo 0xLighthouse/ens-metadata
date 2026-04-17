@@ -61,7 +61,7 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
       }
       if (owner.toLowerCase() !== address.toLowerCase()) {
         throw new Error(
-          `${trimmed} is owned by ${shortAddress(owner)}, not ${shortAddress(address)}. Connect the right wallet.`,
+          `${trimmed} is managed by address ${shortAddress(owner)}, but you have connected with ${shortAddress(address)}. Did you choose the right wallet?`,
         )
       }
 
@@ -83,7 +83,7 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
         nonce: session.nonce,
         uri: origin,
         version: '1',
-        statement: 'Sign in to ENS Metadata to issue an attestation for this ENS name.',
+        statement: 'Sign in to the ENS Metadata Manager to update profile information for your ENS name.',
         issuedAt: new Date(),
       })
 
@@ -134,9 +134,8 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
       <CardHeader>
         <CardTitle>Connect your wallet</CardTitle>
         <CardDescription>
-          Connect the wallet that owns the ENS name. You'll sign a sign-in message — this proves
-          control of the wallet to the attester service. The claim itself is signed by the attester,
-          not by your wallet.
+          Make sure you connect the address that owns or manages the ENS name you would like to add
+          profile information to.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
