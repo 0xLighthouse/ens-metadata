@@ -1,15 +1,18 @@
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { getIntent } from '@/lib/attester-client'
 import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
 import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
 import { useSchema } from '@/lib/use-schema'
+import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { AlertCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { ConnectTelegramStep } from './ConnectTelegramStep'
 import { ConnectTwitterStep } from './ConnectTwitterStep'
 import { ConnectWalletStep } from './ConnectWalletStep'
+import { CreatorBanner } from './CreatorBanner'
 import { EnterAttributesStep } from './EnterAttributesStep'
 import { ReviewStep } from './ReviewStep'
 import { WizardStepIndicator } from './WizardStepIndicator'
@@ -110,6 +113,27 @@ function readIncomingConfig(): IncomingConfig {
   }
 }
 
+// Translate a stored IntentConfig (fully resolved at creation) into the
+// shape the wizard already expects. Keeping the projection narrow means
+// all existing step code keeps reading the same `IncomingConfig` interface.
+function adaptIntentConfig(config: IntentConfig): IncomingConfig {
+  return {
+    prefillName: config.name,
+    allowedPlatforms: config.platforms.filter(isPlatform),
+    platformsRequested: config.platforms.length > 0,
+    requiredAttrs: config.required,
+    optionalAttrs: config.optional.filter((k) => !config.required.includes(k)),
+    classValues: config.classValues,
+    schemaUris: config.schemaUris,
+  }
+}
+
+interface CreatorInfo {
+  ensName: string
+  avatar: string | null
+  message: string
+}
+
 // A wizard step is a named kind, not a number. The list of steps is
 // computed from the incoming config so the indicator and the routing
 // stay in sync without an off-by-one foot-gun.
@@ -134,8 +158,7 @@ function computeSteps(config: IncomingConfig): StepEntry[] {
   }
 
   // Show the attributes step if the URL asks for any text records.
-  const wantsAttrs =
-    totalAttrs > 0 || config.classValues.length > 0 || config.schemaUris.length > 0
+  const wantsAttrs = totalAttrs > 0 || config.classValues.length > 0 || config.schemaUris.length > 0
   if (wantsAttrs) {
     steps.push({ kind: 'attrs', label: 'Complete profile' })
   }
@@ -185,6 +208,8 @@ export function Wizard() {
   // real values land after mount. Gating the render on `hydrated` avoids a
   // flash of the empty-config wizard.
   const [incomingConfig, setIncomingConfig] = useState<IncomingConfig>(DEFAULT_CONFIG)
+  const [creator, setCreator] = useState<CreatorInfo | null>(null)
+  const [intentError, setIntentError] = useState<string | null>(null)
   const steps = useMemo(() => computeSteps(incomingConfig), [incomingConfig])
 
   // Schema fetch + validation runs at the wizard root, before any step
@@ -206,26 +231,63 @@ export function Wizard() {
   const [platform, setPlatform] = useState<Platform>(initialPlatform)
 
   useEffect(() => {
-    const config = readIncomingConfig()
-    setIncomingConfig(config)
+    let cancelled = false
 
-    const persisted = loadPersisted()
-    if (persisted) {
-      setStepIndex(persisted.stepIndex)
-      // Only honor a persisted name if the URL didn't pre-fill one.
-      if (!config.prefillName) setName(persisted.name)
-      else setName(config.prefillName)
-      setSessionId(persisted.sessionId)
-      // Honor the URL platform restriction over a stale persisted value.
-      if (config.allowedPlatforms.length > 0) {
-        setPlatform(config.allowedPlatforms[0])
-      } else {
-        setPlatform(persisted.platform)
+    // `applyConfig` is shared between the intent branch and the legacy
+    // query-param branch so persistence + initial-state handling stays
+    // identical regardless of how the config was delivered.
+    const applyConfig = (config: IncomingConfig) => {
+      if (cancelled) return
+      setIncomingConfig(config)
+      const persisted = loadPersisted()
+      if (persisted) {
+        setStepIndex(persisted.stepIndex)
+        if (!config.prefillName) setName(persisted.name)
+        else setName(config.prefillName)
+        setSessionId(persisted.sessionId)
+        if (config.allowedPlatforms.length > 0) {
+          setPlatform(config.allowedPlatforms[0])
+        } else {
+          setPlatform(persisted.platform)
+        }
+      } else if (config.prefillName) {
+        setName(config.prefillName)
       }
-    } else if (config.prefillName) {
-      setName(config.prefillName)
+      setHydrated(true)
     }
-    setHydrated(true)
+
+    const params = new URLSearchParams(window.location.search)
+    const intentId = params.get('intent')
+    if (intentId) {
+      getIntent(intentId)
+        .then((data) => {
+          if (cancelled) return
+          setCreator({
+            ensName: data.creator.ensName,
+            avatar: data.creator.avatar,
+            message: data.config.message,
+          })
+          applyConfig(adaptIntentConfig(data.config))
+        })
+        .catch((err: Error) => {
+          if (cancelled) return
+          setIntentError(
+            err.message === 'not_found'
+              ? 'This intent link is invalid or has been removed.'
+              : 'Could not load this intent. Check your connection and retry.',
+          )
+          setHydrated(true)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // Legacy path: pure URL query params, no backend hop.
+    applyConfig(readIncomingConfig())
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -247,6 +309,27 @@ export function Wizard() {
       ? incomingConfig.allowedPlatforms
       : [...KNOWN_PLATFORMS]
   const showPlatformPicker = visiblePlatforms.length > 1
+
+  // An unresolvable intent id fails fast before any step renders, with the
+  // same Card shell used for schema errors so the two error modes look
+  // uniform to the recipient.
+  if (intentError) {
+    return (
+      <div className="max-w-xl mx-auto w-full">
+        <Card>
+          <CardHeader>
+            <CardTitle>Intent unavailable</CardTitle>
+            <CardDescription>{intentError}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Ask whoever sent you this link to generate a new one from the profile builder.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   // Refuse to render any wizard step when the schema is broken. The user
   // can still copy the failing URI to debug, but they can't proceed —
@@ -307,6 +390,13 @@ export function Wizard() {
 
   return (
     <div className="max-w-xl mx-auto w-full">
+      {creator && (
+        <CreatorBanner
+          ensName={creator.ensName}
+          avatar={creator.avatar}
+          message={creator.message}
+        />
+      )}
       <WizardStepIndicator steps={stepLabels} current={stepIndex} />
 
       {currentStep?.kind === 'wallet' && (

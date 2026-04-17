@@ -1,29 +1,23 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
+import { IntentCreator } from '@/components/builder/IntentCreator'
 import {
-  type BuilderPlatformId,
-  type BuilderSchema,
   BUILDER_PLATFORMS,
   BUILDER_SCHEMAS,
+  type BuilderPlatformId,
+  type BuilderSchema,
 } from '@/config/builder-schemas'
 import { cn } from '@/lib/utils'
-import { Check, ChevronDown, Copy, ExternalLink } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import type { IntentConfig } from '@ensmetadata/shared/intent'
+import { Check, ChevronDown } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
 import { Pill } from './Pill'
 
 /**
  * Form builder. Actor composes an ask — what classes to allow, which
  * fields are required vs optional, which social accounts to attest —
- * then copies the wizard URL.
- *
- * Required fields are enforced downstream: the wizard disables Continue
- * until every required key has a value. Optional fields just get
- * surfaced as inputs the recipient can leave blank.
- *
- * Wire format:
- *   ?name=&class=A,B&schema=ipfs://X,ipfs://Y
- *   &required=a,b&optional=c,d&platforms=com.x,org.telegram
+ * then signs an intent. The recipient opens `/?intent=<id>` and the
+ * wizard loads the config plus the creator's ENS profile.
  */
 
 const DEFAULT_SCHEMA_ID = 'person'
@@ -59,18 +53,20 @@ function unionAttrs(schemas: readonly BuilderSchema[]): BuilderSchema['attrs'] {
   return out
 }
 
-function buildWizardHref(state: BuilderState): string | null {
-  if (typeof window === 'undefined') return null
+function buildConfigFromState(state: BuilderState): IntentConfig | null {
   const schemas = resolveSchemas(state.schemaIds)
   if (schemas.length === 0) return null
-  const params = new URLSearchParams()
-  if (state.name.trim()) params.set('name', state.name.trim())
-  params.set('class', schemas.map((s) => s.classValue).join(','))
-  params.set('schema', schemas.map((s) => s.schemaUri).join(','))
-  if (state.required.length) params.set('required', state.required.join(','))
-  if (state.optional.length) params.set('optional', state.optional.join(','))
-  if (state.platforms.length) params.set('platforms', state.platforms.join(','))
-  return `${window.location.origin}/?${params.toString()}`
+  const name = state.name.trim()
+  return {
+    version: 1,
+    name: name.length > 0 ? name : null,
+    classValues: schemas.map((s) => s.classValue),
+    schemaUris: schemas.map((s) => s.schemaUri),
+    required: state.required,
+    optional: state.optional,
+    platforms: state.platforms,
+    message: state.message,
+  }
 }
 
 export function FormBuilder() {
@@ -83,11 +79,13 @@ export function FormBuilder() {
     message: '',
   })
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const selectedSchemas = useMemo(() => resolveSchemas(state.schemaIds), [state.schemaIds])
   const availableAttrs = useMemo(() => unionAttrs(selectedSchemas), [selectedSchemas])
-  const href = useMemo(() => buildWizardHref(state), [state])
+  // Pass a lazy builder instead of a precomputed value — signing reads the
+  // latest state, and we don't want a stale closure if the user keeps editing
+  // while the wallet is prompting.
+  const buildConfig = useCallback(() => buildConfigFromState(state), [state])
 
   // Picking a key as required removes it from optional and vice versa —
   // the two pills are mutually exclusive. Unpicking removes from both.
@@ -136,13 +134,6 @@ export function FormBuilder() {
         optional: s.optional.filter((k) => nextKeys.has(k)),
       }
     })
-
-  const copyLink = async () => {
-    if (!href) return
-    await navigator.clipboard.writeText(href)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
-  }
 
   return (
     <div className="space-y-8">
@@ -205,7 +196,7 @@ export function FormBuilder() {
         onMessageChange={(message) => setState((s) => ({ ...s, message }))}
       />
 
-      <GeneratedLink href={href} onCopy={copyLink} copied={copied} />
+      <IntentCreator buildConfig={buildConfig} />
     </div>
   )
 }
@@ -245,9 +236,7 @@ function AdvancedSection({
             <span className="ml-2 text-xs text-neutral-500">{summaryBits.join(' · ')}</span>
           )}
         </span>
-        <ChevronDown
-          className={cn('h-4 w-4 transition-transform', open && 'rotate-180')}
-        />
+        <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
         <div className="space-y-4 border-t border-neutral-200 p-4 dark:border-neutral-800">
@@ -447,54 +436,6 @@ function PlatformPicker({
 }
 
 // -----------------------------
-// Generated link block
-// -----------------------------
-
-function GeneratedLink({
-  href,
-  onCopy,
-  copied,
-}: {
-  href: string | null
-  onCopy: () => void
-  copied: boolean
-}) {
-  if (!href) {
-    return (
-      <div className="rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-        Pick at least one schema above to generate a link.
-      </div>
-    )
-  }
-  return (
-    <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-      <div className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-        Share this link
-      </div>
-      <div className="overflow-x-auto rounded-md bg-neutral-50 px-3 py-2 font-mono text-xs dark:bg-neutral-800">
-        {href}
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={onCopy} full>
-          {copied ? (
-            <>
-              <Check className="mr-2 h-4 w-4" /> Copied
-            </>
-          ) : (
-            <>
-              <Copy className="mr-2 h-4 w-4" /> Copy link
-            </>
-          )}
-        </Button>
-        <Button variant="outline" full onClick={() => window.open(href, '_blank')}>
-          <ExternalLink className="mr-2 h-4 w-4" /> Preview
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// -----------------------------
 // Labels
 // -----------------------------
 
@@ -514,7 +455,5 @@ function fieldsLabel(keys: string[], fallback: string): string {
 
 function platformsLabel(ids: BuilderPlatformId[]): string {
   if (ids.length === 0) return 'social accounts'
-  return ids
-    .map((id) => BUILDER_PLATFORMS.find((p) => p.id === id)?.label ?? id)
-    .join(' + ')
+  return ids.map((id) => BUILDER_PLATFORMS.find((p) => p.id === id)?.label ?? id).join(' + ')
 }

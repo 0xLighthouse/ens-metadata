@@ -17,3 +17,8 @@ PRIVY_APP_SECRET=
 
 # Telegram. When unset, the validator runs in dev passthrough mode.
 TELEGRAM_BOT_TOKEN=
+
+# Mainnet RPC URL used by the profile-builder intent endpoints to verify the
+# creator's primary ENS name and fetch their avatar. A public RPC works;
+# Goldsky/Alchemy/Infura keys are fine. Required for /api/intent to function.
+ENS_RPC_URL=

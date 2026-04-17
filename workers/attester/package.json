@@ -12,10 +12,12 @@
   },
   "dependencies": {
     "@ensmetadata/sdk": "workspace:*",
+    "@ensmetadata/shared": "workspace:*",
     "@turnkey/api-key-stamper": "^0.6.5",
     "@turnkey/http": "^3.18.1",
     "@turnkey/viem": "^0.14.28",
     "jose": "^6.2.2",
+    "nanoid": "^5.1.9",
     "viem": "2.47.6"
   },
   "devDependencies": {

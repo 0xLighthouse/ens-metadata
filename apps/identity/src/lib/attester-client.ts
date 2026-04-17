@@ -1,7 +1,10 @@
+import type { IntentConfig } from '@ensmetadata/shared/intent'
+
 /**
- * Typed client for the ENS Metadata attester worker. Five endpoints, all
- * POST, all JSON. The session-id flows through the wizard state and is
- * persisted to sessionStorage so it survives Privy's OAuth redirect.
+ * Typed client for the ENS Metadata attester worker. The session endpoints
+ * are POST-JSON; the intent endpoints add one GET. The session-id flows
+ * through the wizard state and is persisted to sessionStorage so it survives
+ * Privy's OAuth redirect.
  */
 
 const ATTESTER_URL = process.env.NEXT_PUBLIC_ATTESTER_URL ?? 'http://localhost:8787'
@@ -38,6 +41,21 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
     const message = err instanceof Error ? err.message : 'network request failed'
     throw new AttesterError('network', `${path}: ${message}`)
   }
+  return readJson<T>(path, res)
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${ATTESTER_URL}${path}`, { method: 'GET', credentials: 'omit' })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'network request failed'
+    throw new AttesterError('network', `${path}: ${message}`)
+  }
+  return readJson<T>(path, res)
+}
+
+async function readJson<T>(path: string, res: Response): Promise<T> {
   if (!res.ok) {
     let message = `${path}: ${res.status}`
     try {
@@ -113,4 +131,30 @@ export async function attest(args: AttestArgs): Promise<AttestResult> {
 
 export function evictSession(sessionId: string): Promise<{ ok: true }> {
   return postJson('/api/session/evict', { sessionId })
+}
+
+// -----------------------------
+// Profile-builder intents
+// -----------------------------
+
+export interface CreateIntentArgs {
+  address: `0x${string}`
+  ensName: string
+  config: IntentConfig
+  signature: `0x${string}`
+  expiry: number
+}
+
+export function createIntent(args: CreateIntentArgs): Promise<{ id: string }> {
+  return postJson<{ id: string }>('/api/intent', args)
+}
+
+export interface IntentResponse {
+  id: string
+  config: IntentConfig
+  creator: { address: string; ensName: string; avatar: string | null }
+}
+
+export function getIntent(id: string): Promise<IntentResponse> {
+  return getJson<IntentResponse>(`/api/intent/${encodeURIComponent(id)}`)
 }

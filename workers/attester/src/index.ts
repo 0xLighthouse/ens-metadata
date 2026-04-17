@@ -3,6 +3,7 @@ import { attesterWallet } from './attester'
 import { jsonResponse, preflightResponse } from './cors'
 import type { Env } from './env'
 import { handleAttest } from './handlers/attest'
+import { handleCreateIntent, handleGetIntent } from './handlers/intent'
 import { handlePlatform } from './handlers/platform'
 import { handleSession } from './handlers/session'
 import { handleWallet } from './handlers/wallet'
@@ -13,14 +14,15 @@ import { handleWallet } from './handlers/wallet'
 export { SessionStore } from './session-store'
 
 /**
- * Routing is hand-rolled — five endpoints don't justify a router dep, and
- * fewer deps in an isolate is always better.
+ * Routing is hand-rolled — fewer deps in an isolate is always better.
  *
  *   POST /api/session                       — create session, get nonce
  *   POST /api/session/wallet                — bind wallet via SIWE
  *   POST /api/session/platform/:platformId  — bind platform account
  *   POST /api/session/evict                 — evict session after tx confirmed
  *   POST /api/attest                        — issue signed claim
+ *   POST /api/intent                        — create profile-builder intent
+ *   GET  /api/intent/:id                    — read profile-builder intent
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -67,6 +69,14 @@ export default {
 
     if (request.method === 'POST' && path === '/api/attest') {
       return handleAttest(env, request)
+    }
+
+    if (request.method === 'POST' && path === '/api/intent') {
+      return handleCreateIntent(env, request)
+    }
+    const intentMatch = /^\/api\/intent\/([^/]+)\/?$/.exec(path)
+    if (request.method === 'GET' && intentMatch) {
+      return handleGetIntent(env, request, decodeURIComponent(intentMatch[1]!))
     }
 
     if (request.method === 'POST' && path === '/api/session/evict') {

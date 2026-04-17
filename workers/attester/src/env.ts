@@ -9,6 +9,9 @@ export interface Env {
   // Durable Object namespace for session storage.
   SESSIONS: DurableObjectNamespace<SessionStore>
 
+  // KV store for profile-builder intents.
+  INTENTS: KVNamespace
+
   // Secrets — one of the two signing modes must be configured.
   // Local key (dev): raw hex private key.
   ATTESTER_PRIVATE_KEY?: string
@@ -22,6 +25,10 @@ export interface Env {
   SIWE_DOMAIN: string
   SESSION_TTL_SECONDS: string
   TRUSTED_ORIGIN: string
+
+  // Mainnet RPC URL for ENS reverse/avatar resolution during intent creation.
+  // Secret — set via `wrangler secret put ENS_RPC_URL` or .dev.vars.
+  ENS_RPC_URL?: string
 
   // Privy credentials — required when Twitter/Telegram validators run.
   PRIVY_APP_ID?: string

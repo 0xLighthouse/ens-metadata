@@ -12,6 +12,7 @@
   "dependencies": {
     "@ensdomains/ensjs": "^4.2.2",
     "@ensmetadata/sdk": "workspace:*",
+    "@ensmetadata/shared": "workspace:*",
     "@ipld/dag-cbor": "^9.2.6",
     "@privy-io/react-auth": "^2.23.0",
     "@radix-ui/react-label": "^2.1.0",

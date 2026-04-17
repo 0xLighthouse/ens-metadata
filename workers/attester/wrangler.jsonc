@@ -32,6 +32,15 @@
       "tag": "v1",
       "new_sqlite_classes": ["SessionStore"]
     }
+  ],
+  // Shared KV for profile-builder intents. The Next.js API routes write via
+  // the CF REST API; binding it here gives the worker native access for any
+  // future server-side lookups (e.g. resolving an intent during proof attest).
+  "kv_namespaces": [
+    {
+      "binding": "INTENTS",
+      "id": "8096d8efac58492a8577cbcd64dd0f01"
+    }
   ]
   // Secrets — never commit. Set with: wrangler secret put <NAME>
   // For local dev, populate .dev.vars (see .dev.vars.example):
