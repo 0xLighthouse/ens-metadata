@@ -15,11 +15,12 @@
     "@turnkey/api-key-stamper": "^0.6.5",
     "@turnkey/http": "^3.18.1",
     "@turnkey/viem": "^0.14.28",
+    "jose": "^6.2.2",
     "viem": "2.47.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240924.0",
     "typescript": "^5",
-    "wrangler": "^3.80.0"
+    "wrangler": "^4.83.0"
   }
 }

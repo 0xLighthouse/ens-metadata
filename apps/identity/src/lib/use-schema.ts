@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { isEnsip5Global } from './ensip-5'
 
 /**
  * Minimal JSON Schema property shape — just the bits the wizard reads
@@ -21,7 +22,8 @@ export interface FetchedSchema {
 }
 
 export interface UseSchemaResult {
-  /** Resolved schema doc, or null while loading or on error. */
+  /** Merged schema across all fetched URIs. First URI wins for title /
+   *  description; property maps are unioned. Null while loading or on error. */
   schema: FetchedSchema | null
   /** True until the fetch settles. False when there's no schemaUri. */
   loading: boolean
@@ -41,40 +43,67 @@ function resolveSchemaUrl(uri: string): string {
   return uri
 }
 
+async function fetchOne(uri: string): Promise<FetchedSchema> {
+  const url = resolveSchemaUrl(uri)
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`fetch returned HTTP ${res.status} from ${url}`)
+  }
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch (parseErr) {
+    throw new Error(
+      `response is not valid JSON (${parseErr instanceof Error ? parseErr.message : 'parse error'})`,
+    )
+  }
+  if (!json || typeof json !== 'object') {
+    throw new Error('schema document is not an object')
+  }
+  const fetched = json as FetchedSchema
+  if (!fetched.properties || typeof fetched.properties !== 'object') {
+    throw new Error('schema document has no `properties` map — not a JSON Schema')
+  }
+  return fetched
+}
+
 /**
- * Fetch and validate a JSON Schema document referenced by URI, ensuring
- * the doc is well-formed AND defines every key the caller expects to use.
+ * Fetch and validate one or more JSON Schema documents referenced by URI.
+ * Returns a single merged schema (properties unioned, title/description
+ * from the first) so downstream form rendering stays schema-count agnostic.
  *
  * The wizard runs this at the root: a broken schema would commit garbage
  * into the on-chain `schema` text record, so the wizard must refuse to
- * proceed past step 0 until the schema is either valid or absent.
+ * proceed past step 0 until every schema is either valid or the list is
+ * empty.
  *
  * Errors surfaced (any of these blocks the wizard):
- *   - HTTP failure from the gateway
- *   - Body isn't valid JSON
- *   - Body isn't a JSON object
- *   - Body has no `properties` map (not a JSON Schema)
- *   - Body's `properties` doesn't include one or more `requiredKeys`
+ *   - HTTP failure from the gateway for any schema
+ *   - A body isn't valid JSON
+ *   - A body isn't a JSON object
+ *   - A body has no `properties` map (not a JSON Schema)
+ *   - A `requiredKey` isn't defined in ANY fetched schema AND isn't an
+ *     ENSIP-5 global
  *
- * When `schemaUri` is null/undefined the hook is a no-op — returns
+ * When `schemaUris` is empty the hook is a no-op — returns
  * { schema: null, loading: false, error: null } and nothing is fetched.
  */
 export function useSchema(
-  schemaUri: string | null | undefined,
+  schemaUris: readonly string[],
   requiredKeys: readonly string[],
 ): UseSchemaResult {
   const [schema, setSchema] = useState<FetchedSchema | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Stable dep for the requiredKeys array — reference equality on arrays
-  // would re-fire the effect on every render even when the contents are
-  // the same. Joining is fine: keys are short strings, this is a wizard
-  // step that runs once.
+  // Stable deps for the array inputs — reference equality on arrays would
+  // re-fire the effect on every render. Joining is fine: strings are short
+  // and this runs once per wizard session.
+  const urisKey = schemaUris.join('|')
   const keysKey = requiredKeys.join('|')
 
   useEffect(() => {
-    if (!schemaUri) {
+    if (schemaUris.length === 0) {
       setSchema(null)
       setError(null)
       setLoading(false)
@@ -86,38 +115,31 @@ export function useSchema(
     setSchema(null)
     ;(async () => {
       try {
-        const url = resolveSchemaUrl(schemaUri)
-        const res = await fetch(url)
-        if (!res.ok) {
-          throw new Error(`fetch returned HTTP ${res.status} from ${url}`)
+        const fetched = await Promise.all(schemaUris.map((uri) => fetchOne(uri)))
+        // Union properties; first schema wins on title/description since
+        // it's the primary one that gets written to chain.
+        const mergedProps: Record<string, SchemaProperty> = {}
+        for (const s of fetched) {
+          for (const [k, v] of Object.entries(s.properties ?? {})) {
+            if (!(k in mergedProps)) mergedProps[k] = v
+          }
         }
-        let json: unknown
-        try {
-          json = await res.json()
-        } catch (parseErr) {
-          throw new Error(
-            `response is not valid JSON (${parseErr instanceof Error ? parseErr.message : 'parse error'})`,
-          )
+        const merged: FetchedSchema = {
+          title: fetched[0]?.title,
+          description: fetched[0]?.description,
+          properties: mergedProps,
         }
-        if (!json || typeof json !== 'object') {
-          throw new Error('schema document is not an object')
-        }
-        const fetched = json as FetchedSchema
-        if (!fetched.properties || typeof fetched.properties !== 'object') {
-          throw new Error('schema document has no `properties` map — not a JSON Schema')
-        }
-        // Tighter check: every key the caller said it needs must be
-        // defined in the schema. Catches typos and stale agent URL
-        // templates before the user wastes effort filling in fields the
-        // schema doesn't even know about.
-        const missing = requiredKeys.filter((k) => !(k in (fetched.properties ?? {})))
+        // Every required key must be defined in the merged property set
+        // or be an ENSIP-5 global. ENSIP-5 globals are universally valid
+        // text records regardless of schema.
+        const missing = requiredKeys.filter((k) => !(k in mergedProps) && !isEnsip5Global(k))
         if (missing.length > 0) {
           throw new Error(
             `schema does not define requested attribute${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}`,
           )
         }
         if (!cancelled) {
-          setSchema(fetched)
+          setSchema(merged)
           setLoading(false)
         }
       } catch (err) {
@@ -131,7 +153,7 @@ export function useSchema(
     return () => {
       cancelled = true
     }
-  }, [schemaUri, keysKey])
+  }, [urisKey, keysKey])
 
   return { schema, loading, error }
 }

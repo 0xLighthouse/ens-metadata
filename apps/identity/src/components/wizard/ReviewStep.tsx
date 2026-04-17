@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { attest, evictSession } from '@/lib/attester-client'
+import { type RecordDiff, diffHasChanges, diffToWriteMap } from '@/lib/record-diff'
 import { metadataWriter } from '@ensmetadata/sdk'
-import { CheckCircle2, ExternalLink, FileSignature } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { mainnet } from 'viem/chains'
 import type { AnyDraftFullProof } from './Wizard'
@@ -15,9 +16,9 @@ interface Props {
   /** Draft full-proof for the proof-issuance path. Null when the wizard
    *  was launched in attrs-only mode (no platforms requested). */
   draft: AnyDraftFullProof | null
-  /** Plain ENS text records to write alongside the proof — comes from
-   *  the EnterAttributesStep. May be empty in proof-only mode. */
-  extraRecords: Record<string, string>
+  /** Diff between on-chain records and what the user submitted. Drives
+   *  the add/update/remove preview and the write payload. */
+  recordDiff: RecordDiff
   sessionId: string
   onBack: () => void
 }
@@ -37,14 +38,14 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Props) {
+export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props) {
   const { walletClient, publicClient } = useWeb3()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
 
   const recordKey = draft ? `social-proofs[${draft.claim.p}]` : null
-  const hasExtras = Object.keys(extraRecords).length > 0
+  const hasRecordChanges = diffHasChanges(recordDiff)
 
   const runFlow = async () => {
     if (!walletClient) {
@@ -52,15 +53,15 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
       setPhase('error')
       return
     }
-    if (!draft && !hasExtras) {
-      setError('Nothing to write — no proof or attributes provided.')
+    if (!draft && !hasRecordChanges) {
+      setError('Nothing to write — no proof or attribute changes.')
       setPhase('error')
       return
     }
     setError(null)
 
     try {
-      const recordsToWrite: Record<string, string> = { ...extraRecords }
+      const recordsToWrite = diffToWriteMap(recordDiff)
 
       if (draft && recordKey) {
         setPhase('attesting')
@@ -109,15 +110,11 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
     ? `${mainnet.blockExplorers.default.url}/tx/${txHash}`
     : null
 
-  const writeSummary = (() => {
-    const parts: string[] = []
-    if (recordKey) parts.push(recordKey)
-    const extraCount = Object.keys(extraRecords).length
-    if (extraCount > 0) {
-      parts.push(`${extraCount} profile record${extraCount === 1 ? '' : 's'}`)
-    }
-    return parts.join(' + ')
-  })()
+  const changeCount =
+    recordDiff.added.length +
+    recordDiff.updated.length +
+    recordDiff.removed.length +
+    (draft ? 1 : 0)
 
   if (phase === 'done') {
     return (
@@ -125,7 +122,7 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
         <CardHeader>
           <CardTitle>Records published</CardTitle>
           <CardDescription>
-            <span className="font-mono">{writeSummary || 'Records'}</span> set on{' '}
+            {changeCount} record{changeCount === 1 ? '' : 's'} written to{' '}
             <span className="font-mono">{name}</span>.
           </CardDescription>
         </CardHeader>
@@ -179,51 +176,83 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Review and write</CardTitle>
+        <CardTitle>Review changes</CardTitle>
         <CardDescription>
-          {draft && hasExtras
-            ? 'Get the attester to sign and write the proof + profile records to ENS in one transaction.'
-            : draft
-              ? `Get the attester to issue a signed claim and write ${recordKey} on ${name}.`
-              : `Write ${Object.keys(extraRecords).length} profile record${Object.keys(extraRecords).length === 1 ? '' : 's'} to ${name}.`}
+          Changes to <span className="font-mono">{name}</span> shown below. The wallet transaction
+          will apply them in a single multicall.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <dl className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-neutral-500 dark:text-neutral-400">ENS name</dt>
-            <dd className="font-mono">{name}</dd>
+      <CardContent className="space-y-5">
+        {/* Proof record — treated as "new" since we don't read the current
+            proof to diff against yet. */}
+        {draft && recordKey && (
+          <DiffSection tone="add" title="New proof">
+            <DiffRow
+              icon={<Plus className="h-3.5 w-3.5" />}
+              tone="add"
+              k={recordKey}
+              value={
+                <span>
+                  {platformLabel}{' '}
+                  <span className="font-semibold">@{draft.claim.h}</span> signed by attester
+                </span>
+              }
+            />
+          </DiffSection>
+        )}
+
+        {recordDiff.added.length > 0 && (
+          <DiffSection tone="add" title={`Added (${recordDiff.added.length})`}>
+            {recordDiff.added.map((r) => (
+              <DiffRow
+                key={r.key}
+                icon={<Plus className="h-3.5 w-3.5" />}
+                tone="add"
+                k={r.key}
+                value={r.next}
+              />
+            ))}
+          </DiffSection>
+        )}
+
+        {recordDiff.updated.length > 0 && (
+          <DiffSection tone="update" title={`Updated (${recordDiff.updated.length})`}>
+            {recordDiff.updated.map((r) => (
+              <DiffRow
+                key={r.key}
+                icon={<PencilLine className="h-3.5 w-3.5" />}
+                tone="update"
+                k={r.key}
+                value={
+                  <span className="flex flex-col gap-0.5">
+                    <span className="line-through opacity-60">{r.prev}</span>
+                    <span>{r.next}</span>
+                  </span>
+                }
+              />
+            ))}
+          </DiffSection>
+        )}
+
+        {recordDiff.removed.length > 0 && (
+          <DiffSection tone="remove" title={`Removed (${recordDiff.removed.length})`}>
+            {recordDiff.removed.map((r) => (
+              <DiffRow
+                key={r.key}
+                icon={<Minus className="h-3.5 w-3.5" />}
+                tone="remove"
+                k={r.key}
+                value={<span className="line-through opacity-60">{r.prev}</span>}
+              />
+            ))}
+          </DiffSection>
+        )}
+
+        {!draft && !hasRecordChanges && (
+          <div className="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+            Nothing has changed vs. what&apos;s currently on chain. Go back to edit.
           </div>
-
-          {draft && recordKey && (
-            <>
-              <div className="flex justify-between">
-                <dt className="text-neutral-500 dark:text-neutral-400">Record key</dt>
-                <dd className="font-mono">{recordKey}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-neutral-500 dark:text-neutral-400">{platformLabel} handle</dt>
-                <dd className="font-mono">@{draft.claim.h}</dd>
-              </div>
-            </>
-          )}
-
-          {hasExtras && (
-            <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
-              <dt className="text-neutral-500 dark:text-neutral-400 text-xs uppercase tracking-wide">
-                Profile records
-              </dt>
-              {Object.entries(extraRecords).map(([key, value]) => (
-                <div key={key} className="flex justify-between gap-4">
-                  <dd className="font-mono text-neutral-500 dark:text-neutral-400">{key}</dd>
-                  <dd className="font-mono truncate max-w-[16rem]" title={value}>
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </div>
-          )}
-        </dl>
+        )}
 
         {phase === 'confirming' && explorerUrl && (
           <a
@@ -254,7 +283,12 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
               Try again
             </Button>
           ) : (
-            <Button full onClick={handleSignAndPublish} disabled={busy} isLoading={busy}>
+            <Button
+              full
+              onClick={handleSignAndPublish}
+              disabled={busy || (!draft && !hasRecordChanges)}
+              isLoading={busy}
+            >
               {!busy && <FileSignature className="h-4 w-4 mr-2" />}
               {phaseLabel[phase]}
             </Button>
@@ -262,5 +296,80 @@ export function ReviewStep({ name, draft, extraRecords, sessionId, onBack }: Pro
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+type Tone = 'add' | 'update' | 'remove'
+
+const TONE_STYLES: Record<
+  Tone,
+  { border: string; bg: string; badge: string; label: string }
+> = {
+  add: {
+    border: 'border-green-200 dark:border-green-900',
+    bg: 'bg-green-50/60 dark:bg-green-950/30',
+    badge: 'bg-green-500 text-white',
+    label: 'text-green-700 dark:text-green-300',
+  },
+  update: {
+    border: 'border-amber-200 dark:border-amber-900',
+    bg: 'bg-amber-50/60 dark:bg-amber-950/30',
+    badge: 'bg-amber-500 text-white',
+    label: 'text-amber-700 dark:text-amber-300',
+  },
+  remove: {
+    border: 'border-red-200 dark:border-red-900',
+    bg: 'bg-red-50/60 dark:bg-red-950/30',
+    badge: 'bg-red-500 text-white',
+    label: 'text-red-700 dark:text-red-300',
+  },
+}
+
+function DiffSection({
+  tone,
+  title,
+  children,
+}: {
+  tone: Tone
+  title: string
+  children: React.ReactNode
+}) {
+  const s = TONE_STYLES[tone]
+  return (
+    <div className={`rounded-lg border ${s.border} ${s.bg} overflow-hidden`}>
+      <div
+        className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${s.label}`}
+      >
+        {title}
+      </div>
+      <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">{children}</div>
+    </div>
+  )
+}
+
+function DiffRow({
+  icon,
+  tone,
+  k,
+  value,
+}: {
+  icon: React.ReactNode
+  tone: Tone
+  k: string
+  value: React.ReactNode
+}) {
+  const s = TONE_STYLES[tone]
+  return (
+    <div className="flex items-start gap-3 px-3 py-2.5 text-sm">
+      <span
+        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${s.badge}`}
+      >
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">{k}</span>
+        <div className="break-words font-mono text-sm">{value}</div>
+      </div>
+    </div>
   )
 }

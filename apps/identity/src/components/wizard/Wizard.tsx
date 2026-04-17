@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
 import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
 import { useSchema } from '@/lib/use-schema'
@@ -29,6 +30,11 @@ function isPlatform(s: string): s is Platform {
  * Config decoded from the URL. Each field is independent — agents can
  * request just a proof, just attributes, both, or neither (in which case
  * the wizard runs its default proof-only flow).
+ *
+ * `class` and `schema` accept comma-joined values for multi-schema asks.
+ * The wizard validates attrs against the union of all schemas but writes
+ * only the FIRST class value + schema URI to chain, since ENS text records
+ * are single strings and downstream verifiers parse them as such.
  */
 interface IncomingConfig {
   prefillName: string | null
@@ -36,25 +42,39 @@ interface IncomingConfig {
   allowedPlatforms: Platform[]
   /** Whether the URL specified `platforms` at all (vs. left it open). */
   platformsRequested: boolean
-  /** Text record keys to surface as form inputs in the attributes step. */
-  requestedAttrs: string[]
-  /** Pre-set `class` text record value, written automatically. */
-  classValue: string | null
-  /** Pre-set `schema` text record value, written automatically. */
-  schemaUri: string | null
+  /** Text record keys the recipient MUST fill in (Continue is gated on these). */
+  requiredAttrs: string[]
+  /** Text record keys surfaced as form inputs but OK to leave blank. */
+  optionalAttrs: string[]
+  /** Offered `class` text record values. First is the primary (written). */
+  classValues: string[]
+  /** Offered `schema` text record URIs. First is the primary (written). */
+  schemaUris: string[]
+}
+
+// SSR-safe default. First server render + first client render both use
+// this; the real URL-derived config is populated in an effect on the
+// client to avoid a hydration mismatch in the step indicator.
+const DEFAULT_CONFIG: IncomingConfig = {
+  prefillName: null,
+  allowedPlatforms: [],
+  platformsRequested: false,
+  requiredAttrs: [],
+  optionalAttrs: [],
+  classValues: [],
+  schemaUris: [],
+}
+
+function parseCsv(raw: string | null): string[] {
+  if (!raw) return []
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function readIncomingConfig(): IncomingConfig {
-  if (typeof window === 'undefined') {
-    return {
-      prefillName: null,
-      allowedPlatforms: [],
-      platformsRequested: false,
-      requestedAttrs: [],
-      classValue: null,
-      schemaUri: null,
-    }
-  }
+  if (typeof window === 'undefined') return DEFAULT_CONFIG
   const params = new URLSearchParams(window.location.search)
   const platformsRaw = params.get('platforms')
   const allowed = platformsRaw
@@ -63,20 +83,30 @@ function readIncomingConfig(): IncomingConfig {
         .map((s) => s.trim())
         .filter(isPlatform)
     : []
-  const attrsRaw = params.get('attrs')
-  const requestedAttrs = attrsRaw
-    ? attrsRaw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : []
+
+  // Preferred wire format: separate required + optional lists. Legacy
+  // `?attrs=` is read as "all optional" when the new params aren't present
+  // so existing shared links keep working.
+  const rawRequired = params.get('required')
+  const rawOptional = params.get('optional')
+  const legacyAttrs = params.get('attrs')
+  const requiredAttrs = parseCsv(rawRequired)
+  let optionalAttrs = parseCsv(rawOptional)
+  if (!rawRequired && !rawOptional && legacyAttrs) {
+    optionalAttrs = parseCsv(legacyAttrs)
+  }
+  // De-dup: anything in required should not also appear in optional.
+  const requiredSet = new Set(requiredAttrs)
+  optionalAttrs = optionalAttrs.filter((k) => !requiredSet.has(k))
+
   return {
     prefillName: params.get('name'),
     allowedPlatforms: allowed,
     platformsRequested: !!platformsRaw,
-    requestedAttrs,
-    classValue: params.get('class'),
-    schemaUri: params.get('schema'),
+    requiredAttrs,
+    optionalAttrs,
+    classValues: parseCsv(params.get('class')),
+    schemaUris: parseCsv(params.get('schema')),
   }
 }
 
@@ -95,15 +125,17 @@ function computeSteps(config: IncomingConfig): StepEntry[] {
 
   // Show the social step if the URL explicitly asks for platforms OR if
   // nothing specific was asked (the default proof-only flow).
+  const totalAttrs = config.requiredAttrs.length + config.optionalAttrs.length
   const wantsSocial =
     config.platformsRequested ||
-    (config.requestedAttrs.length === 0 && !config.classValue && !config.schemaUri)
+    (totalAttrs === 0 && config.classValues.length === 0 && config.schemaUris.length === 0)
   if (wantsSocial) {
     steps.push({ kind: 'social', label: 'Connect account' })
   }
 
   // Show the attributes step if the URL asks for any text records.
-  const wantsAttrs = config.requestedAttrs.length > 0 || !!config.classValue || !!config.schemaUri
+  const wantsAttrs =
+    totalAttrs > 0 || config.classValues.length > 0 || config.schemaUris.length > 0
   if (wantsAttrs) {
     steps.push({ kind: 'attrs', label: 'Profile' })
   }
@@ -146,11 +178,13 @@ export function Wizard() {
   const [name, setName] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AnyDraftFullProof | null>(null)
-  const [extraRecords, setExtraRecords] = useState<Record<string, string>>({})
+  const [recordDiff, setRecordDiff] = useState<RecordDiff>(EMPTY_DIFF)
 
-  // Read the URL config once, on mount. Memoised to keep the steps array
-  // and platform default stable between renders.
-  const incomingConfig = useMemo(() => readIncomingConfig(), [])
+  // The URL-derived config is read on the client only. First render (server
+  // + first client pass) uses DEFAULT_CONFIG so the initial HTML matches; the
+  // real values land after mount. Gating the render on `hydrated` avoids a
+  // flash of the empty-config wizard.
+  const [incomingConfig, setIncomingConfig] = useState<IncomingConfig>(DEFAULT_CONFIG)
   const steps = useMemo(() => computeSteps(incomingConfig), [incomingConfig])
 
   // Schema fetch + validation runs at the wizard root, before any step
@@ -162,31 +196,37 @@ export function Wizard() {
     schema: resolvedSchema,
     loading: schemaLoading,
     error: schemaError,
-  } = useSchema(incomingConfig.schemaUri, incomingConfig.requestedAttrs)
+  } = useSchema(incomingConfig.schemaUris, [
+    ...incomingConfig.requiredAttrs,
+    ...incomingConfig.optionalAttrs,
+  ])
 
   // Default platform: first allowed if the URL constrained it, else com.x.
   const initialPlatform: Platform = incomingConfig.allowedPlatforms[0] ?? 'com.x'
   const [platform, setPlatform] = useState<Platform>(initialPlatform)
 
   useEffect(() => {
+    const config = readIncomingConfig()
+    setIncomingConfig(config)
+
     const persisted = loadPersisted()
     if (persisted) {
       setStepIndex(persisted.stepIndex)
       // Only honor a persisted name if the URL didn't pre-fill one.
-      if (!incomingConfig.prefillName) setName(persisted.name)
-      else setName(incomingConfig.prefillName)
+      if (!config.prefillName) setName(persisted.name)
+      else setName(config.prefillName)
       setSessionId(persisted.sessionId)
       // Honor the URL platform restriction over a stale persisted value.
-      if (incomingConfig.allowedPlatforms.length > 0) {
-        setPlatform(incomingConfig.allowedPlatforms[0])
+      if (config.allowedPlatforms.length > 0) {
+        setPlatform(config.allowedPlatforms[0])
       } else {
         setPlatform(persisted.platform)
       }
-    } else if (incomingConfig.prefillName) {
-      setName(incomingConfig.prefillName)
+    } else if (config.prefillName) {
+      setName(config.prefillName)
     }
     setHydrated(true)
-  }, [incomingConfig])
+  }, [])
 
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
@@ -233,7 +273,9 @@ export function Wizard() {
                   <div className="font-medium">{schemaError}</div>
                   <div className="text-xs">
                     Schema URI:{' '}
-                    <span className="font-mono break-all">{incomingConfig.schemaUri}</span>
+                    <span className="font-mono break-all">
+                      {incomingConfig.schemaUris.join(', ')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -248,13 +290,15 @@ export function Wizard() {
     )
   }
 
-  if (schemaLoading) {
+  if (!hydrated || schemaLoading) {
     return (
       <div className="max-w-xl mx-auto w-full">
         <Card>
           <CardHeader>
             <CardTitle>Loading…</CardTitle>
-            <CardDescription>Fetching the schema referenced by this link.</CardDescription>
+            <CardDescription>
+              {schemaLoading ? 'Fetching the schema referenced by this link.' : 'Preparing…'}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -337,13 +381,14 @@ export function Wizard() {
       {currentStep?.kind === 'attrs' && (
         <EnterAttributesStep
           name={name}
-          requestedAttrs={incomingConfig.requestedAttrs}
-          classValue={incomingConfig.classValue ?? undefined}
-          schemaUri={incomingConfig.schemaUri ?? undefined}
+          requiredAttrs={incomingConfig.requiredAttrs}
+          optionalAttrs={incomingConfig.optionalAttrs}
+          classValue={incomingConfig.classValues[0]}
+          schemaUri={incomingConfig.schemaUris[0]}
           schema={resolvedSchema}
           onBack={back}
-          onComplete={(records) => {
-            setExtraRecords(records)
+          onComplete={(diff) => {
+            setRecordDiff(diff)
             advance()
           }}
         />
@@ -353,7 +398,7 @@ export function Wizard() {
         <ReviewStep
           name={name}
           draft={draft}
-          extraRecords={extraRecords}
+          recordDiff={recordDiff}
           sessionId={sessionId}
           onBack={back}
         />

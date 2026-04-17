@@ -5,15 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useWeb3 } from '@/contexts/Web3Provider'
+import { type RecordDiff, computeRecordDiff } from '@/lib/record-diff'
 import type { FetchedSchema, SchemaProperty } from '@/lib/use-schema'
-import { computeDelta, metadataReader } from '@ensmetadata/sdk'
+import { metadataReader } from '@ensmetadata/sdk'
 import { useEffect, useMemo, useState } from 'react'
 
 interface Props {
   /** ENS name being attested. */
   name: string
-  /** Text record keys the agent asked the user to fill in. */
-  requestedAttrs: string[]
+  /** Text record keys the recipient MUST fill in before Continue unlocks. */
+  requiredAttrs: string[]
+  /** Text record keys surfaced as form inputs but OK to leave blank. */
+  optionalAttrs: string[]
   /**
    * Pre-set `class` text record value, supplied via the URL. Written
    * automatically alongside the requested attrs; not exposed as a form
@@ -33,12 +36,12 @@ interface Props {
   schema: FetchedSchema | null
   onBack: () => void
   /**
-   * Receives only the records that need to be written — the diff between
-   * what's currently on chain and what the user submitted. Records that
-   * already match the existing value are omitted, so the eventual
-   * setMetadata multicall only touches what actually changed.
+   * Receives the full diff between what's currently on chain and what the
+   * user submitted: additions, updates (with prior values), and removals.
+   * ReviewStep uses this to render a proper add/update/remove preview and
+   * derives the write payload at publish time.
    */
-  onComplete: (records: Record<string, string>) => void
+  onComplete: (diff: RecordDiff) => void
 }
 
 /**
@@ -61,7 +64,8 @@ function htmlInputType(prop: SchemaProperty | undefined): string {
 
 export function EnterAttributesStep({
   name,
-  requestedAttrs,
+  requiredAttrs,
+  optionalAttrs,
   classValue,
   schemaUri,
   schema,
@@ -69,8 +73,17 @@ export function EnterAttributesStep({
   onComplete,
 }: Props) {
   const { publicClient } = useWeb3()
+
+  // All requested keys (required + optional), preserving the order the
+  // actor specified. Used for the form inputs and the chain read.
+  const allRequestedAttrs = useMemo(
+    () => [...requiredAttrs, ...optionalAttrs],
+    [requiredAttrs, optionalAttrs],
+  )
+  const requiredSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
+
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(requestedAttrs.map((k) => [k, ''])),
+    Object.fromEntries(allRequestedAttrs.map((k) => [k, ''])),
   )
   const [loaded, setLoaded] = useState<Record<string, string | null> | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -79,11 +92,11 @@ export function EnterAttributesStep({
   // class/schema records, since we want to skip writing those if they
   // already match the values supplied via the URL.
   const allKeys = useMemo(() => {
-    const keys = [...requestedAttrs]
+    const keys = [...allRequestedAttrs]
     if (classValue) keys.push('class')
     if (schemaUri) keys.push('schema')
     return [...new Set(keys)]
-  }, [requestedAttrs, classValue, schemaUri])
+  }, [allRequestedAttrs, classValue, schemaUri])
 
   // Load existing values on mount via the SDK's metadataReader. Pre-fills
   // the form inputs with whatever's already on chain so the user sees
@@ -103,7 +116,7 @@ export function EnterAttributesStep({
         setLoaded(properties)
         setValues((prev) => {
           const next = { ...prev }
-          for (const key of requestedAttrs) {
+          for (const key of allRequestedAttrs) {
             const existing = properties[key]
             if (typeof existing === 'string' && existing) next[key] = existing
           }
@@ -118,22 +131,29 @@ export function EnterAttributesStep({
     return () => {
       cancelled = true
     }
-  }, [publicClient, name, allKeys, requestedAttrs])
+  }, [publicClient, name, allKeys, allRequestedAttrs])
+
+  // Missing-required check — Continue is blocked until every required
+  // key has a non-empty value (current input OR loaded-from-chain value).
+  const missingRequired = useMemo(() => {
+    return requiredAttrs.filter((k) => {
+      const v = values[k]
+      return typeof v !== 'string' || v.trim().length === 0
+    })
+  }, [requiredAttrs, values])
 
   const handleContinue = () => {
-    // Build the desired-state map. Empty strings stay empty (computeDelta
-    // treats empty + empty as no-op, empty + present as deletion — but we
-    // skip the deletion case in this version by not emitting deletes).
+    if (missingRequired.length > 0) return
+    // Build the desired-state map and diff it against what's on chain.
+    // computeRecordDiff returns {added, updated, removed} with prior
+    // values attached so the review screen can show exactly what will
+    // change, including cleared fields.
     const desired: Record<string, string> = { ...values }
     if (classValue) desired.class = classValue
     if (schemaUri) desired.schema = schemaUri
 
-    // Diff against the loaded baseline. Returns { changes, deleted }; we
-    // only act on `changes` for now since the wizard doesn't surface
-    // a "clear this record" UI.
     const original = loaded ?? {}
-    const delta = computeDelta(original, desired)
-    onComplete(delta.changes)
+    onComplete(computeRecordDiff(original, desired))
   }
 
   const isLoading = loaded === null
@@ -165,17 +185,19 @@ export function EnterAttributesStep({
           </div>
         )}
 
-        {!isLoading && requestedAttrs.length === 0 && hiddenRecords.length > 0 && (
+        {!isLoading && allRequestedAttrs.length === 0 && hiddenRecords.length > 0 && (
           <div className="rounded-md border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-600 dark:text-neutral-400">
             No fields to fill in — the agent only asked to set the structural records below.
           </div>
         )}
 
         {!isLoading &&
-          requestedAttrs.map((key) => {
+          allRequestedAttrs.map((key) => {
             const existing = loaded?.[key]
             const current = values[key] ?? ''
             const unchanged = typeof existing === 'string' && existing === current && current !== ''
+            const isRequired = requiredSet.has(key)
+            const isMissing = isRequired && current.trim().length === 0
             // Per-property metadata from the resolved schema, with sensible
             // fallbacks. The wizard root already validated that every
             // requested attr is defined in the schema, so this lookup
@@ -193,7 +215,18 @@ export function EnterAttributesStep({
             return (
               <div key={key} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor={`attr-${key}`}>{labelText}</Label>
+                  <Label htmlFor={`attr-${key}`} className="flex items-center gap-2">
+                    <span>{labelText}</span>
+                    {isRequired ? (
+                      <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
+                        required
+                      </span>
+                    ) : (
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                        optional
+                      </span>
+                    )}
+                  </Label>
                   {unchanged && (
                     <span className="text-xs text-neutral-400 dark:text-neutral-500">
                       unchanged
@@ -209,6 +242,8 @@ export function EnterAttributesStep({
                   autoCorrect="off"
                   spellCheck={false}
                   placeholder={placeholder}
+                  aria-required={isRequired}
+                  aria-invalid={isMissing}
                 />
                 {helpText && (
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">{helpText}</p>
@@ -242,11 +277,22 @@ export function EnterAttributesStep({
           </div>
         )}
 
+        {!isLoading && missingRequired.length > 0 && (
+          <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
+            Required field{missingRequired.length === 1 ? '' : 's'} still empty:{' '}
+            <span className="font-mono">{missingRequired.join(', ')}</span>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button variant="outline" onClick={onBack} full>
             Back
           </Button>
-          <Button onClick={handleContinue} full disabled={isLoading}>
+          <Button
+            onClick={handleContinue}
+            full
+            disabled={isLoading || missingRequired.length > 0}
+          >
             Continue
           </Button>
         </div>
