@@ -19,13 +19,13 @@
     "prepublishOnly": "pnpm build && pnpm test && pnpm lint"
   },
   "dependencies": {
-    "@ensdomains/ensjs": "^4.0.2",
-    "viem": "2.23.15"
+    "@ensdomains/ensjs": "^4.2.2",
+    "viem": "2.48.1"
   },
   "devDependencies": {
     "@ensmetadata/schemas": "workspace:*",
     "tsup": "^8.5.1",
-    "typescript": "^5",
-    "vitest": "^3.2.1"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
