@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { attest, evictSession } from '@/lib/attester-client'
-import { type RecordDiff, diffHasChanges, diffToWriteMap } from '@/lib/record-diff'
+import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
 import { metadataWriter } from '@ensmetadata/sdk'
 import { CheckCircle2, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -48,7 +48,32 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
   const [txHash, setTxHash] = useState<string | null>(null)
 
   const recordKey = draft ? `social-proofs[${draft.claim.p}]` : null
-  const hasRecordChanges = diffHasChanges(recordDiff) || !!(classValue || schemaUri)
+
+  // Split recordDiff into structural (class/schema) and non-structural entries.
+  const STRUCTURAL_KEYS = new Set(['class', 'schema'])
+  const addedNonStructural = recordDiff.added.filter((r) => !STRUCTURAL_KEYS.has(r.key))
+  const updatedNonStructural = recordDiff.updated.filter((r) => !STRUCTURAL_KEYS.has(r.key))
+  const removedNonStructural = recordDiff.removed.filter((r) => !STRUCTURAL_KEYS.has(r.key))
+
+  // Structural entries for category 3. Direct props (skipped attrs step) take
+  // precedence; fall back to whatever the diff computed.
+  const classFromDiff =
+    recordDiff.added.find((r) => r.key === 'class') ??
+    recordDiff.updated.find((r) => r.key === 'class')
+  const schemaFromDiff =
+    recordDiff.added.find((r) => r.key === 'schema') ??
+    recordDiff.updated.find((r) => r.key === 'schema')
+  const effectiveClass = classValue ?? classFromDiff?.next
+  const effectiveSchema = schemaUri ?? schemaFromDiff?.next
+  const structuralEntries: Array<{ key: string; value: string }> = []
+  if (effectiveClass) structuralEntries.push({ key: 'class', value: effectiveClass })
+  if (effectiveSchema) structuralEntries.push({ key: 'schema', value: effectiveSchema })
+
+  const hasRecordChanges =
+    addedNonStructural.length > 0 ||
+    updatedNonStructural.length > 0 ||
+    removedNonStructural.length > 0 ||
+    structuralEntries.length > 0
 
   const runFlow = async () => {
     if (!walletClient) {
@@ -116,12 +141,11 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
     : null
 
   const changeCount =
-    recordDiff.added.length +
-    recordDiff.updated.length +
-    recordDiff.removed.length +
+    addedNonStructural.length +
+    updatedNonStructural.length +
+    removedNonStructural.length +
     (draft ? 1 : 0) +
-    (classValue ? 1 : 0) +
-    (schemaUri ? 1 : 0)
+    structuralEntries.length
 
   if (phase === 'done') {
     return (
@@ -190,48 +214,23 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Proof record — treated as "new" since we don't read the current
-            proof to diff against yet. */}
-        {draft && recordKey && (
-          <DiffSection tone="add" title="New proof">
-            <DiffRow
-              icon={<Plus className="h-3.5 w-3.5" />}
-              tone="add"
-              k={recordKey}
-              value={
-                <span>
-                  {platformLabel}{' '}
-                  <span className="font-semibold">@{draft.claim.h}</span> signed by attester
-                </span>
-              }
-            />
-          </DiffSection>
-        )}
-
-        {(classValue || schemaUri) && (
-          <DiffSection tone="add" title="Structural records">
-            {classValue && (
+        {/* Category 1: New records (proof + added non-structural) */}
+        {(draft || addedNonStructural.length > 0) && (
+          <DiffSection tone="add" title="Values to add" subtitle="These new records will be added to your profile.">
+            {draft && recordKey && (
               <DiffRow
                 icon={<Plus className="h-3.5 w-3.5" />}
                 tone="add"
-                k="class"
-                value={classValue}
+                k={recordKey}
+                value={
+                  <span>
+                    {platformLabel}{' '}
+                    <span className="font-semibold">@{draft.claim.h}</span> signed by attester
+                  </span>
+                }
               />
             )}
-            {schemaUri && (
-              <DiffRow
-                icon={<Plus className="h-3.5 w-3.5" />}
-                tone="add"
-                k="schema"
-                value={schemaUri}
-              />
-            )}
-          </DiffSection>
-        )}
-
-        {recordDiff.added.length > 0 && (
-          <DiffSection tone="add" title={`Added (${recordDiff.added.length})`}>
-            {recordDiff.added.map((r) => (
+            {addedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
                 icon={<Plus className="h-3.5 w-3.5" />}
@@ -243,9 +242,10 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
           </DiffSection>
         )}
 
-        {recordDiff.updated.length > 0 && (
-          <DiffSection tone="update" title={`Updated (${recordDiff.updated.length})`}>
-            {recordDiff.updated.map((r) => (
+        {/* Category 2: Updated/removed non-structural records */}
+        {(updatedNonStructural.length > 0 || removedNonStructural.length > 0) && (
+          <DiffSection tone="update" title="Values to update" subtitle="These existing records will be updated on your profile.">
+            {updatedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
                 icon={<PencilLine className="h-3.5 w-3.5" />}
@@ -259,18 +259,32 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
                 }
               />
             ))}
-          </DiffSection>
-        )}
-
-        {recordDiff.removed.length > 0 && (
-          <DiffSection tone="remove" title={`Removed (${recordDiff.removed.length})`}>
-            {recordDiff.removed.map((r) => (
+            {removedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
                 icon={<Minus className="h-3.5 w-3.5" />}
                 tone="remove"
                 k={r.key}
                 value={<span className="line-through opacity-60">{r.prev}</span>}
+              />
+            ))}
+          </DiffSection>
+        )}
+
+        {/* Category 3: Structural records (class/schema only) */}
+        {structuralEntries.length > 0 && (
+          <DiffSection
+            tone="neutral"
+            title="Additional records"
+            subtitle="These records will be updated to make your profile discoverable."
+          >
+            {structuralEntries.map((entry) => (
+              <DiffRow
+                key={entry.key}
+                icon={<Plus className="h-3.5 w-3.5" />}
+                tone="neutral"
+                k={entry.key}
+                value={entry.value}
               />
             ))}
           </DiffSection>
@@ -327,7 +341,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
   )
 }
 
-type Tone = 'add' | 'update' | 'remove'
+type Tone = 'add' | 'update' | 'remove' | 'neutral'
 
 const TONE_STYLES: Record<
   Tone,
@@ -351,24 +365,31 @@ const TONE_STYLES: Record<
     badge: 'bg-red-500 text-white',
     label: 'text-red-700 dark:text-red-300',
   },
+  neutral: {
+    border: 'border-neutral-200 dark:border-neutral-700',
+    bg: 'bg-transparent',
+    badge: 'bg-neutral-400 text-white',
+    label: 'text-neutral-500 dark:text-neutral-400',
+  },
 }
 
 function DiffSection({
   tone,
   title,
+  subtitle,
   children,
 }: {
   tone: Tone
   title: string
+  subtitle: string
   children: React.ReactNode
 }) {
   const s = TONE_STYLES[tone]
   return (
     <div className={`rounded-lg border ${s.border} ${s.bg} overflow-hidden`}>
-      <div
-        className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${s.label}`}
-      >
-        {title}
+      <div className={`px-3 pt-2.5 pb-2 ${s.label}`}>
+        <div className="text-xs font-semibold uppercase tracking-wide">{title}</div>
+        <div className="text-xs mt-0.5 opacity-80">{subtitle}</div>
       </div>
       <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">{children}</div>
     </div>
