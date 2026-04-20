@@ -21,6 +21,9 @@ interface Props {
   recordDiff: RecordDiff
   sessionId: string
   onBack: () => void
+  /** Written directly when the attrs step was skipped (no user-facing fields). */
+  classValue?: string
+  schemaUri?: string
 }
 
 type Phase = 'idle' | 'attesting' | 'writing' | 'confirming' | 'done' | 'error'
@@ -38,14 +41,14 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props) {
+export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classValue, schemaUri }: Props) {
   const { walletClient, publicClient } = useWeb3()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
 
   const recordKey = draft ? `social-proofs[${draft.claim.p}]` : null
-  const hasRecordChanges = diffHasChanges(recordDiff)
+  const hasRecordChanges = diffHasChanges(recordDiff) || !!(classValue || schemaUri)
 
   const runFlow = async () => {
     if (!walletClient) {
@@ -62,6 +65,8 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props
 
     try {
       const recordsToWrite = diffToWriteMap(recordDiff)
+      if (classValue) recordsToWrite.class = classValue
+      if (schemaUri) recordsToWrite.schema = schemaUri
 
       if (draft && recordKey) {
         setPhase('attesting')
@@ -114,7 +119,9 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props
     recordDiff.added.length +
     recordDiff.updated.length +
     recordDiff.removed.length +
-    (draft ? 1 : 0)
+    (draft ? 1 : 0) +
+    (classValue ? 1 : 0) +
+    (schemaUri ? 1 : 0)
 
   if (phase === 'done') {
     return (
@@ -198,6 +205,27 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack }: Props
                 </span>
               }
             />
+          </DiffSection>
+        )}
+
+        {(classValue || schemaUri) && (
+          <DiffSection tone="add" title="Structural records">
+            {classValue && (
+              <DiffRow
+                icon={<Plus className="h-3.5 w-3.5" />}
+                tone="add"
+                k="class"
+                value={classValue}
+              />
+            )}
+            {schemaUri && (
+              <DiffRow
+                icon={<Plus className="h-3.5 w-3.5" />}
+                tone="add"
+                k="schema"
+                value={schemaUri}
+              />
+            )}
           </DiffSection>
         )}
 

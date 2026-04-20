@@ -157,9 +157,6 @@ export function EnterAttributesStep({
   }
 
   const isLoading = loaded === null
-  const hiddenRecords: Array<[string, string]> = []
-  if (classValue) hiddenRecords.push(['class', classValue])
-  if (schemaUri) hiddenRecords.push(['schema', schemaUri])
 
   return (
     <Card>
@@ -184,12 +181,6 @@ export function EnterAttributesStep({
             Couldn&apos;t load existing records (<span className="font-mono">{loadError}</span>).
             Warning! Submitting new records risks overwriting existing data. It is okay to continue
             if this is what you want to do.
-          </div>
-        )}
-
-        {!isLoading && allRequestedAttrs.length === 0 && hiddenRecords.length > 0 && (
-          <div className="rounded-md border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-600 dark:text-neutral-400">
-            No fields to fill in — the agent only asked to set the structural records below.
           </div>
         )}
 
@@ -246,24 +237,6 @@ export function EnterAttributesStep({
               </div>
             )
           })}
-
-        {hiddenRecords.length > 0 && (
-          <div className="rounded-md border border-dashed border-neutral-200 dark:border-neutral-700 p-3 text-xs">
-            <div className="text-neutral-500 dark:text-neutral-400 mb-2">
-              Also written automatically (only if different from current):
-            </div>
-            <dl className="space-y-1">
-              {hiddenRecords.map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-4">
-                    <dt className="font-mono text-neutral-500 dark:text-neutral-400">{k}</dt>
-                    <dd className="font-mono truncate">
-                      <span>{v}</span>
-                    </dd>
-                  </div>
-              ))}
-            </dl>
-          </div>
-        )}
 
         {!isLoading && missingRequired.length > 0 && (
           <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">

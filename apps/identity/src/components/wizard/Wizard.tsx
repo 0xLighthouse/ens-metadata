@@ -157,8 +157,9 @@ function computeSteps(config: IncomingConfig): StepEntry[] {
     steps.push({ kind: 'social', label: 'Link accounts' })
   }
 
-  // Show the attributes step if the URL asks for any text records.
-  const wantsAttrs = totalAttrs > 0 || config.classValues.length > 0 || config.schemaUris.length > 0
+  // Show the attributes step only when there are fields for the user to fill in.
+  // class/schema-only writes skip this step and go directly to review.
+  const wantsAttrs = totalAttrs > 0
   if (wantsAttrs) {
     steps.push({ kind: 'attrs', label: 'Complete profile' })
   }
@@ -302,6 +303,10 @@ export function Wizard() {
   const stepLabels = steps.map((s) => s.label)
   const advance = () => setStepIndex((i) => Math.min(i + 1, steps.length - 1))
   const back = () => setStepIndex((i) => Math.max(i - 1, 0))
+
+  // When the attrs step is absent, class/schema values bypass EnterAttributesStep
+  // and are passed directly to ReviewStep to be written unconditionally.
+  const hasAttrsStep = steps.some((s) => s.kind === 'attrs')
 
   // Visible platforms in the picker — restricted by the URL or all known.
   const visiblePlatforms: Platform[] =
@@ -491,6 +496,8 @@ export function Wizard() {
           recordDiff={recordDiff}
           sessionId={sessionId}
           onBack={back}
+          classValue={!hasAttrsStep ? incomingConfig.classValues[0] : undefined}
+          schemaUri={!hasAttrsStep ? incomingConfig.schemaUris[0] : undefined}
         />
       )}
     </div>
