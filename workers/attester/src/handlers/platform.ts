@@ -11,6 +11,11 @@ import { getPlatform } from '../platforms'
  * Body: { sessionId, payload } where the shape of payload is platform-
  * specific (Privy access token for Twitter, Login Widget HMAC for
  * Telegram, etc.). The validator owns the parsing.
+ *
+ * When the session has SIWE resources (i.e. the client used the multi-
+ * platform signing flow), we verify that the platform handle was included
+ * in the signed message. This ties the attestation to the exact accounts
+ * the user consented to in their signature.
  */
 export async function handlePlatform(
   env: Env,
@@ -50,6 +55,21 @@ export async function handlePlatform(
       { error: err instanceof Error ? err.message : 'validation failed' },
       { status: 400 },
     )
+  }
+
+  // When the client included resources in the SIWE message, verify the handle
+  // is present. Format: "social:{platformId}:{handle}". Skipped for sessions
+  // created by older clients that don't include resources.
+  if (session.siweResources.length > 0) {
+    const expected = `social:${platform.id}:${validated.handle}`
+    if (!session.siweResources.includes(expected)) {
+      return jsonResponse(
+        env,
+        request,
+        { error: `platform handle not included in signed message` },
+        { status: 403 },
+      )
+    }
   }
 
   await stub.bindPlatform({

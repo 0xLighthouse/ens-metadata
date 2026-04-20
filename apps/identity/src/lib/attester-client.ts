@@ -114,15 +114,19 @@ export interface AttestArgs {
   name: string
 }
 
-export interface AttestResult {
+export interface AttestationEntry {
   /** 0x-prefixed hex of the fully-encoded v1 envelope — write directly to ENS. */
   claimHex: string
-  /** Platform namespace from the session. */
+  /** Platform namespace (e.g. "com.x", "org.telegram"). */
   platform: string
-  /** Handle from the session. */
+  /** Display handle. */
   handle: string
   /** Attester address. */
   attester: string
+}
+
+export interface AttestResult {
+  attestations: AttestationEntry[]
 }
 
 export async function attest(args: AttestArgs): Promise<AttestResult> {

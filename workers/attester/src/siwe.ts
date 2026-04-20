@@ -3,9 +3,16 @@ import { parseSiweMessage, validateSiweMessage } from 'viem/siwe'
 import { matchesAllowlist, parseAllowlist } from './allowlist'
 import type { Env } from './env'
 
+export interface SiweVerifyResult {
+  address: Address
+  /** Resources extracted from the SIWE message, may be empty. */
+  resources: string[]
+}
+
 /**
  * Verify a SIWE (EIP-4361) message + signature pair against an expected
- * nonce. Returns the recovered wallet address on success, throws otherwise.
+ * nonce. Returns the recovered wallet address and any declared resources on
+ * success, throws otherwise.
  *
  * Three checks:
  *   1. The message parses as a valid SIWE payload.
@@ -29,7 +36,7 @@ export async function verifySiwe(
     signature: `0x${string}`
     expectedNonce: string
   },
-): Promise<Address> {
+): Promise<SiweVerifyResult> {
   const parsed = parseSiweMessage(args.message)
   if (!parsed.address) {
     throw new Error('siwe: message has no address')
@@ -59,5 +66,5 @@ export async function verifySiwe(
   if (!recovered) {
     throw new Error('siwe: signature does not recover to the message address')
   }
-  return parsed.address
+  return { address: parsed.address, resources: parsed.resources ?? [] }
 }

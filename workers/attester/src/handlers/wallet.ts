@@ -33,9 +33,9 @@ export async function handleWallet(env: Env, request: Request): Promise<Response
     return jsonResponse(env, request, { error: 'session not found or expired' }, { status: 404 })
   }
 
-  let wallet
+  let verified
   try {
-    wallet = await verifySiwe(env, {
+    verified = await verifySiwe(env, {
       message,
       signature: signature as `0x${string}`,
       expectedNonce: session.nonce,
@@ -49,6 +49,6 @@ export async function handleWallet(env: Env, request: Request): Promise<Response
     )
   }
 
-  await stub.bindWallet(wallet)
-  return jsonResponse(env, request, { ok: true, wallet })
+  await stub.bindWallet(verified.address, verified.resources)
+  return jsonResponse(env, request, { ok: true, wallet: verified.address })
 }

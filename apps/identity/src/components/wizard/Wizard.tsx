@@ -10,10 +10,9 @@ import { formatKeyName } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { AlertCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { ConnectTelegramStep } from './ConnectTelegramStep'
-import { ConnectTwitterStep } from './ConnectTwitterStep'
 import { ConnectWalletStep } from './ConnectWalletStep'
 import { CreatorBanner } from './CreatorBanner'
+import { type AttestationProof, LinkAccountsStep } from './LinkAccountsStep'
 import { EnterAttributesStep } from './EnterAttributesStep'
 import { ReviewStep } from './ReviewStep'
 import { WizardStepIndicator } from './WizardStepIndicator'
@@ -175,22 +174,28 @@ interface PersistedState {
   stepIndex: number
   name: string
   sessionId: string | null
+  nonce: string | null
   platform: Platform
+  proofs: AttestationProof[]
 }
 
 function loadPersisted(): PersistedState | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedState
     if (typeof parsed.stepIndex !== 'number' || typeof parsed.name !== 'string') return null
+    const proofs: AttestationProof[] = Array.isArray(parsed.proofs) ? parsed.proofs : []
     return {
-      // Never resume into the review step — draft is ephemeral and won't exist.
-      stepIndex: Math.min(parsed.stepIndex, 1),
+      // If attestations are in hand, resume up to step 2 (attrs or review).
+      // Otherwise cap at step 1 so they redo the social linking step.
+      stepIndex: proofs.length > 0 ? Math.min(parsed.stepIndex, 2) : Math.min(parsed.stepIndex, 1),
       name: parsed.name,
       sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
+      nonce: typeof parsed.nonce === 'string' ? parsed.nonce : null,
       platform: isPlatform(parsed.platform) ? parsed.platform : 'com.x',
+      proofs,
     }
   } catch {
     return null
@@ -202,7 +207,8 @@ export function Wizard() {
   const [stepIndex, setStepIndex] = useState(0)
   const [name, setName] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<AnyDraftFullProof | null>(null)
+  const [nonce, setNonce] = useState<string | null>(null)
+  const [proofs, setProofs] = useState<AttestationProof[]>([])
   const [recordDiff, setRecordDiff] = useState<RecordDiff>(EMPTY_DIFF)
 
   // The URL-derived config is read on the client only. First render (server
@@ -247,6 +253,8 @@ export function Wizard() {
         if (!config.prefillName) setName(persisted.name)
         else setName(config.prefillName)
         setSessionId(persisted.sessionId)
+        setNonce(persisted.nonce)
+        if (persisted.proofs.length > 0) setProofs(persisted.proofs)
         if (config.allowedPlatforms.length > 0) {
           setPlatform(config.allowedPlatforms[0])
         } else {
@@ -294,16 +302,25 @@ export function Wizard() {
 
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ stepIndex, name, sessionId, platform } satisfies PersistedState),
+      JSON.stringify({ stepIndex, name, sessionId, nonce, platform, proofs } satisfies PersistedState),
     )
-  }, [hydrated, stepIndex, name, sessionId, platform])
+  }, [hydrated, stepIndex, name, sessionId, nonce, platform, proofs])
 
   const currentStep = steps[stepIndex]
   const stepLabels = steps.map((s) => s.label)
   const advance = () => setStepIndex((i) => Math.min(i + 1, steps.length - 1))
   const back = () => setStepIndex((i) => Math.max(i - 1, 0))
+
+  // Session expired mid-flow: clear session state and return to step 1 so the
+  // user re-validates their ENS name and gets a fresh session.
+  const handleSessionExpired = () => {
+    setSessionId(null)
+    setNonce(null)
+    setProofs([])
+    setStepIndex(0)
+  }
 
   // When the attrs step is absent, class/schema values bypass EnterAttributesStep
   // and are passed directly to ReviewStep to be written unconditionally.
@@ -320,13 +337,6 @@ export function Wizard() {
       }),
     )
   }, [resolvedSchema, incomingConfig.requiredAttrs, incomingConfig.optionalAttrs])
-
-  // Visible platforms in the picker — restricted by the URL or all known.
-  const visiblePlatforms: Platform[] =
-    incomingConfig.allowedPlatforms.length > 0
-      ? incomingConfig.allowedPlatforms
-      : [...KNOWN_PLATFORMS]
-  const showPlatformPicker = visiblePlatforms.length > 1
 
   // An unresolvable intent id fails fast before any step renders, with the
   // same Card shell used for schema errors so the two error modes look
@@ -348,6 +358,7 @@ export function Wizard() {
       </div>
     )
   }
+
 
   // Refuse to render any wizard step when the schema is broken. The user
   // can still copy the failing URI to debug, but they can't proceed —
@@ -420,70 +431,30 @@ export function Wizard() {
       {currentStep?.kind === 'wallet' && (
         <ConnectWalletStep
           defaultName={incomingConfig.prefillName ?? undefined}
-          onComplete={(n, sid) => {
+          onComplete={(n, sid, nonceVal) => {
             setName(n)
             setSessionId(sid)
+            setNonce(nonceVal)
             advance()
           }}
         />
       )}
 
-      {currentStep?.kind === 'social' && sessionId && (
-        <div className="space-y-4">
-          {showPlatformPicker && (
-            <div className="flex gap-2 max-w-xl mx-auto">
-              {visiblePlatforms.includes('com.x') && (
-                <button
-                  type="button"
-                  onClick={() => setPlatform('com.x')}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    platform === 'com.x'
-                      ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
-                      : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                  }`}
-                >
-                  X
-                </button>
-              )}
-              {visiblePlatforms.includes('org.telegram') && (
-                <button
-                  type="button"
-                  onClick={() => setPlatform('org.telegram')}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    platform === 'org.telegram'
-                      ? 'border-neutral-900 bg-neutral-900 text-neutral-50 dark:border-neutral-50 dark:bg-neutral-50 dark:text-neutral-900'
-                      : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                  }`}
-                >
-                  Telegram
-                </button>
-              )}
-            </div>
-          )}
-
-          {platform === 'com.x' && (
-            <ConnectTwitterStep
-              name={name}
-              sessionId={sessionId}
-              onBack={back}
-              onComplete={(next) => {
-                setDraft(next)
-                advance()
-              }}
-            />
-          )}
-          {platform === 'org.telegram' && (
-            <ConnectTelegramStep
-              name={name}
-              sessionId={sessionId}
-              onBack={back}
-              onComplete={(next) => {
-                setDraft(next)
-                advance()
-              }}
-            />
-          )}
-        </div>
+      {currentStep?.kind === 'social' && sessionId && nonce && (
+        <LinkAccountsStep
+          name={name}
+          sessionId={sessionId}
+          nonce={nonce}
+          allowedPlatforms={incomingConfig.allowedPlatforms}
+          initialPlatform={platform}
+          onPlatformChange={(p) => setPlatform(p)}
+          onBack={back}
+          onSessionExpired={handleSessionExpired}
+          onComplete={(nextProofs) => {
+            setProofs(nextProofs)
+            advance()
+          }}
+        />
       )}
 
       {currentStep?.kind === 'attrs' && (
@@ -506,7 +477,7 @@ export function Wizard() {
       {currentStep?.kind === 'review' && sessionId && (
         <ReviewStep
           name={name}
-          draft={draft}
+          proofs={proofs}
           recordDiff={recordDiff}
           sessionId={sessionId}
           onBack={back}

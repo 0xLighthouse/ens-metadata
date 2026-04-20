@@ -18,8 +18,10 @@ export interface SessionData {
   nonce: string
   /** Wallet address bound to the session, after successful SIWE verify. */
   wallet?: Address
-  /** Platform account bound to this session, if any. */
-  platform?: PlatformBinding
+  /** Platform accounts bound to this session. */
+  platforms: PlatformBinding[]
+  /** Resources extracted from the SIWE message, used to validate platform bindings. */
+  siweResources: string[]
   /** Created at, unix seconds. */
   createdAt: number
   /** Expires at, unix seconds. */
@@ -54,6 +56,8 @@ export class SessionStore extends DurableObject<Env> {
     const now = Math.floor(Date.now() / 1000)
     const data: SessionData = {
       nonce,
+      platforms: [],
+      siweResources: [],
       createdAt: now,
       expiresAt: now + ttlSeconds,
     }
@@ -70,13 +74,19 @@ export class SessionStore extends DurableObject<Env> {
       await this.ctx.storage.deleteAll()
       return null
     }
+    // Migrate sessions created before the multi-platform schema.
+    data.platforms ??= (data as unknown as { platform?: PlatformBinding }).platform
+      ? [(data as unknown as { platform: PlatformBinding }).platform]
+      : []
+    data.siweResources ??= []
     return data
   }
 
-  async bindWallet(wallet: Address): Promise<SessionData | null> {
+  async bindWallet(wallet: Address, resources: string[]): Promise<SessionData | null> {
     const data = await this.get()
     if (!data) return null
     data.wallet = wallet
+    data.siweResources = resources
     await this.ctx.storage.put('data', data)
     return data
   }
@@ -84,7 +94,13 @@ export class SessionStore extends DurableObject<Env> {
   async bindPlatform(binding: PlatformBinding): Promise<SessionData | null> {
     const data = await this.get()
     if (!data) return null
-    data.platform = binding
+    // Replace if the same platform was already bound (re-link), otherwise append.
+    const idx = data.platforms.findIndex((p) => p.platform === binding.platform)
+    if (idx >= 0) {
+      data.platforms[idx] = binding
+    } else {
+      data.platforms.push(binding)
+    }
     await this.ctx.storage.put('data', data)
     return data
   }

@@ -5,25 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useWeb3 } from '@/contexts/Web3Provider'
-import { bindWallet, createSession } from '@/lib/attester-client'
+import { createSession } from '@/lib/attester-client'
 import { resolveOwner } from '@/lib/ens'
 import { shortAddress } from '@/lib/utils'
 import { usePrivy } from '@privy-io/react-auth'
-import { AlertCircle, FileSignature, Wallet } from 'lucide-react'
+import { AlertCircle, Wallet } from 'lucide-react'
 import { useState } from 'react'
-import type { Hex } from 'viem'
-import { createSiweMessage } from 'viem/siwe'
 
 interface Props {
   defaultName?: string
-  onComplete: (name: string, sessionId: string) => void
+  onComplete: (name: string, sessionId: string, nonce: string) => void
 }
 
-type Phase = 'idle' | 'checking-owner' | 'creating-session' | 'awaiting-siwe' | 'binding-wallet'
+type Phase = 'idle' | 'checking-owner' | 'creating-session'
 
 export function ConnectWalletStep({ defaultName, onComplete }: Props) {
   const { login, logout, authenticated, user, ready } = usePrivy()
-  const { publicClient, walletClient, isInitialized } = useWeb3()
+  const { publicClient, isInitialized } = useWeb3()
   const [name, setName] = useState(defaultName ?? '')
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -45,10 +43,6 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
       setError('Connect a wallet first')
       return
     }
-    if (!walletClient) {
-      setError('Wallet client not ready')
-      return
-    }
 
     try {
       // 1. Local ownership check — friendlier UX than waiting for the
@@ -65,48 +59,12 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
         )
       }
 
-      // 2. Open a session on the attester. Returns a fresh sessionId + nonce
-      //    bound to a Durable Object that lives until SESSION_TTL_SECONDS.
+      // 2. Open a session on the attester. The wallet signature that binds
+      //    this session happens in the next step, after social linking.
       setPhase('creating-session')
       const session = await createSession()
 
-      // 3. Build a SIWE message. The domain MUST match the attester's
-      //    SIWE_DOMAIN env — both ends use window.location.host in dev,
-      //    which keeps them in sync without extra config.
-      const domain = window.location.host
-      const origin = window.location.origin
-      const chainId = publicClient?.chain?.id ?? 1
-      const message = createSiweMessage({
-        address,
-        chainId,
-        domain,
-        nonce: session.nonce,
-        uri: origin,
-        version: '1',
-        statement: 'Sign in to the ENS Metadata Manager to update profile information for your ENS name.',
-        issuedAt: new Date(),
-      })
-
-      // 4. Wallet signs the SIWE message via personal_sign. This is the only
-      //    wallet signature in the whole flow — the claim itself is signed
-      //    by the attester key, not by this wallet.
-      setPhase('awaiting-siwe')
-      const signature = (await walletClient.signMessage({
-        account: address,
-        message,
-      })) as Hex
-
-      // 5. POST to the attester. The worker verifies the SIWE message
-      //    against the session nonce and binds the recovered address to
-      //    the session.
-      setPhase('binding-wallet')
-      await bindWallet({
-        sessionId: session.sessionId,
-        message,
-        signature,
-      })
-
-      onComplete(trimmed, session.sessionId)
+      onComplete(trimmed, session.sessionId, session.nonce)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to bind wallet')
       setPhase('idle')
@@ -119,11 +77,7 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
       case 'checking-owner':
         return 'Checking ENS ownership…'
       case 'creating-session':
-        return 'Opening attestation session…'
-      case 'awaiting-siwe':
-        return 'Waiting for wallet signature…'
-      case 'binding-wallet':
-        return 'Binding wallet to session…'
+        return 'Opening session…'
       default:
         return 'Continue'
     }
@@ -190,14 +144,7 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
             disabled={!authenticated || !isInitialized || !name.trim()}
             isLoading={checking}
           >
-            {phase === 'awaiting-siwe' ? (
-              <>
-                <FileSignature className="h-4 w-4 mr-2" />
-                {phaseLabel}
-              </>
-            ) : (
-              phaseLabel
-            )}
+            {phaseLabel}
           </Button>
         </form>
       </CardContent>

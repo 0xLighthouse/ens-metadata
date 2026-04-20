@@ -3,20 +3,20 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
-import { attest, evictSession } from '@/lib/attester-client'
+import { evictSession } from '@/lib/attester-client'
 import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
 import { formatKeyName } from '@/lib/utils'
 import { metadataWriter } from '@ensmetadata/sdk'
 import { CheckCircle2, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { mainnet } from 'viem/chains'
-import type { AnyDraftFullProof } from './Wizard'
+import type { AttestationProof } from './LinkAccountsStep'
 
 interface Props {
   name: string
-  /** Draft full-proof for the proof-issuance path. Null when the wizard
-   *  was launched in attrs-only mode (no platforms requested). */
-  draft: AnyDraftFullProof | null
+  /** Signed attestation proofs from the social linking step. Empty when
+   *  the wizard was launched in attrs-only mode (no platforms requested). */
+  proofs: AttestationProof[]
   /** Diff between on-chain records and what the user submitted. Drives
    *  the add/update/remove preview and the write payload. */
   recordDiff: RecordDiff
@@ -28,7 +28,7 @@ interface Props {
   keyLabels: Record<string, string>
 }
 
-type Phase = 'idle' | 'attesting' | 'writing' | 'confirming' | 'done' | 'error'
+type Phase = 'idle' | 'writing' | 'confirming' | 'done' | 'error'
 
 function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
@@ -43,13 +43,11 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classValue, schemaUri, keyLabels }: Props) {
+export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classValue, schemaUri, keyLabels }: Props) {
   const { walletClient, publicClient } = useWeb3()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
-
-  const recordKey = draft ? `social-proofs[${draft.claim.p}]` : null
 
   // Split recordDiff into structural (class/schema) and non-structural entries.
   const STRUCTURAL_KEYS = new Set(['class', 'schema'])
@@ -83,7 +81,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
       setPhase('error')
       return
     }
-    if (!draft && !hasRecordChanges) {
+    if (!proofs.length && !hasRecordChanges) {
       setError('Nothing to write — no proof or attribute changes.')
       setPhase('error')
       return
@@ -95,10 +93,8 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
       if (classValue) recordsToWrite.class = classValue
       if (schemaUri) recordsToWrite.schema = schemaUri
 
-      if (draft && recordKey) {
-        setPhase('attesting')
-        const { claimHex } = await attest({ sessionId, name })
-        recordsToWrite[recordKey] = claimHex
+      for (const { draft, claimHex } of proofs) {
+        recordsToWrite[`social-proofs[${draft.claim.p}]`] = claimHex
       }
 
       setPhase('writing')
@@ -128,10 +124,9 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
     setPhase('idle')
   }
 
-  const busy = phase === 'attesting' || phase === 'writing' || phase === 'confirming'
+  const busy = phase === 'writing' || phase === 'confirming'
   const phaseLabel: Record<Phase, string> = {
     idle: 'Publish profile',
-    attesting: 'Issuing attestation…',
     writing: 'Writing to ENS…',
     confirming: 'Waiting for confirmations…',
     done: 'Done',
@@ -146,7 +141,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
     addedNonStructural.length +
     updatedNonStructural.length +
     removedNonStructural.length +
-    (draft ? 1 : 0) +
+    proofs.length +
     structuralEntries.length
 
   if (phase === 'done') {
@@ -199,13 +194,6 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
     )
   }
 
-  const platformLabel = (() => {
-    if (!draft) return ''
-    if (draft.claim.p === 'com.x') return 'X'
-    if (draft.claim.p === 'org.telegram') return 'Telegram'
-    return draft.claim.p
-  })()
-
   return (
     <Card>
       <CardHeader>
@@ -216,22 +204,29 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Category 1: New records (proof + added non-structural) */}
-        {(draft || addedNonStructural.length > 0) && (
+        {/* Category 1: New records (proofs + added non-structural) */}
+        {(proofs.length > 0 || addedNonStructural.length > 0) && (
           <DiffSection tone="add" title="Values to add" subtitle="These new records will be added to your profile.">
-            {draft && recordKey && (
-              <DiffRow
-                icon={<Plus className="h-3.5 w-3.5" />}
-                tone="add"
-                k={recordKey}
-                value={
-                  <span>
-                    {platformLabel}{' '}
-                    <span className="font-semibold">@{draft.claim.h}</span> signed by attester
-                  </span>
-                }
-              />
-            )}
+            {proofs.map(({ draft }) => {
+              const platformLabel =
+                draft.claim.p === 'com.x' ? 'X'
+                : draft.claim.p === 'org.telegram' ? 'Telegram'
+                : draft.claim.p
+              return (
+                <DiffRow
+                  key={draft.claim.p}
+                  icon={<Plus className="h-3.5 w-3.5" />}
+                  tone="add"
+                  k={`social-proofs[${draft.claim.p}]`}
+                  value={
+                    <span>
+                      {platformLabel}{' '}
+                      <span className="font-semibold">@{draft.claim.h}</span> signed by attester
+                    </span>
+                  }
+                />
+              )
+            })}
             {addedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
@@ -292,7 +287,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
           </DiffSection>
         )}
 
-        {!draft && !hasRecordChanges && (
+        {!proofs.length && !hasRecordChanges && (
           <div className="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
             Nothing has changed vs. what&apos;s currently on chain. Go back to edit.
           </div>
@@ -330,7 +325,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
             <Button
               full
               onClick={handleSignAndPublish}
-              disabled={busy || (!draft && !hasRecordChanges)}
+              disabled={busy || (!proofs.length && !hasRecordChanges)}
               isLoading={busy}
             >
               {!busy && <FileSignature className="h-4 w-4 mr-2" />}
