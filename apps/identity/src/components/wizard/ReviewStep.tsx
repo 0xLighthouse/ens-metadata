@@ -7,7 +7,7 @@ import { evictSession } from '@/lib/attester-client'
 import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
 import { formatKeyName } from '@/lib/utils'
 import { metadataWriter } from '@ensmetadata/sdk'
-import { CheckCircle2, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { mainnet } from 'viem/chains'
 import type { AttestationProof } from './LinkAccountsStep'
@@ -48,6 +48,8 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [openProofKey, setOpenProofKey] = useState<string | null>(null)
+  const [isAdditionalOpen, setIsAdditionalOpen] = useState(false)
 
   // Split recordDiff into structural (class/schema) and non-structural entries.
   const STRUCTURAL_KEYS = new Set(['class', 'schema'])
@@ -207,26 +209,18 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
         {/* Category 1: New records (proofs + added non-structural) */}
         {(proofs.length > 0 || addedNonStructural.length > 0) && (
           <DiffSection tone="add" title="Values to add" subtitle="These new records will be added to your profile.">
-            {proofs.map(({ draft }) => {
-              const platformLabel =
-                draft.claim.p === 'com.x' ? 'X'
-                : draft.claim.p === 'org.telegram' ? 'Telegram'
-                : draft.claim.p
-              return (
-                <DiffRow
-                  key={draft.claim.p}
-                  icon={<Plus className="h-3.5 w-3.5" />}
-                  tone="add"
-                  k={`social-proofs[${draft.claim.p}]`}
-                  value={
-                    <span>
-                      {platformLabel}{' '}
-                      <span className="font-semibold">@{draft.claim.h}</span> signed by attester
-                    </span>
-                  }
-                />
-              )
-            })}
+            {proofs.map((proof) => (
+              <ProofPillRow
+                key={proof.draft.claim.p}
+                proof={proof}
+                isOpen={openProofKey === proof.draft.claim.p}
+                onToggle={() =>
+                  setOpenProofKey((k) =>
+                    k === proof.draft.claim.p ? null : proof.draft.claim.p,
+                  )
+                }
+              />
+            ))}
             {addedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
@@ -274,6 +268,8 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
             tone="neutral"
             title="Additional records"
             subtitle="These records will be updated to make your profile discoverable."
+            isOpen={isAdditionalOpen}
+            onToggle={() => setIsAdditionalOpen((v) => !v)}
           >
             {structuralEntries.map((entry) => (
               <DiffRow
@@ -370,25 +366,99 @@ const TONE_STYLES: Record<
   },
 }
 
+function ProofPillRow({
+  proof,
+  isOpen,
+  onToggle,
+}: {
+  proof: AttestationProof
+  isOpen: boolean
+  onToggle: () => void
+}) {
+  const { draft, claimHex } = proof
+  const platformLabel =
+    draft.claim.p === 'com.x' ? 'X'
+    : draft.claim.p === 'org.telegram' ? 'Telegram'
+    : draft.claim.p
+  const recordKey = `social-proofs[${draft.claim.p}]`
+
+  return (
+    <div className="px-3 py-2.5">
+      <div
+        className="bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 overflow-hidden rounded-2xl"
+      >
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center justify-between gap-2 w-full px-4 py-1.5 text-sm font-medium hover:bg-green-200/60 dark:hover:bg-green-800/30 transition-colors"
+        >
+          <span>
+            {platformLabel} Attestation (
+            <span className="font-semibold">@{draft.claim.h}</span>)
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {isOpen && (
+          <div className="px-4 pb-3 pt-1 border-t border-green-200 dark:border-green-800 space-y-2 text-xs">
+            <div>
+              <div className="opacity-60 mb-0.5">Key</div>
+              <div className="font-mono">{recordKey}</div>
+            </div>
+            <div>
+              <div className="opacity-60 mb-0.5">Value</div>
+              <div className="font-mono break-all opacity-80">{claimHex}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DiffSection({
   tone,
   title,
   subtitle,
   children,
+  isOpen,
+  onToggle,
 }: {
   tone: Tone
   title: string
   subtitle: string
   children: React.ReactNode
+  isOpen?: boolean
+  onToggle?: () => void
 }) {
   const s = TONE_STYLES[tone]
+  const expandable = onToggle !== undefined
+  const header = (
+    <>
+      <div className="text-xs font-semibold uppercase tracking-wide">{title}</div>
+      <div className="text-xs mt-0.5 opacity-80">{subtitle}</div>
+    </>
+  )
   return (
     <div className={`rounded-lg border ${s.border} ${s.bg} overflow-hidden`}>
-      <div className={`px-3 pt-2.5 pb-2 ${s.label}`}>
-        <div className="text-xs font-semibold uppercase tracking-wide">{title}</div>
-        <div className="text-xs mt-0.5 opacity-80">{subtitle}</div>
-      </div>
-      <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">{children}</div>
+      {expandable ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-2 ${s.label} hover:opacity-70 transition-opacity text-left`}
+        >
+          <div>{header}</div>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 mt-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+      ) : (
+        <div className={`px-3 pt-2.5 pb-2 ${s.label}`}>{header}</div>
+      )}
+      {(!expandable || isOpen) && (
+        <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">{children}</div>
+      )}
     </div>
   )
 }
