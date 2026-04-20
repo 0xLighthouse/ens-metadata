@@ -10,6 +10,7 @@ import {
   TWITTER_PLATFORM,
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
+import { wizardStyles as s } from './wizardStyles'
 import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { AlertCircle, CheckCircle2, FileSignature, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -135,10 +136,10 @@ export function ConnectTwitterStep({ name, sessionId, nonce, onBack, onSessionEx
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+        <div className={s.borderedContainer}>
           {!twitter ? (
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            <div className={s.unlinkedAccountInner}>
+              <p className={s.bodyText}>
                 Log in to X and approve access to continue. Only your X handle will be made
                 public — no other data is stored or shared.
               </p>
@@ -147,11 +148,11 @@ export function ConnectTwitterStep({ name, sessionId, nonce, onBack, onSessionEx
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className={s.connectedAccountRow}>
               <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                <span className="font-mono font-semibold">@{twitter.username}</span>
-                <span className="text-neutral-400 dark:text-neutral-500 text-xs">connected</span>
+                <CheckCircle2 className={s.checkIcon} />
+                <span className={s.monoSemibold}>@{twitter.username}</span>
+                <span className={s.connectedLabel}>connected</span>
               </div>
               <Button
                 variant="ghost"
@@ -168,13 +169,13 @@ export function ConnectTwitterStep({ name, sessionId, nonce, onBack, onSessionEx
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className={s.errorBox}>
+            <AlertCircle className={s.errorIcon} />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className={s.buttonRow}>
           <Button variant="outline" onClick={onBack} disabled={busy} full>
             Back
           </Button>
@@ -186,7 +187,7 @@ export function ConnectTwitterStep({ name, sessionId, nonce, onBack, onSessionEx
           >
             {phase === 'awaiting-siwe' ? (
               <>
-                <FileSignature className="h-4 w-4 mr-2" />
+                <FileSignature className={s.iconSm} />
                 {continueLabel}
               </>
             ) : (

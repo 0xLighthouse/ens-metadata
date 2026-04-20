@@ -8,6 +8,7 @@ import { useWeb3 } from '@/contexts/Web3Provider'
 import { createSession } from '@/lib/attester-client'
 import { resolveOwner } from '@/lib/ens'
 import { shortAddress } from '@/lib/utils'
+import { wizardStyles as s } from './wizardStyles'
 import { usePrivy } from '@privy-io/react-auth'
 import { AlertCircle, Wallet } from 'lucide-react'
 import { useState } from 'react'
@@ -92,17 +93,17 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
           profile information to.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className={s.stack6}>
         {!authenticated ? (
           <Button onClick={login} disabled={!ready} full>
-            <Wallet className="h-4 w-4 mr-2" />
+            <Wallet className={s.iconSm} />
             Connect wallet
           </Button>
         ) : (
-          <div className="flex items-center justify-between rounded-md border border-neutral-200 dark:border-neutral-700 px-4 py-3">
+          <div className={s.borderedRow}>
             <div className="text-sm">
-              <div className="text-neutral-500 dark:text-neutral-400">Connected</div>
-              <div className="font-mono">{shortAddress(address)}</div>
+              <div className={s.mutedText}>Connected</div>
+              <div className={s.mono}>{shortAddress(address)}</div>
             </div>
             <Button variant="ghost" size="sm" onClick={logout}>
               Disconnect
@@ -115,9 +116,9 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
             e.preventDefault()
             handleContinue()
           }}
-          className="space-y-6"
+          className={s.stack6}
         >
-          <div className="space-y-2">
+          <div className={s.stack2}>
             <Label htmlFor="ens-name">ENS name</Label>
             <Input
               id="ens-name"
@@ -132,8 +133,8 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className={s.errorBox}>
+              <AlertCircle className={s.errorIcon} />
               <span>{error}</span>
             </div>
           )}

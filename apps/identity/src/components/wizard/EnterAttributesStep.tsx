@@ -9,6 +9,7 @@ import { type RecordDiff, computeRecordDiff } from '@/lib/record-diff'
 import type { FetchedSchema, SchemaProperty } from '@/lib/use-schema'
 import { metadataReader } from '@ensmetadata/sdk'
 import { useEffect, useMemo, useState } from 'react'
+import { wizardStyles as s } from './wizardStyles'
 
 interface Props {
   /** ENS name being attested. */
@@ -179,18 +180,18 @@ export function EnterAttributesStep({
         </CardTitle>
         <CardDescription>
           {schema?.description ? <>{schema.description} </> : null}
-          Enter the values below to be added to <span className="font-mono">{name}</span>.
+          Enter the values below to be added to <span className={s.mono}>{name}</span>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {isLoading && (
-          <div className="rounded-md border border-neutral-200 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+          <div className={s.infoBox}>
             Checking <span className="font-mono">{name}</span> for existing records...
           </div>
         )}
 
         {loadError && (
-          <div className="rounded-md border border-yellow-300 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-3 text-xs text-yellow-900 dark:text-yellow-100">
+          <div className={s.warningBox}>
             Couldn&apos;t load existing records (<span className="font-mono">{loadError}</span>).
             Warning! Submitting new records risks overwriting existing data. It is okay to continue
             if this is what you want to do.
@@ -217,16 +218,16 @@ export function EnterAttributesStep({
             const inputType = htmlInputType(prop)
 
             return (
-              <div key={key} className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div key={key} className={s.stack2}>
+                <div className={s.fieldHeader}>
                   <Label htmlFor={`attr-${key}`} className="flex items-center gap-2">
                     <span>{labelText}</span>
                     {isRequired ? (
-                      <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
+                      <span className={s.requiredBadge}>
                         required
                       </span>
                     ) : (
-                      <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                      <span className={s.optionalLabel}>
                         optional
                       </span>
                     )}
@@ -245,20 +246,20 @@ export function EnterAttributesStep({
                   aria-invalid={isMissing}
                 />
                 {helpText && (
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{helpText}</p>
+                  <p className={s.helpText}>{helpText}</p>
                 )}
               </div>
             )
           })}
 
         {!isLoading && missingRequired.length > 0 && (
-          <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
+          <div className={s.requiredWarningBox}>
             Required field{missingRequired.length === 1 ? '' : 's'} still empty:{' '}
             <span className="font-mono">{missingRequired.join(', ')}</span>
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className={s.buttonRow}>
           <Button variant="outline" onClick={onBack} full>
             Back
           </Button>

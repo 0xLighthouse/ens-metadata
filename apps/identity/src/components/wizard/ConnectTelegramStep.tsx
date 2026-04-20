@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { AttesterError, attest, bindPlatform, bindWallet } from '@/lib/attester-client'
+import { wizardStyles as s } from './wizardStyles'
 import {
   type DraftFullProof,
   type PrivyTelegramAccount,
@@ -140,27 +141,27 @@ export function ConnectTelegramStep({ name, sessionId, nonce, onBack, onSessionE
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+        <div className={s.borderedContainer}>
           {!telegram ? (
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            <div className={s.unlinkedAccountInner}>
+              <p className={s.bodyText}>
                 Log in to Telegram and approve access to continue. Your Telegram account must
                 have a public @username. Only your username will be made public — no other data
                 is stored or shared.
               </p>
               <Button onClick={handleLink} full>
-                <Send className="h-4 w-4 mr-2" />
+                <Send className={s.iconSm} />
                 Link Telegram account
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className={s.connectedAccountRow}>
               <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                <span className="font-mono font-semibold">
+                <CheckCircle2 className={s.checkIcon} />
+                <span className={s.monoSemibold}>
                   {telegram.username ? `@${telegram.username}` : '(no public @username)'}
                 </span>
-                <span className="text-neutral-400 dark:text-neutral-500 text-xs">connected</span>
+                <span className={s.connectedLabel}>connected</span>
               </div>
               <Button
                 variant="ghost"
@@ -177,13 +178,13 @@ export function ConnectTelegramStep({ name, sessionId, nonce, onBack, onSessionE
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className={s.errorBox}>
+            <AlertCircle className={s.errorIcon} />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className={s.buttonRow}>
           <Button variant="outline" onClick={onBack} disabled={busy} full>
             Back
           </Button>
@@ -195,7 +196,7 @@ export function ConnectTelegramStep({ name, sessionId, nonce, onBack, onSessionE
           >
             {phase === 'awaiting-siwe' ? (
               <>
-                <FileSignature className="h-4 w-4 mr-2" />
+                <FileSignature className={s.iconSm} />
                 {continueLabel}
               </>
             ) : (

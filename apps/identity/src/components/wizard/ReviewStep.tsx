@@ -6,6 +6,7 @@ import { useWeb3 } from '@/contexts/Web3Provider'
 import { evictSession } from '@/lib/attester-client'
 import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
 import { formatKeyName } from '@/lib/utils'
+import { wizardStyles as s } from './wizardStyles'
 import { metadataWriter } from '@ensmetadata/sdk'
 import { CheckCircle2, ChevronDown, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -153,40 +154,40 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
           <CardTitle>Records published</CardTitle>
           <CardDescription>
             {changeCount} record{changeCount === 1 ? '' : 's'} written to{' '}
-            <span className="font-mono">{name}</span>.
+            <span className={s.mono}>{name}</span>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-md border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950 p-4 text-sm">
+          <div className={s.successBox}>
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+              <CheckCircle2 className={s.successIcon} />
               <div className="space-y-1">
-                <div className="font-medium text-green-900 dark:text-green-100">
+                <div className={s.successTitle}>
                   Transaction confirmed
                 </div>
                 {txHash && (
-                  <div className="font-mono text-xs break-all text-green-800 dark:text-green-200">
+                  <div className={s.successHash}>
                     {txHash}
                   </div>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className={s.buttonRow}>
             {explorerUrl && (
               <a
                 href={explorerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800 h-10 px-4 py-2 text-sm font-medium transition-colors"
+                className={s.outlineLink}
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
+                <ExternalLink className={s.iconSm} />
                 Etherscan
               </a>
             )}
             <a
               href={`/proofs/${name}`}
-              className="inline-flex w-full items-center justify-center rounded-md bg-neutral-900 text-neutral-50 hover:bg-neutral-900/90 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-50/90 h-10 px-4 py-2 text-sm font-medium transition-colors"
+              className={s.primaryLink}
             >
               View proof
             </a>
@@ -202,7 +203,7 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
         <CardTitle>Final review</CardTitle>
         <CardDescription>
           The following records will be written to the on-chain profile for{' '}
-          <span className="font-mono">{name}</span>.
+          <span className={s.mono}>{name}</span>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -284,7 +285,7 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
         )}
 
         {!proofs.length && !hasRecordChanges && (
-          <div className="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+          <div className={s.emptyStateBox}>
             Nothing has changed vs. what&apos;s currently on chain. Go back to edit.
           </div>
         )}
@@ -294,27 +295,27 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
             href={explorerUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+            className={s.subtleLink}
           >
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className={s.iconXs} />
             View on Etherscan
           </a>
         )}
 
         {phase === 'error' && error && (
-          <div className="rounded-md border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-900 dark:text-red-100">
+          <div className={s.errorBox}>
             <div className="font-medium">Something went wrong</div>
             <div className="mt-1 break-words">{error}</div>
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className={s.buttonRow}>
           <Button variant="outline" onClick={onBack} disabled={busy} full>
             Back
           </Button>
           {phase === 'error' ? (
             <Button full onClick={handleRetry}>
-              <FileSignature className="h-4 w-4 mr-2" />
+              <FileSignature className={s.iconSm} />
               Try again
             </Button>
           ) : (
@@ -324,7 +325,7 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
               disabled={busy || (!proofs.length && !hasRecordChanges)}
               isLoading={busy}
             >
-              {!busy && <FileSignature className="h-4 w-4 mr-2" />}
+              {!busy && <FileSignature className={s.iconSm} />}
               {phaseLabel[phase]}
             </Button>
           )}
@@ -404,11 +405,11 @@ function ProofPillRow({
           <div className="px-4 pb-3 pt-1 border-t border-green-200 dark:border-green-800 space-y-2 text-xs">
             <div>
               <div className="opacity-60 mb-0.5">Key</div>
-              <div className="font-mono">{recordKey}</div>
+              <div className={s.mono}>{recordKey}</div>
             </div>
             <div>
               <div className="opacity-60 mb-0.5">Value</div>
-              <div className="font-mono break-all opacity-80">{claimHex}</div>
+              <div className={`${s.mono} break-all opacity-80`}>{claimHex}</div>
             </div>
           </div>
         )}
@@ -432,7 +433,7 @@ function DiffSection({
   isOpen?: boolean
   onToggle?: () => void
 }) {
-  const s = TONE_STYLES[tone]
+  const t = TONE_STYLES[tone]
   const expandable = onToggle !== undefined
   const header = (
     <>
@@ -441,12 +442,12 @@ function DiffSection({
     </>
   )
   return (
-    <div className={`rounded-lg border ${s.border} ${s.bg} overflow-hidden`}>
+    <div className={`rounded-lg border ${t.border} ${t.bg} overflow-hidden`}>
       {expandable ? (
         <button
           type="button"
           onClick={onToggle}
-          className={`w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-2 ${s.label} hover:opacity-70 transition-opacity text-left`}
+          className={`w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-2 ${t.label} hover:opacity-70 transition-opacity text-left`}
         >
           <div>{header}</div>
           <ChevronDown
@@ -454,7 +455,7 @@ function DiffSection({
           />
         </button>
       ) : (
-        <div className={`px-3 pt-2.5 pb-2 ${s.label}`}>{header}</div>
+        <div className={`px-3 pt-2.5 pb-2 ${t.label}`}>{header}</div>
       )}
       {(!expandable || isOpen) && (
         <div className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">{children}</div>
@@ -474,17 +475,17 @@ function DiffRow({
   k: string
   value: React.ReactNode
 }) {
-  const s = TONE_STYLES[tone]
+  const t = TONE_STYLES[tone]
   return (
     <div className="flex items-start gap-3 px-3 py-2.5 text-sm">
       <span
-        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${s.badge}`}
+        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${t.badge}`}
       >
         {icon}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">{k}</span>
-        <div className="break-words font-mono text-sm">{value}</div>
+        <span className={`${s.mono} text-xs ${s.mutedText}`}>{k}</span>
+        <div className={`${s.mono} break-words text-sm`}>{value}</div>
       </div>
     </div>
   )
