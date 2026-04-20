@@ -41,8 +41,10 @@ function isPlatform(s: string): s is Platform {
  */
 interface IncomingConfig {
   prefillName: string | null
-  /** Allowed platforms for the proof step. Empty = all platforms allowed. */
-  allowedPlatforms: Platform[]
+  /** Platforms the recipient MUST link before they can continue. */
+  requiredPlatforms: Platform[]
+  /** Platforms shown as linkable but skippable. */
+  optionalPlatforms: Platform[]
   /** Whether the URL specified `platforms` at all (vs. left it open). */
   platformsRequested: boolean
   /** Text record keys the recipient MUST fill in (Continue is gated on these). */
@@ -60,7 +62,8 @@ interface IncomingConfig {
 // client to avoid a hydration mismatch in the step indicator.
 const DEFAULT_CONFIG: IncomingConfig = {
   prefillName: null,
-  allowedPlatforms: [],
+  requiredPlatforms: [],
+  optionalPlatforms: [],
   platformsRequested: false,
   requiredAttrs: [],
   optionalAttrs: [],
@@ -79,24 +82,36 @@ function parseCsv(raw: string | null): string[] {
 function readIncomingConfig(): IncomingConfig {
   if (typeof window === 'undefined') return DEFAULT_CONFIG
   const params = new URLSearchParams(window.location.search)
-  const platformsRaw = params.get('platforms')
-  const allowed = platformsRaw
-    ? platformsRaw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(isPlatform)
-    : []
 
-  // Preferred wire format: separate required + optional lists. Legacy
-  // `?attrs=` is read as "all optional" when the new params aren't present
-  // so existing shared links keep working.
+  // platforms=!com.x,org.telegram — ! prefix = required, plain = optional
+  const platformsRaw = params.get('platforms')
+  const platformParts = platformsRaw
+    ? platformsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+    : []
+  const requiredPlatforms = platformParts
+    .filter((s) => s.startsWith('!'))
+    .map((s) => s.slice(1))
+    .filter(isPlatform)
+  const optionalPlatforms = platformParts
+    .filter((s) => !s.startsWith('!'))
+    .filter(isPlatform)
+
+  // Attrs: preferred wire format uses separate required= and optional= params.
+  // Legacy attrs= is supported as "all optional", but ! prefix in attrs=
+  // promotes individual keys to required (e.g. attrs=!email,name).
   const rawRequired = params.get('required')
   const rawOptional = params.get('optional')
   const legacyAttrs = params.get('attrs')
-  const requiredAttrs = parseCsv(rawRequired)
+  let requiredAttrs = parseCsv(rawRequired)
   let optionalAttrs = parseCsv(rawOptional)
   if (!rawRequired && !rawOptional && legacyAttrs) {
-    optionalAttrs = parseCsv(legacyAttrs)
+    for (const part of legacyAttrs.split(',').map((s) => s.trim()).filter(Boolean)) {
+      if (part.startsWith('!')) {
+        requiredAttrs.push(part.slice(1))
+      } else {
+        optionalAttrs.push(part)
+      }
+    }
   }
   // De-dup: anything in required should not also appear in optional.
   const requiredSet = new Set(requiredAttrs)
@@ -104,7 +119,8 @@ function readIncomingConfig(): IncomingConfig {
 
   return {
     prefillName: params.get('name'),
-    allowedPlatforms: allowed,
+    requiredPlatforms,
+    optionalPlatforms,
     platformsRequested: !!platformsRaw,
     requiredAttrs,
     optionalAttrs,
@@ -117,12 +133,21 @@ function readIncomingConfig(): IncomingConfig {
 // shape the wizard already expects. Keeping the projection narrow means
 // all existing step code keeps reading the same `IncomingConfig` interface.
 function adaptIntentConfig(config: IntentConfig): IncomingConfig {
+  const platformParts: string[] = config.platforms
+  const requiredPlatforms = platformParts
+    .filter((s) => s.startsWith('!'))
+    .map((s) => s.slice(1))
+    .filter(isPlatform)
+  const optionalPlatforms = platformParts
+    .filter((s) => !s.startsWith('!'))
+    .filter(isPlatform)
   return {
     prefillName: config.name,
-    allowedPlatforms: config.platforms.filter(isPlatform),
+    requiredPlatforms,
+    optionalPlatforms,
     platformsRequested: config.platforms.length > 0,
     requiredAttrs: config.required,
-    optionalAttrs: config.optional.filter((k) => !config.required.includes(k)),
+    optionalAttrs: config.optional.filter((k: string) => !config.required.includes(k)),
     classValues: config.classValues,
     schemaUris: config.schemaUris,
   }
@@ -238,8 +263,9 @@ export function Wizard() {
     ...incomingConfig.optionalAttrs,
   ])
 
-  // Default platform: first allowed if the URL constrained it, else com.x.
-  const initialPlatform: Platform = incomingConfig.allowedPlatforms[0] ?? 'com.x'
+  // Default platform: prefer first required, then first optional, then com.x.
+  const initialPlatform: Platform =
+    incomingConfig.requiredPlatforms[0] ?? incomingConfig.optionalPlatforms[0] ?? 'com.x'
   const [platform, setPlatform] = useState<Platform>(initialPlatform)
 
   useEffect(() => {
@@ -260,8 +286,9 @@ export function Wizard() {
         setNonce(persisted.nonce)
         if (persisted.proofs.length > 0) setProofs(persisted.proofs)
         if (Object.keys(persisted.attrsValues).length > 0) setAttrsValues(persisted.attrsValues)
-        if (config.allowedPlatforms.length > 0) {
-          setPlatform(config.allowedPlatforms[0])
+        const firstPlatform = config.requiredPlatforms[0] ?? config.optionalPlatforms[0]
+        if (firstPlatform) {
+          setPlatform(firstPlatform)
         } else {
           setPlatform(persisted.platform)
         }
@@ -435,7 +462,7 @@ export function Wizard() {
 
       {currentStep?.kind === 'wallet' && (
         <ConnectWalletStep
-          defaultName={incomingConfig.prefillName ?? undefined}
+          defaultName={incomingConfig.prefillName ?? (name || undefined)}
           onComplete={(n, sid, nonceVal) => {
             setName(n)
             setSessionId(sid)
@@ -450,7 +477,9 @@ export function Wizard() {
           name={name}
           sessionId={sessionId}
           nonce={nonce}
-          allowedPlatforms={incomingConfig.allowedPlatforms}
+          requiredPlatforms={incomingConfig.requiredPlatforms}
+          optionalPlatforms={incomingConfig.optionalPlatforms}
+          platformsRequested={incomingConfig.platformsRequested}
           initialPlatform={platform}
           onPlatformChange={(p) => setPlatform(p)}
           onBack={back}

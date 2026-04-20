@@ -34,7 +34,9 @@ interface Props {
   name: string
   sessionId: string
   nonce: string
-  allowedPlatforms: Platform[]
+  requiredPlatforms: Platform[]
+  optionalPlatforms: Platform[]
+  platformsRequested: boolean
   initialPlatform: Platform
   onPlatformChange: (p: Platform) => void
   onBack: () => void
@@ -46,15 +48,18 @@ export function LinkAccountsStep({
   name,
   sessionId,
   nonce,
-  allowedPlatforms,
+  requiredPlatforms,
+  optionalPlatforms,
+  platformsRequested,
   initialPlatform,
   onPlatformChange,
   onBack,
   onSessionExpired,
   onComplete,
 }: Props) {
+  const specifiedPlatforms: Platform[] = [...requiredPlatforms, ...optionalPlatforms]
   const visiblePlatforms: Platform[] =
-    allowedPlatforms.length > 0 ? allowedPlatforms : ['com.x', 'org.telegram']
+    specifiedPlatforms.length > 0 ? specifiedPlatforms : ['com.x', 'org.telegram']
   const [activePlatform, setActivePlatform] = useState<Platform>(initialPlatform)
   const { user, linkTwitter, linkTelegram, unlinkTwitter, unlinkTelegram } = usePrivy()
   const { wallets } = useWallets()
@@ -67,6 +72,11 @@ export function LinkAccountsStep({
   const telegram = (user?.telegram ?? null) as PrivyTelegramAccount | null
   const anyLinked = !!(twitter || telegram)
   const busy = phase !== 'idle'
+
+  const allRequiredLinked = requiredPlatforms.every(
+    (p) => (p === 'com.x' && !!twitter) || (p === 'org.telegram' && !!telegram),
+  )
+  const canSkip = platformsRequested && requiredPlatforms.length === 0 && !anyLinked
 
   const switchTab = (p: Platform) => {
     setActivePlatform(p)
@@ -233,9 +243,11 @@ export function LinkAccountsStep({
                   }`}
                 >
                   X
-                  {twitter && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
-                  )}
+                  {twitter
+                    ? <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+                    : requiredPlatforms.includes('com.x')
+                      ? <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
+                      : null}
                 </button>
               )}
               {visiblePlatforms.includes('org.telegram') && (
@@ -250,9 +262,11 @@ export function LinkAccountsStep({
                 >
                   <Send className="h-4 w-4" />
                   Telegram
-                  {telegram && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
-                  )}
+                  {telegram
+                    ? <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+                    : requiredPlatforms.includes('org.telegram')
+                      ? <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
+                      : null}
                 </button>
               )}
             </div>
@@ -340,12 +354,13 @@ export function LinkAccountsStep({
             Back
           </Button>
           <Button
-            onClick={handleCreateAttestation}
+            onClick={canSkip ? () => onComplete([]) : handleCreateAttestation}
             full
-            disabled={!anyLinked || busy}
-            isLoading={busy}
+            disabled={!canSkip && (!anyLinked || !allRequiredLinked || busy)}
+            isLoading={!canSkip && busy}
+            className={canSkip ? 'bg-neutral-400 dark:bg-neutral-500 text-neutral-50 hover:bg-neutral-400/90 dark:hover:bg-neutral-500/90' : undefined}
           >
-            {phase === 'awaiting-siwe' ? (
+            {canSkip ? 'Skip attestation' : phase === 'awaiting-siwe' ? (
               <>
                 <FileSignature className="h-4 w-4 mr-2" />
                 {continueLabel}

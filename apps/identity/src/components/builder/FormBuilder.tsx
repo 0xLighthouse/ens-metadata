@@ -28,7 +28,10 @@ interface BuilderState {
   required: string[]
   /** Keys the recipient MAY fill in. Disjoint with required. */
   optional: string[]
-  platforms: BuilderPlatformId[]
+  /** Platforms the recipient MUST link. Disjoint with optionalPlatforms. */
+  requiredPlatforms: BuilderPlatformId[]
+  /** Platforms shown as linkable but skippable. Disjoint with requiredPlatforms. */
+  optionalPlatforms: BuilderPlatformId[]
   name: string
   message: string
 }
@@ -64,7 +67,10 @@ function buildConfigFromState(state: BuilderState): IntentConfig | null {
     schemaUris: schemas.map((s) => s.schemaUri),
     required: state.required,
     optional: state.optional,
-    platforms: state.platforms,
+    platforms: [
+      ...state.requiredPlatforms.map((id) => `!${id}`),
+      ...state.optionalPlatforms,
+    ],
     message: state.message,
   }
 }
@@ -74,7 +80,8 @@ export function FormBuilder() {
     schemaIds: [DEFAULT_SCHEMA_ID],
     required: [],
     optional: [],
-    platforms: [],
+    requiredPlatforms: [],
+    optionalPlatforms: [],
     name: '',
     message: '',
   })
@@ -109,13 +116,25 @@ export function FormBuilder() {
       }
     })
 
-  const togglePlatform = (id: BuilderPlatformId) =>
-    setState((s) => ({
-      ...s,
-      platforms: s.platforms.includes(id)
-        ? s.platforms.filter((p) => p !== id)
-        : [...s.platforms, id],
-    }))
+  const toggleRequiredPlatform = (id: BuilderPlatformId) =>
+    setState((s) => {
+      const isOn = s.requiredPlatforms.includes(id)
+      return {
+        ...s,
+        requiredPlatforms: isOn ? s.requiredPlatforms.filter((p) => p !== id) : [...s.requiredPlatforms, id],
+        optionalPlatforms: s.optionalPlatforms.filter((p) => p !== id),
+      }
+    })
+
+  const toggleOptionalPlatform = (id: BuilderPlatformId) =>
+    setState((s) => {
+      const isOn = s.optionalPlatforms.includes(id)
+      return {
+        ...s,
+        optionalPlatforms: isOn ? s.optionalPlatforms.filter((p) => p !== id) : [...s.optionalPlatforms, id],
+        requiredPlatforms: s.requiredPlatforms.filter((p) => p !== id),
+      }
+    })
 
   const toggleSchema = (target: BuilderSchema) =>
     setState((s) => {
@@ -177,13 +196,29 @@ export function FormBuilder() {
           </Pill>
           . We also want their{' '}
           <Pill
-            unset={state.platforms.length === 0}
-            placeholder="social accounts"
-            label={platformsLabel(state.platforms)}
+            unset={state.requiredPlatforms.length === 0}
+            placeholder="required accounts"
+            label={platformsLabel(state.requiredPlatforms)}
           >
-            <PlatformPicker selected={state.platforms} onToggle={togglePlatform} />
+            <PlatformPicker
+              selected={state.requiredPlatforms}
+              onToggle={toggleRequiredPlatform}
+              disabledIds={state.optionalPlatforms}
+            />
           </Pill>{' '}
-          to be attested.
+          accounts to be required, and optionally their{' '}
+          <Pill
+            unset={state.optionalPlatforms.length === 0}
+            placeholder="optional accounts"
+            label={platformsLabel(state.optionalPlatforms)}
+          >
+            <PlatformPicker
+              selected={state.optionalPlatforms}
+              onToggle={toggleOptionalPlatform}
+              disabledIds={state.requiredPlatforms}
+            />
+          </Pill>{' '}
+          accounts to be attested.
         </p>
       </div>
 
@@ -400,20 +435,30 @@ function FieldPicker({
 function PlatformPicker({
   selected,
   onToggle,
+  disabledIds = [],
 }: {
   selected: BuilderPlatformId[]
   onToggle: (id: BuilderPlatformId) => void
+  disabledIds?: BuilderPlatformId[]
 }) {
+  const disabled = new Set(disabledIds)
   return (
     <ul className="space-y-1">
       {BUILDER_PLATFORMS.map((p) => {
         const isOn = selected.includes(p.id)
+        const isDisabled = disabled.has(p.id)
         return (
           <li key={p.id}>
             <button
               type="button"
-              onClick={() => onToggle(p.id)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              onClick={() => !isDisabled && onToggle(p.id)}
+              disabled={isDisabled}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                isDisabled
+                  ? 'cursor-not-allowed opacity-40'
+                  : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+              )}
             >
               <span
                 className={cn(
@@ -426,6 +471,11 @@ function PlatformPicker({
                 {isOn && <Check className="h-3 w-3" />}
               </span>
               <span className="text-sm font-medium">{p.label}</span>
+              {isDisabled && (
+                <span className="ml-1 text-[10px] uppercase tracking-wider text-neutral-400">
+                  in the other pill
+                </span>
+              )}
               <span className="ml-auto font-mono text-[11px] text-neutral-400">{p.id}</span>
             </button>
           </li>
@@ -454,6 +504,6 @@ function fieldsLabel(keys: string[], fallback: string): string {
 }
 
 function platformsLabel(ids: BuilderPlatformId[]): string {
-  if (ids.length === 0) return 'social accounts'
+  if (ids.length === 0) return ''
   return ids.map((id) => BUILDER_PLATFORMS.find((p) => p.id === id)?.label ?? id).join(' + ')
 }
