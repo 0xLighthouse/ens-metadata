@@ -35,6 +35,10 @@ interface Props {
    */
   schema: FetchedSchema | null
   keyLabels: Record<string, string>
+  /** Values previously entered by the user, restored when navigating back. */
+  initialValues?: Record<string, string>
+  /** Fires whenever form values change so the parent can persist them. */
+  onValuesChange?: (values: Record<string, string>) => void
   onBack: () => void
   /**
    * Receives the full diff between what's currently on chain and what the
@@ -71,6 +75,8 @@ export function EnterAttributesStep({
   schemaUri,
   schema,
   keyLabels,
+  initialValues,
+  onValuesChange,
   onBack,
   onComplete,
 }: Props) {
@@ -85,8 +91,12 @@ export function EnterAttributesStep({
   const requiredSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
 
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(allRequestedAttrs.map((k) => [k, ''])),
+    Object.fromEntries(allRequestedAttrs.map((k) => [k, initialValues?.[k] ?? ''])),
   )
+
+  useEffect(() => {
+    onValuesChange?.(values)
+  }, [values]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loaded, setLoaded] = useState<Record<string, string | null> | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -120,7 +130,8 @@ export function EnterAttributesStep({
           const next = { ...prev }
           for (const key of allRequestedAttrs) {
             const existing = properties[key]
-            if (typeof existing === 'string' && existing) next[key] = existing
+            // Only fill from chain when the user hasn't already entered a value.
+            if (typeof existing === 'string' && existing && !next[key]) next[key] = existing
           }
           return next
         })

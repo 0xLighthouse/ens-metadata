@@ -177,6 +177,7 @@ interface PersistedState {
   nonce: string | null
   platform: Platform
   proofs: AttestationProof[]
+  attrsValues: Record<string, string>
 }
 
 function loadPersisted(): PersistedState | null {
@@ -187,15 +188,17 @@ function loadPersisted(): PersistedState | null {
     const parsed = JSON.parse(raw) as PersistedState
     if (typeof parsed.stepIndex !== 'number' || typeof parsed.name !== 'string') return null
     const proofs: AttestationProof[] = Array.isArray(parsed.proofs) ? parsed.proofs : []
+    const stepIndex = proofs.length > 0 ? Math.min(parsed.stepIndex, 2) : Math.min(parsed.stepIndex, 1)
     return {
-      // If attestations are in hand, resume up to step 2 (attrs or review).
-      // Otherwise cap at step 1 so they redo the social linking step.
-      stepIndex: proofs.length > 0 ? Math.min(parsed.stepIndex, 2) : Math.min(parsed.stepIndex, 1),
+      stepIndex,
       name: parsed.name,
       sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
       nonce: typeof parsed.nonce === 'string' ? parsed.nonce : null,
       platform: isPlatform(parsed.platform) ? parsed.platform : 'com.x',
       proofs,
+      attrsValues: parsed.attrsValues && typeof parsed.attrsValues === 'object'
+        ? parsed.attrsValues as Record<string, string>
+        : {},
     }
   } catch {
     return null
@@ -210,6 +213,7 @@ export function Wizard() {
   const [nonce, setNonce] = useState<string | null>(null)
   const [proofs, setProofs] = useState<AttestationProof[]>([])
   const [recordDiff, setRecordDiff] = useState<RecordDiff>(EMPTY_DIFF)
+  const [attrsValues, setAttrsValues] = useState<Record<string, string>>({})
 
   // The URL-derived config is read on the client only. First render (server
   // + first client pass) uses DEFAULT_CONFIG so the initial HTML matches; the
@@ -255,6 +259,7 @@ export function Wizard() {
         setSessionId(persisted.sessionId)
         setNonce(persisted.nonce)
         if (persisted.proofs.length > 0) setProofs(persisted.proofs)
+        if (Object.keys(persisted.attrsValues).length > 0) setAttrsValues(persisted.attrsValues)
         if (config.allowedPlatforms.length > 0) {
           setPlatform(config.allowedPlatforms[0])
         } else {
@@ -304,9 +309,9 @@ export function Wizard() {
     if (!hydrated || typeof window === 'undefined') return
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ stepIndex, name, sessionId, nonce, platform, proofs } satisfies PersistedState),
+      JSON.stringify({ stepIndex, name, sessionId, nonce, platform, proofs, attrsValues } satisfies PersistedState),
     )
-  }, [hydrated, stepIndex, name, sessionId, nonce, platform, proofs])
+  }, [hydrated, stepIndex, name, sessionId, nonce, platform, proofs, attrsValues])
 
   const currentStep = steps[stepIndex]
   const stepLabels = steps.map((s) => s.label)
@@ -466,6 +471,8 @@ export function Wizard() {
           schemaUri={incomingConfig.schemaUris[0]}
           schema={resolvedSchema}
           keyLabels={keyLabels}
+          initialValues={attrsValues}
+          onValuesChange={(v) => setAttrsValues(v)}
           onBack={back}
           onComplete={(diff) => {
             setRecordDiff(diff)
