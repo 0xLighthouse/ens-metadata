@@ -195,9 +195,7 @@ export function EnterAttributesStep({
 
         {!isLoading &&
           allRequestedAttrs.map((key) => {
-            const existing = loaded?.[key]
             const current = values[key] ?? ''
-            const unchanged = typeof existing === 'string' && existing === current && current !== ''
             const isRequired = requiredSet.has(key)
             const isMissing = isRequired && current.trim().length === 0
             // Per-property metadata from the resolved schema, with sensible
@@ -229,11 +227,6 @@ export function EnterAttributesStep({
                       </span>
                     )}
                   </Label>
-                  {unchanged && (
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                      unchanged
-                    </span>
-                  )}
                 </div>
                 <Input
                   id={`attr-${key}`}
@@ -260,21 +253,14 @@ export function EnterAttributesStep({
               Also written automatically (only if different from current):
             </div>
             <dl className="space-y-1">
-              {hiddenRecords.map(([k, v]) => {
-                const existing = loaded?.[k]
-                const unchanged = typeof existing === 'string' && existing === v
-                return (
+              {hiddenRecords.map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4">
                     <dt className="font-mono text-neutral-500 dark:text-neutral-400">{k}</dt>
-                    <dd className="font-mono truncate flex items-center gap-2">
+                    <dd className="font-mono truncate">
                       <span>{v}</span>
-                      {unchanged && (
-                        <span className="text-neutral-400 dark:text-neutral-500">unchanged</span>
-                      )}
                     </dd>
                   </div>
-                )
-              })}
+              ))}
             </dl>
           </div>
         )}

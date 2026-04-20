@@ -156,42 +156,50 @@ export function ConnectWalletStep({ defaultName, onComplete }: Props) {
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="ens-name">ENS name</Label>
-          <Input
-            id="ens-name"
-            placeholder="alice.eth"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={!authenticated}
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-        </div>
-
-        {error && (
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <Button
-          full
-          onClick={handleContinue}
-          disabled={!authenticated || !isInitialized || !name.trim()}
-          isLoading={checking}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleContinue()
+          }}
+          className="space-y-6"
         >
-          {phase === 'awaiting-siwe' ? (
-            <>
-              <FileSignature className="h-4 w-4 mr-2" />
-              {phaseLabel}
-            </>
-          ) : (
-            phaseLabel
+          <div className="space-y-2">
+            <Label htmlFor="ens-name">ENS name</Label>
+            <Input
+              id="ens-name"
+              placeholder="alice.eth"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!authenticated}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
           )}
-        </Button>
+
+          <Button
+            type="submit"
+            full
+            disabled={!authenticated || !isInitialized || !name.trim()}
+            isLoading={checking}
+          >
+            {phase === 'awaiting-siwe' ? (
+              <>
+                <FileSignature className="h-4 w-4 mr-2" />
+                {phaseLabel}
+              </>
+            ) : (
+              phaseLabel
+            )}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   )
