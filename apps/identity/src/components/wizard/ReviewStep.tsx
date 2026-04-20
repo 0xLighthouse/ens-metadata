@@ -8,7 +8,7 @@ import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
 import { formatKeyName } from '@/lib/utils'
 import { wizardStyles as s } from './wizardStyles'
 import { metadataWriter } from '@ensmetadata/sdk'
-import { CheckCircle2, ChevronDown, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ExternalLink, FileSignature, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { mainnet } from 'viem/chains'
 import type { AttestationProof } from './LinkAccountsStep'
@@ -209,38 +209,45 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
       <CardContent className="space-y-5">
         {/* Category 1: New records (proofs + added non-structural) */}
         {(proofs.length > 0 || addedNonStructural.length > 0) && (
-          <DiffSection tone="add" title="Values to add" subtitle="These new records will be added to your profile.">
-            {proofs.map((proof) => (
-              <ProofPillRow
-                key={proof.draft.claim.p}
-                proof={proof}
-                isOpen={openProofKey === proof.draft.claim.p}
-                onToggle={() =>
-                  setOpenProofKey((k) =>
-                    k === proof.draft.claim.p ? null : proof.draft.claim.p,
-                  )
-                }
-              />
-            ))}
+          <DiffSection tone="add" icon={<Plus className="h-3.5 w-3.5" />} title="Values to add" subtitle="These new records will be added to your profile.">
             {addedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
-                icon={<Plus className="h-3.5 w-3.5" />}
                 tone="add"
                 k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={r.next}
               />
             ))}
+            {proofs.length > 0 && (
+              <div className="px-3 py-2.5">
+                <div className="flex min-w-0 flex-col gap-2">
+                  <span className={`${s.mono} text-xs ${s.mutedText}`}>Attestations</span>
+                  <div className="flex flex-col gap-2">
+                    {proofs.map((proof) => (
+                      <ProofPillRow
+                        key={proof.draft.claim.p}
+                        proof={proof}
+                        isOpen={openProofKey === proof.draft.claim.p}
+                        onToggle={() =>
+                          setOpenProofKey((k) =>
+                            k === proof.draft.claim.p ? null : proof.draft.claim.p,
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </DiffSection>
         )}
 
         {/* Category 2: Updated/removed non-structural records */}
         {(updatedNonStructural.length > 0 || removedNonStructural.length > 0) && (
-          <DiffSection tone="update" title="Values to update" subtitle="These existing records will be updated on your profile.">
+          <DiffSection tone="update" icon={<PencilLine className="h-3.5 w-3.5" />} title="Values to update" subtitle="These existing records will be updated on your profile.">
             {updatedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
-                icon={<PencilLine className="h-3.5 w-3.5" />}
                 tone="update"
                 k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={
@@ -254,7 +261,6 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
             {removedNonStructural.map((r) => (
               <DiffRow
                 key={r.key}
-                icon={<Minus className="h-3.5 w-3.5" />}
                 tone="remove"
                 k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={<span className="line-through opacity-60">{r.prev}</span>}
@@ -267,6 +273,7 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
         {structuralEntries.length > 0 && (
           <DiffSection
             tone="neutral"
+            icon={<Plus className="h-3.5 w-3.5" />}
             title="Additional records"
             subtitle="These records will be updated to make your profile discoverable."
             isOpen={isAdditionalOpen}
@@ -275,7 +282,6 @@ export function ReviewStep({ name, proofs, recordDiff, sessionId, onBack, classV
             {structuralEntries.map((entry) => (
               <DiffRow
                 key={entry.key}
-                icon={<Plus className="h-3.5 w-3.5" />}
                 tone="neutral"
                 k={entry.key}
                 value={entry.value}
@@ -360,10 +366,10 @@ const TONE_STYLES: Record<
     label: 'text-red-700 dark:text-red-300',
   },
   neutral: {
-    border: 'border-neutral-200 dark:border-neutral-700',
-    bg: 'bg-transparent',
-    badge: 'bg-neutral-400 text-white',
-    label: 'text-neutral-500 dark:text-neutral-400',
+    border: 'border-blue-200 dark:border-blue-800',
+    bg: 'bg-blue-50/60 dark:bg-blue-950/30',
+    badge: 'bg-blue-500 text-white',
+    label: 'text-blue-900 dark:text-blue-100',
   },
 }
 
@@ -384,42 +390,41 @@ function ProofPillRow({
   const recordKey = `social-proofs[${draft.claim.p}]`
 
   return (
-    <div className="px-3 py-2.5">
-      <div
-        className="bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 overflow-hidden rounded-2xl"
+    <div
+      className="bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 overflow-hidden rounded-2xl"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center justify-between gap-2 w-full px-4 py-1.5 text-sm font-medium hover:bg-green-200/60 dark:hover:bg-green-800/30 transition-colors"
       >
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex items-center justify-between gap-2 w-full px-4 py-1.5 text-sm font-medium hover:bg-green-200/60 dark:hover:bg-green-800/30 transition-colors"
-        >
-          <span>
-            {platformLabel} Attestation (
-            <span className="font-semibold">@{draft.claim.h}</span>)
-          </span>
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          />
-        </button>
-        {isOpen && (
-          <div className="px-4 pb-3 pt-1 border-t border-green-200 dark:border-green-800 space-y-2 text-xs">
-            <div>
-              <div className="opacity-60 mb-0.5">Key</div>
-              <div className={s.mono}>{recordKey}</div>
-            </div>
-            <div>
-              <div className="opacity-60 mb-0.5">Value</div>
-              <div className={`${s.mono} break-all opacity-80`}>{claimHex}</div>
-            </div>
+        <span>
+          {platformLabel} Account (
+          <span className="font-semibold">@{draft.claim.h}</span>)
+        </span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOpen && (
+        <div className="px-4 pb-3 pt-1 border-t border-green-200 dark:border-green-800 space-y-2 text-xs">
+          <div>
+            <div className="opacity-60 mb-0.5">Key</div>
+            <div className={s.mono}>{recordKey}</div>
           </div>
-        )}
-      </div>
+          <div>
+            <div className="opacity-60 mb-0.5">Value</div>
+            <div className={`${s.mono} break-all opacity-80`}>{claimHex}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function DiffSection({
   tone,
+  icon,
   title,
   subtitle,
   children,
@@ -427,6 +432,7 @@ function DiffSection({
   onToggle,
 }: {
   tone: Tone
+  icon?: React.ReactNode
   title: string
   subtitle: string
   children: React.ReactNode
@@ -436,10 +442,17 @@ function DiffSection({
   const t = TONE_STYLES[tone]
   const expandable = onToggle !== undefined
   const header = (
-    <>
-      <div className="text-xs font-semibold uppercase tracking-wide">{title}</div>
-      <div className="text-xs mt-0.5 opacity-80">{subtitle}</div>
-    </>
+    <div className="flex items-start gap-3">
+      {icon && (
+        <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${t.badge}`}>
+          {icon}
+        </span>
+      )}
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide">{title}</div>
+        <div className="text-xs mt-0.5 opacity-80">{subtitle}</div>
+      </div>
+    </div>
   )
   return (
     <div className={`rounded-lg border ${t.border} ${t.bg} overflow-hidden`}>
@@ -447,9 +460,9 @@ function DiffSection({
         <button
           type="button"
           onClick={onToggle}
-          className={`w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-2 ${t.label} hover:opacity-70 transition-opacity text-left`}
+          className={`w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-2 ${t.label} text-left`}
         >
-          <div>{header}</div>
+          {header}
           <ChevronDown
             className={`h-3.5 w-3.5 shrink-0 mt-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
@@ -465,25 +478,17 @@ function DiffSection({
 }
 
 function DiffRow({
-  icon,
   tone,
   k,
   value,
 }: {
-  icon: React.ReactNode
   tone: Tone
   k: string
   value: React.ReactNode
 }) {
-  const t = TONE_STYLES[tone]
   return (
-    <div className="flex items-start gap-3 px-3 py-2.5 text-sm">
-      <span
-        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${t.badge}`}
-      >
-        {icon}
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <div className="px-3 py-2.5 text-sm">
+      <div className="flex min-w-0 flex-col gap-0.5">
         <span className={`${s.mono} text-xs ${s.mutedText}`}>{k}</span>
         <div className={`${s.mono} break-words text-sm`}>{value}</div>
       </div>
