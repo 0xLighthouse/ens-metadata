@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { attest, evictSession } from '@/lib/attester-client'
 import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
+import { formatKeyName } from '@/lib/utils'
 import { metadataWriter } from '@ensmetadata/sdk'
 import { CheckCircle2, ExternalLink, FileSignature, Minus, PencilLine, Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -24,6 +25,7 @@ interface Props {
   /** Written directly when the attrs step was skipped (no user-facing fields). */
   classValue?: string
   schemaUri?: string
+  keyLabels: Record<string, string>
 }
 
 type Phase = 'idle' | 'attesting' | 'writing' | 'confirming' | 'done' | 'error'
@@ -41,7 +43,7 @@ function friendlyError(err: unknown): string {
   return raw
 }
 
-export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classValue, schemaUri }: Props) {
+export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classValue, schemaUri, keyLabels }: Props) {
   const { walletClient, publicClient } = useWeb3()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -235,7 +237,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
                 key={r.key}
                 icon={<Plus className="h-3.5 w-3.5" />}
                 tone="add"
-                k={r.key}
+                k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={r.next}
               />
             ))}
@@ -250,7 +252,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
                 key={r.key}
                 icon={<PencilLine className="h-3.5 w-3.5" />}
                 tone="update"
-                k={r.key}
+                k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={
                   <span className="flex flex-col gap-0.5">
                     <span className="line-through opacity-60">{r.prev}</span>
@@ -264,7 +266,7 @@ export function ReviewStep({ name, draft, recordDiff, sessionId, onBack, classVa
                 key={r.key}
                 icon={<Minus className="h-3.5 w-3.5" />}
                 tone="remove"
-                k={r.key}
+                k={keyLabels[r.key] ?? formatKeyName(r.key)}
                 value={<span className="line-through opacity-60">{r.prev}</span>}
               />
             ))}

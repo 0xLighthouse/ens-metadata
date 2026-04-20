@@ -6,6 +6,7 @@ import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
 import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
 import { useSchema } from '@/lib/use-schema'
+import { formatKeyName } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { AlertCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -308,6 +309,18 @@ export function Wizard() {
   // and are passed directly to ReviewStep to be written unconditionally.
   const hasAttrsStep = steps.some((s) => s.kind === 'attrs')
 
+  // Build a key → display label map once, at the root, so both the form step
+  // and review step show consistent names without duplicating schema logic.
+  const keyLabels = useMemo<Record<string, string>>(() => {
+    const allKeys = [...incomingConfig.requiredAttrs, ...incomingConfig.optionalAttrs]
+    return Object.fromEntries(
+      allKeys.map((key) => {
+        const title = resolvedSchema?.properties?.[key]?.title
+        return [key, title ?? formatKeyName(key)]
+      }),
+    )
+  }, [resolvedSchema, incomingConfig.requiredAttrs, incomingConfig.optionalAttrs])
+
   // Visible platforms in the picker — restricted by the URL or all known.
   const visiblePlatforms: Platform[] =
     incomingConfig.allowedPlatforms.length > 0
@@ -481,6 +494,7 @@ export function Wizard() {
           classValue={incomingConfig.classValues[0]}
           schemaUri={incomingConfig.schemaUris[0]}
           schema={resolvedSchema}
+          keyLabels={keyLabels}
           onBack={back}
           onComplete={(diff) => {
             setRecordDiff(diff)
@@ -498,6 +512,7 @@ export function Wizard() {
           onBack={back}
           classValue={!hasAttrsStep ? incomingConfig.classValues[0] : undefined}
           schemaUri={!hasAttrsStep ? incomingConfig.schemaUris[0] : undefined}
+          keyLabels={keyLabels}
         />
       )}
     </div>

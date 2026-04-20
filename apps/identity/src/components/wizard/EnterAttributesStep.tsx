@@ -34,6 +34,7 @@ interface Props {
    * input types). Null when the URL didn't supply a schema URI.
    */
   schema: FetchedSchema | null
+  keyLabels: Record<string, string>
   onBack: () => void
   /**
    * Receives the full diff between what's currently on chain and what the
@@ -69,6 +70,7 @@ export function EnterAttributesStep({
   classValue,
   schemaUri,
   schema,
+  keyLabels,
   onBack,
   onComplete,
 }: Props) {
@@ -194,7 +196,7 @@ export function EnterAttributesStep({
             // requested attr is defined in the schema, so this lookup
             // always finds something when `schema` is present.
             const prop = schema?.properties?.[key]
-            const labelText = prop?.title ?? key
+            const labelText = keyLabels[key] ?? key
             const helpText = prop?.description
             const exampleFromSchema =
               Array.isArray(prop?.examples) && typeof prop.examples[0] === 'string'
