@@ -3,24 +3,18 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getIntent } from '@/lib/attester-client'
 import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
-import type { DraftFullProof as DraftTelegramProof } from '@/lib/telegram-proof'
-import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
 import { useSchema } from '@/lib/use-schema'
 import { formatKeyName } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { AlertCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { ConnectWalletStep } from './ConnectWalletStep'
+import {
+  type AttestationProof,
+  ComposeScreen,
+  type UnchangedRecord,
+} from './ComposeScreen'
 import { CreatorBanner } from './CreatorBanner'
-import { type AttestationProof, LinkAccountsStep } from './LinkAccountsStep'
-import { EnterAttributesStep } from './EnterAttributesStep'
-import { ReviewStep } from './ReviewStep'
-import { WizardStepIndicator } from './WizardStepIndicator'
-
-// The two draft types are structurally similar (same inner claim shape,
-// different `proof` payload). ReviewStep only reads the inner claim, so
-// the union is enough — it doesn't need to discriminate the proof field.
-export type AnyDraftFullProof = DraftTwitterProof | DraftTelegramProof
+import { PreviewScreen } from './PreviewScreen'
 
 type Platform = 'com.x' | 'org.telegram'
 const KNOWN_PLATFORMS: readonly Platform[] = ['com.x', 'org.telegram'] as const
@@ -31,8 +25,7 @@ function isPlatform(s: string): s is Platform {
 
 /**
  * Config resolved from a stored intent. Each field is independent — the
- * creator can request just a proof, just attributes, both, or neither
- * (in which case the wizard runs its default proof-only flow).
+ * creator can request just a proof, just attributes, both, or neither.
  *
  * `class` and `schema` accept multiple values for multi-schema asks. The
  * wizard validates attrs against the union of all schemas but writes only
@@ -41,25 +34,15 @@ function isPlatform(s: string): s is Platform {
  */
 interface IncomingConfig {
   prefillName: string | null
-  /** Platforms the recipient MUST link before they can continue. */
   requiredPlatforms: Platform[]
-  /** Platforms shown as linkable but skippable. */
   optionalPlatforms: Platform[]
-  /** Whether the URL specified `platforms` at all (vs. left it open). */
   platformsRequested: boolean
-  /** Text record keys the recipient MUST fill in (Continue is gated on these). */
   requiredAttrs: string[]
-  /** Text record keys surfaced as form inputs but OK to leave blank. */
   optionalAttrs: string[]
-  /** Offered `class` text record values. First is the primary (written). */
   classValues: string[]
-  /** Offered `schema` text record URIs. First is the primary (written). */
   schemaUris: string[]
 }
 
-// SSR-safe default. First server render + first client render both use
-// this; the real intent-derived config is populated in an effect on the
-// client to avoid a hydration mismatch in the step indicator.
 const DEFAULT_CONFIG: IncomingConfig = {
   prefillName: null,
   requiredPlatforms: [],
@@ -71,9 +54,6 @@ const DEFAULT_CONFIG: IncomingConfig = {
   schemaUris: [],
 }
 
-// Translate a stored IntentConfig (fully resolved at creation) into the
-// shape the wizard already expects. Keeping the projection narrow means
-// all existing step code keeps reading the same `IncomingConfig` interface.
 function adaptIntentConfig(config: IntentConfig): IncomingConfig {
   const requiredPlatforms = config.requiredPlatforms.filter(isPlatform)
   const optionalPlatforms = config.optionalPlatforms.filter(isPlatform)
@@ -95,71 +75,41 @@ interface CreatorInfo {
   message: string
 }
 
-// A wizard step is a named kind, not a number. The list of steps is
-// computed from the incoming config so the indicator and the routing
-// stay in sync without an off-by-one foot-gun.
-type StepKind = 'wallet' | 'social' | 'attrs' | 'review'
+type Screen = 'compose' | 'preview'
 
-interface StepEntry {
-  kind: StepKind
-  label: string
-}
+const STORAGE_KEY_PREFIX = 'proofs-wizard-state:'
+const storageKeyFor = (intentId: string) => `${STORAGE_KEY_PREFIX}${intentId}`
 
-function computeSteps(config: IncomingConfig): StepEntry[] {
-  const steps: StepEntry[] = [{ kind: 'wallet', label: 'Connect wallet' }]
-
-  // Show the social step if the URL explicitly asks for platforms OR if
-  // nothing specific was asked (the default proof-only flow).
-  const totalAttrs = config.requiredAttrs.length + config.optionalAttrs.length
-  const wantsSocial =
-    config.platformsRequested ||
-    (totalAttrs === 0 && config.classValues.length === 0 && config.schemaUris.length === 0)
-  if (wantsSocial) {
-    steps.push({ kind: 'social', label: 'Link accounts' })
-  }
-
-  // Show the attributes step only when there are fields for the user to fill in.
-  // class/schema-only writes skip this step and go directly to review.
-  const wantsAttrs = totalAttrs > 0
-  if (wantsAttrs) {
-    steps.push({ kind: 'attrs', label: 'Complete profile' })
-  }
-
-  steps.push({ kind: 'review', label: 'Review and publish' })
-  return steps
-}
-
-const STORAGE_KEY = 'proofs-wizard-state'
-
+// Persists everything that makes the flow feel continuous within a single
+// intent: draft name/attrs, plus sessionId/nonce so the "confirmed ENS name"
+// state survives reloads (notably OAuth round-trips). The session itself may
+// be server-side expired by the time it's restored — that's fine because
+// every API call in the attestation flow mints a fresh session before use,
+// and evictSession is tolerant to 404s. The stored values act purely as
+// "user has already confirmed ownership of this name" markers.
+// Wallet + social linking are handled by Privy's own storage.
 interface PersistedState {
-  stepIndex: number
   name: string
   sessionId: string | null
   nonce: string | null
-  platform: Platform
-  proofs: AttestationProof[]
   attrsValues: Record<string, string>
 }
 
-function loadPersisted(): PersistedState | null {
+function loadPersisted(intentId: string): PersistedState | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKeyFor(intentId))
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedState
-    if (typeof parsed.stepIndex !== 'number' || typeof parsed.name !== 'string') return null
-    const proofs: AttestationProof[] = Array.isArray(parsed.proofs) ? parsed.proofs : []
-    const stepIndex = proofs.length > 0 ? Math.min(parsed.stepIndex, 2) : Math.min(parsed.stepIndex, 1)
+    if (typeof parsed.name !== 'string') return null
     return {
-      stepIndex,
       name: parsed.name,
       sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
       nonce: typeof parsed.nonce === 'string' ? parsed.nonce : null,
-      platform: isPlatform(parsed.platform) ? parsed.platform : 'com.x',
-      proofs,
-      attrsValues: parsed.attrsValues && typeof parsed.attrsValues === 'object'
-        ? parsed.attrsValues as Record<string, string>
-        : {},
+      attrsValues:
+        parsed.attrsValues && typeof parsed.attrsValues === 'object'
+          ? (parsed.attrsValues as Record<string, string>)
+          : {},
     }
   } catch {
     return null
@@ -172,28 +122,22 @@ interface WizardProps {
 
 export function Wizard({ intentId }: WizardProps) {
   const [hydrated, setHydrated] = useState(false)
-  const [stepIndex, setStepIndex] = useState(0)
+  const [screen, setScreen] = useState<Screen>('compose')
   const [name, setName] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [nonce, setNonce] = useState<string | null>(null)
   const [proofs, setProofs] = useState<AttestationProof[]>([])
   const [recordDiff, setRecordDiff] = useState<RecordDiff>(EMPTY_DIFF)
+  const [unchangedRecords, setUnchangedRecords] = useState<UnchangedRecord[]>([])
   const [attrsValues, setAttrsValues] = useState<Record<string, string>>({})
 
-  // The URL-derived config is read on the client only. First render (server
-  // + first client pass) uses DEFAULT_CONFIG so the initial HTML matches; the
-  // real values land after mount. Gating the render on `hydrated` avoids a
-  // flash of the empty-config wizard.
   const [incomingConfig, setIncomingConfig] = useState<IncomingConfig>(DEFAULT_CONFIG)
   const [creator, setCreator] = useState<CreatorInfo | null>(null)
   const [intentError, setIntentError] = useState<string | null>(null)
-  const steps = useMemo(() => computeSteps(incomingConfig), [incomingConfig])
 
-  // Schema fetch + validation runs at the wizard root, before any step
-  // gets a chance to render. A broken schema URI compromises the entire
-  // submission — the wizard would write a `schema = ipfs://...` text
-  // record pointing at garbage — so we refuse to start the flow until
-  // the schema is either valid or absent.
+  // Schema fetch + validation runs at the wizard root. A broken schema URI
+  // compromises the entire submission (we'd write `schema = ipfs://garbage`)
+  // so we refuse to start the flow until the schema is valid or absent.
   const {
     schema: resolvedSchema,
     loading: schemaLoading,
@@ -203,35 +147,30 @@ export function Wizard({ intentId }: WizardProps) {
     ...incomingConfig.optionalAttrs,
   ])
 
-  // Default platform: prefer first required, then first optional, then com.x.
-  const initialPlatform: Platform =
-    incomingConfig.requiredPlatforms[0] ?? incomingConfig.optionalPlatforms[0] ?? 'com.x'
-  const [platform, setPlatform] = useState<Platform>(initialPlatform)
-
   useEffect(() => {
     let cancelled = false
+    // Pause saves while the new intent loads — prevents the save effect
+    // from firing with stale state under the new intent's key before
+    // applyConfig has had a chance to reset/overlay values.
+    setHydrated(false)
 
     const applyConfig = (config: IncomingConfig) => {
       if (cancelled) return
       setIncomingConfig(config)
-      const persisted = loadPersisted()
-      if (persisted) {
-        setStepIndex(persisted.stepIndex)
-        if (!config.prefillName) setName(persisted.name)
-        else setName(config.prefillName)
-        setSessionId(persisted.sessionId)
-        setNonce(persisted.nonce)
-        if (persisted.proofs.length > 0) setProofs(persisted.proofs)
-        if (Object.keys(persisted.attrsValues).length > 0) setAttrsValues(persisted.attrsValues)
-        const firstPlatform = config.requiredPlatforms[0] ?? config.optionalPlatforms[0]
-        if (firstPlatform) {
-          setPlatform(firstPlatform)
-        } else {
-          setPlatform(persisted.platform)
-        }
-      } else if (config.prefillName) {
-        setName(config.prefillName)
-      }
+      const persisted = loadPersisted(intentId)
+
+      // Wipe the strictly-ephemeral state on every load — proofs bind to a
+      // specific SIWE resource set and always regenerate on publish, and the
+      // preview screen is a computed downstream view of that.
+      setProofs([])
+      setRecordDiff(EMPTY_DIFF)
+      setUnchangedRecords([])
+      setScreen('compose')
+
+      setName(config.prefillName ?? persisted?.name ?? '')
+      setSessionId(persisted?.sessionId ?? null)
+      setNonce(persisted?.nonce ?? null)
+      setAttrsValues(persisted?.attrsValues ?? {})
       setHydrated(true)
     }
 
@@ -263,31 +202,13 @@ export function Wizard({ intentId }: WizardProps) {
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
     window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ stepIndex, name, sessionId, nonce, platform, proofs, attrsValues } satisfies PersistedState),
+      storageKeyFor(intentId),
+      JSON.stringify({ name, sessionId, nonce, attrsValues } satisfies PersistedState),
     )
-  }, [hydrated, stepIndex, name, sessionId, nonce, platform, proofs, attrsValues])
+  }, [hydrated, intentId, name, sessionId, nonce, attrsValues])
 
-  const currentStep = steps[stepIndex]
-  const stepLabels = steps.map((s) => s.label)
-  const advance = () => setStepIndex((i) => Math.min(i + 1, steps.length - 1))
-  const back = () => setStepIndex((i) => Math.max(i - 1, 0))
-
-  // Session expired mid-flow: clear session state and return to step 1 so the
-  // user re-validates their ENS name and gets a fresh session.
-  const handleSessionExpired = () => {
-    setSessionId(null)
-    setNonce(null)
-    setProofs([])
-    setStepIndex(0)
-  }
-
-  // When the attrs step is absent, class/schema values bypass EnterAttributesStep
-  // and are passed directly to ReviewStep to be written unconditionally.
-  const hasAttrsStep = steps.some((s) => s.kind === 'attrs')
-
-  // Build a key → display label map once, at the root, so both the form step
-  // and review step show consistent names without duplicating schema logic.
+  // Build a key → display label map once, at the root, so compose and
+  // preview show consistent names without duplicating schema logic.
   const keyLabels = useMemo<Record<string, string>>(() => {
     const allKeys = [...incomingConfig.requiredAttrs, ...incomingConfig.optionalAttrs]
     return Object.fromEntries(
@@ -298,12 +219,9 @@ export function Wizard({ intentId }: WizardProps) {
     )
   }, [resolvedSchema, incomingConfig.requiredAttrs, incomingConfig.optionalAttrs])
 
-  // An unresolvable intent id fails fast before any step renders, with the
-  // same Card shell used for schema errors so the two error modes look
-  // uniform to the recipient.
   if (intentError) {
     return (
-      <div className="max-w-xl mx-auto w-full">
+      <div className="mx-auto max-w-3xl w-full">
         <Card>
           <CardHeader>
             <CardTitle>Intent unavailable</CardTitle>
@@ -319,14 +237,9 @@ export function Wizard({ intentId }: WizardProps) {
     )
   }
 
-
-  // Refuse to render any wizard step when the schema is broken. The user
-  // can still copy the failing URI to debug, but they can't proceed —
-  // this is the schema check the agent's URL template wants the user
-  // to bounce off rather than ride to a garbage on-chain write.
   if (schemaError) {
     return (
-      <div className="max-w-xl mx-auto w-full">
+      <div className="mx-auto max-w-3xl w-full">
         <Card>
           <CardHeader>
             <CardTitle>Schema error</CardTitle>
@@ -364,12 +277,12 @@ export function Wizard({ intentId }: WizardProps) {
 
   if (!hydrated || schemaLoading) {
     return (
-      <div className="max-w-xl mx-auto w-full">
+      <div className="mx-auto max-w-3xl w-full">
         <Card>
           <CardHeader>
             <CardTitle>Loading…</CardTitle>
             <CardDescription>
-              {schemaLoading ? 'Fetching the schema referenced by this link.' : 'Preparing…'}
+              {schemaLoading ? 'Fetching the schema referenced by this link.' : 'Please wait.'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -378,76 +291,62 @@ export function Wizard({ intentId }: WizardProps) {
   }
 
   return (
-    <div className="max-w-xl mx-auto w-full">
-      {creator && (
+    <div className="mx-auto max-w-3xl w-full">
+      {creator && creator.message && (
         <CreatorBanner
           ensName={creator.ensName}
           avatar={creator.avatar}
           message={creator.message}
         />
       )}
-      <WizardStepIndicator steps={stepLabels} current={stepIndex} />
 
-      {currentStep?.kind === 'wallet' && (
-        <ConnectWalletStep
-          defaultName={incomingConfig.prefillName ?? (name || undefined)}
-          onComplete={(n, sid, nonceVal) => {
-            setName(n)
-            setSessionId(sid)
-            setNonce(nonceVal)
-            advance()
-          }}
-        />
-      )}
-
-      {currentStep?.kind === 'social' && sessionId && nonce && (
-        <LinkAccountsStep
+      {screen === 'compose' && (
+        <ComposeScreen
           name={name}
+          defaultName={incomingConfig.prefillName ?? undefined}
           sessionId={sessionId}
           nonce={nonce}
-          requiredPlatforms={incomingConfig.requiredPlatforms}
-          optionalPlatforms={incomingConfig.optionalPlatforms}
-          platformsRequested={incomingConfig.platformsRequested}
-          initialPlatform={platform}
-          onPlatformChange={(p) => setPlatform(p)}
-          onBack={back}
-          onSessionExpired={handleSessionExpired}
-          onComplete={(nextProofs) => {
-            setProofs(nextProofs)
-            advance()
-          }}
-        />
-      )}
-
-      {currentStep?.kind === 'attrs' && (
-        <EnterAttributesStep
-          name={name}
+          attrsValues={attrsValues}
           requiredAttrs={incomingConfig.requiredAttrs}
           optionalAttrs={incomingConfig.optionalAttrs}
           classValue={incomingConfig.classValues[0]}
           schemaUri={incomingConfig.schemaUris[0]}
           schema={resolvedSchema}
           keyLabels={keyLabels}
-          initialValues={attrsValues}
-          onValuesChange={(v) => setAttrsValues(v)}
-          onBack={back}
-          onComplete={(diff) => {
-            setRecordDiff(diff)
-            advance()
+          requiredPlatforms={incomingConfig.requiredPlatforms}
+          optionalPlatforms={incomingConfig.optionalPlatforms}
+          platformsRequested={incomingConfig.platformsRequested}
+          onNameChange={setName}
+          onSessionChange={(sid, n) => {
+            setSessionId(sid)
+            setNonce(n)
+            if (sid === null) {
+              // Session cleared — drop any stale proofs too so they don't
+              // get silently carried into the next attestation.
+              setProofs([])
+            }
+          }}
+          onAttrsChange={setAttrsValues}
+          onAttestation={(nextProofs, nextDiff, nextUnchanged) => {
+            setProofs(nextProofs)
+            setRecordDiff(nextDiff)
+            setUnchangedRecords(nextUnchanged)
+            setScreen('preview')
           }}
         />
       )}
 
-      {currentStep?.kind === 'review' && sessionId && (
-        <ReviewStep
+      {screen === 'preview' && sessionId && (
+        <PreviewScreen
           name={name}
+          sessionId={sessionId}
           proofs={proofs}
           recordDiff={recordDiff}
-          sessionId={sessionId}
-          onBack={back}
-          classValue={!hasAttrsStep ? incomingConfig.classValues[0] : undefined}
-          schemaUri={!hasAttrsStep ? incomingConfig.schemaUris[0] : undefined}
+          unchangedRecords={unchangedRecords}
+          classValue={incomingConfig.classValues[0]}
+          schemaUri={incomingConfig.schemaUris[0]}
           keyLabels={keyLabels}
+          onBack={() => setScreen('compose')}
         />
       )}
     </div>

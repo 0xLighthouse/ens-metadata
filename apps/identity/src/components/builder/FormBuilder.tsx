@@ -2,6 +2,7 @@
 
 import { CreatorPreviewCard } from '@/components/builder/CreatorPreviewCard'
 import { IntentCreator } from '@/components/builder/IntentCreator'
+import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
 import {
   BUILDER_PLATFORMS,
   BUILDER_SCHEMAS,
@@ -11,7 +12,6 @@ import {
 import { cn } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { Building2, Check, Plus, User, X } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /**
@@ -81,6 +81,9 @@ export function FormBuilder() {
     optionalPlatforms: [],
     message: '',
   })
+  // Locked while a shareable link is live, so the user can't silently drift
+  // the config away from whatever the link encodes.
+  const [linkLocked, setLinkLocked] = useState(false)
 
   const selectedSchema = useMemo(() => resolveSchema(state.schemaId), [state.schemaId])
   const availableAttrs = selectedSchema?.attrs ?? []
@@ -98,6 +101,12 @@ export function FormBuilder() {
 
   const q1Answered = state.schemaId !== ''
   const q2Answered = chosenAttrs.length > 0
+  // Enables the "Get shareable link" button — the intent needs at least one
+  // thing for the recipient to do, either attrs or a non-off platform.
+  const hasContent =
+    state.chosenOrder.length > 0 ||
+    state.requiredPlatforms.length > 0 ||
+    state.optionalPlatforms.length > 0
 
   const selectSchema = (id: string) => {
     const target = resolveSchema(id)
@@ -189,8 +198,15 @@ export function FormBuilder() {
         onMessageChange={(message) => setState((s) => ({ ...s, message }))}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-        <QuestionSection
+      <div
+        className={cn(
+          'transition-all duration-200',
+          linkLocked && 'pointer-events-none select-none opacity-60 saturate-75',
+        )}
+        aria-disabled={linkLocked}
+      >
+      <GuidedCard>
+        <GuidedSection
           number="01"
           title="What type of profile do you want to create?"
           description="Pick the kind of entity this profile represents."
@@ -201,14 +217,13 @@ export function FormBuilder() {
             value={state.schemaId}
             onChange={selectSchema}
           />
-        </QuestionSection>
+        </GuidedSection>
 
-        <QuestionSection
+        <GuidedSection
           number="02"
           title="What would you like to ask about?"
           description="Pick all attributes the user might fill in."
           active={q1Answered}
-          inactiveHint="Answer the previous question to continue."
         >
           <ChipAddField
             options={attrChipOptions}
@@ -219,87 +234,38 @@ export function FormBuilder() {
               availableAttrs.length === 0 ? 'Pick a profile type first.' : undefined
             }
           />
-        </QuestionSection>
+        </GuidedSection>
 
-        <QuestionSection
+        <GuidedSection
           number="03"
           title="Which of these are required?"
           description="Users will be required to fill these in before they are allowed to continue."
           active={q1Answered && q2Answered}
-          inactiveHint="Pick at least one attribute above to continue."
         >
           <RequiredToggleField
             attrs={chosenAttrs}
             required={state.required}
             onToggle={toggleAttrRequired}
           />
-        </QuestionSection>
+        </GuidedSection>
 
-        <QuestionSection
+        <GuidedSection
           number="04"
           title="Social account linking"
           description="Users can prove ownership of their social media accounts and add an attestation to their profile. For any account marked 'required', the user will not be able to continue until they link their account."
-          active={q1Answered && q2Answered}
-          inactiveHint="Answer the questions above to continue."
+          active={q1Answered}
         >
           <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />
-        </QuestionSection>
+        </GuidedSection>
+      </GuidedCard>
       </div>
 
-      <IntentCreator buildConfig={buildConfig} />
+      <IntentCreator
+        buildConfig={buildConfig}
+        hasContent={hasContent}
+        onGeneratedChange={setLinkLocked}
+      />
     </div>
-  )
-}
-
-// -----------------------------
-// Layout primitives
-// -----------------------------
-
-function QuestionSection({
-  number,
-  title,
-  description,
-  active,
-  inactiveHint,
-  children,
-}: {
-  number: string
-  title: string
-  description?: string
-  active: boolean
-  inactiveHint?: string
-  children: ReactNode
-}) {
-  return (
-    <section
-      aria-disabled={!active}
-      className={cn(
-        'border-t border-neutral-200 px-5 py-6 transition-opacity duration-300 first:border-t-0 sm:px-8 sm:py-7 dark:border-neutral-800',
-        !active && 'pointer-events-none select-none opacity-50',
-      )}
-    >
-      <header className="mb-4">
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-xs font-semibold tracking-wider text-rose-500/80 dark:text-rose-400/80">
-            {number}
-          </span>
-          <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-            {title}
-          </h3>
-        </div>
-        {description && (
-          <p className="ml-[calc(1.5rem+0.75rem)] mt-1 max-w-prose text-sm leading-snug text-neutral-500 dark:text-neutral-400">
-            {description}
-          </p>
-        )}
-        {!active && inactiveHint && (
-          <p className="ml-[calc(1.5rem+0.75rem)] mt-2 text-xs italic text-neutral-400 dark:text-neutral-500">
-            {inactiveHint}
-          </p>
-        )}
-      </header>
-      <div className="ml-[calc(1.5rem+0.75rem)]">{children}</div>
-    </section>
   )
 }
 

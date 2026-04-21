@@ -9,7 +9,7 @@ interface Props {
 export function CreatorBanner({ ensName, avatar, message }: Props) {
   const initial = ensName.charAt(0).toUpperCase()
   return (
-    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm dark:border-blue-900 dark:bg-blue-950/20">
       <div className="shrink-0">
         {avatar ? (
           <img
@@ -31,7 +31,7 @@ export function CreatorBanner({ ensName, avatar, message }: Props) {
           <span className="text-neutral-500 dark:text-neutral-400"> says...</span>
         </div>
         {message && (
-          <p className="text-sm text-neutral-600 dark:text-neutral-300">{message}</p>
+          <p className="text-sm italic text-neutral-600 dark:text-neutral-300">{message}</p>
         )}
       </div>
     </div>

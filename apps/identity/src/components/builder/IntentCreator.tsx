@@ -10,7 +10,7 @@ import {
   hashConfig,
 } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
-import { AlertCircle, Check, Copy, ExternalLink } from 'lucide-react'
+import { AlertCircle, Check, Copy, ExternalLink, PencilLine } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Hex } from 'viem'
 
@@ -18,9 +18,15 @@ type Phase = 'idle' | 'ens-missing' | 'signing' | 'submitting' | 'success' | 'er
 
 interface Props {
   buildConfig: () => IntentConfig | null
+  /** True when the config has at least one chosen attribute or a non-off
+   *  platform — i.e. there's something worth sharing. */
+  hasContent: boolean
+  /** Notified when a shareable link becomes available or is cleared.
+   *  FormBuilder uses it to freeze the config UI while a live link exists. */
+  onGeneratedChange?: (generated: boolean) => void
 }
 
-export function IntentCreator({ buildConfig }: Props) {
+export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Props) {
   const { authenticated, user } = usePrivy()
   const { publicClient, walletClient } = useWeb3()
 
@@ -67,11 +73,7 @@ export function IntentCreator({ buildConfig }: Props) {
     if (!address || !walletClient || !ensName) return
 
     const config = buildConfig()
-    if (!config) {
-      setError('Pick a schema before creating the link.')
-      setPhase('error')
-      return
-    }
+    if (!config) return
 
     try {
       setPhase('signing')
@@ -89,6 +91,7 @@ export function IntentCreator({ buildConfig }: Props) {
       const { id } = await createIntent({ address, ensName, config, signature, expiry })
       setShareUrl(`${window.location.origin}/${id}`)
       setPhase('success')
+      onGeneratedChange?.(true)
     } catch (err) {
       if (err instanceof AttesterError) {
         setError(errorMessage(err.message))
@@ -106,9 +109,23 @@ export function IntentCreator({ buildConfig }: Props) {
     setTimeout(() => setCopied(false), 1800)
   }
 
+  const handleMakeChanges = () => {
+    setShareUrl(null)
+    setError(null)
+    setCopied(false)
+    setPhase('idle')
+    onGeneratedChange?.(false)
+  }
+
   const inFlight = phase === 'signing' || phase === 'submitting'
   const canCreate =
-    authenticated && !!walletClient && !!address && !ensLoading && !!ensName && !inFlight
+    authenticated &&
+    !!walletClient &&
+    !!address &&
+    !ensLoading &&
+    !!ensName &&
+    !inFlight &&
+    hasContent
 
   return (
     <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
@@ -129,8 +146,8 @@ export function IntentCreator({ buildConfig }: Props) {
                 </>
               )}
             </Button>
-            <Button variant="outline" full onClick={() => window.open(shareUrl, '_blank')}>
-              <ExternalLink className="mr-2 h-4 w-4" /> Preview
+            <Button variant="outline" full onClick={handleMakeChanges}>
+              <PencilLine className="mr-2 h-4 w-4" /> Make changes
             </Button>
           </div>
         </>

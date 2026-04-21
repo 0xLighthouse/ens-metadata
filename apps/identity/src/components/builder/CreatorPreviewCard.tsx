@@ -58,11 +58,15 @@ export function CreatorPreviewCard({ message, onMessageChange }: Props) {
 
   if (!authenticated) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">
-          Connect your wallet to begin.
+      <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+        {/* Invisible spacer matches the avatar column in the authenticated
+         *  state, so the text lines up with the question content below. */}
+        <div aria-hidden className="h-10 w-10 shrink-0" />
+        <p className="flex-1 text-sm text-neutral-600 dark:text-neutral-300">
+          Connect your wallet to begin. You must have an ENS name set as the primary name for the
+          address you connect.
         </p>
-        <Button onClick={login} disabled={!privyReady}>
+        <Button onClick={login} disabled={!privyReady} className="shrink-0">
           <Wallet className="mr-2 h-4 w-4" />
           Connect wallet
         </Button>
