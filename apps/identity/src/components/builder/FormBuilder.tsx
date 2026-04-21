@@ -1,5 +1,6 @@
 'use client'
 
+import { CreatorPreviewCard } from '@/components/builder/CreatorPreviewCard'
 import { IntentCreator } from '@/components/builder/IntentCreator'
 import {
   BUILDER_PLATFORMS,
@@ -9,21 +10,22 @@ import {
 } from '@/config/builder-schemas'
 import { cn } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Pill } from './Pill'
 
 /**
  * Form builder. Actor composes an ask — what classes to allow, which
  * fields are required vs optional, which social accounts to attest —
- * then signs an intent. The recipient opens `/?intent=<id>` and the
- * wizard loads the config plus the creator's ENS profile.
+ * then signs an intent. The recipient opens `/<id>` and the wizard
+ * loads the config plus the creator's ENS profile.
  */
 
 const DEFAULT_SCHEMA_ID = 'person'
+const ALLOWED_SCHEMA_IDS = ['person', 'org'] as const
 
 interface BuilderState {
-  schemaIds: string[]
+  schemaId: string
   /** Keys the recipient MUST fill in. */
   required: string[]
   /** Keys the recipient MAY fill in. Disjoint with required. */
@@ -32,63 +34,42 @@ interface BuilderState {
   requiredPlatforms: BuilderPlatformId[]
   /** Platforms shown as linkable but skippable. Disjoint with requiredPlatforms. */
   optionalPlatforms: BuilderPlatformId[]
-  name: string
   message: string
 }
 
-function resolveSchemas(ids: readonly string[]): BuilderSchema[] {
-  return ids
-    .map((id) => BUILDER_SCHEMAS.find((s) => s.id === id))
-    .filter((s): s is BuilderSchema => !!s)
-}
-
-/** Union of attr lists across selected schemas, deduplicated by key. */
-function unionAttrs(schemas: readonly BuilderSchema[]): BuilderSchema['attrs'] {
-  const seen = new Set<string>()
-  const out: BuilderSchema['attrs'] = []
-  for (const s of schemas) {
-    for (const a of s.attrs) {
-      if (seen.has(a.key)) continue
-      seen.add(a.key)
-      out.push(a)
-    }
-  }
-  return out
+function resolveSchema(id: string): BuilderSchema | null {
+  return BUILDER_SCHEMAS.find((s) => s.id === id) ?? null
 }
 
 function buildConfigFromState(state: BuilderState): IntentConfig | null {
-  const schemas = resolveSchemas(state.schemaIds)
-  if (schemas.length === 0) return null
-  const name = state.name.trim()
+  const schema = resolveSchema(state.schemaId)
+  if (!schema) return null
   return {
     version: 1,
-    name: name.length > 0 ? name : null,
-    classValues: schemas.map((s) => s.classValue),
-    schemaUris: schemas.map((s) => s.schemaUri),
+    name: null,
+    classValues: [schema.classValue],
+    schemaUris: [schema.schemaUri],
     required: state.required,
     optional: state.optional,
-    platforms: [
-      ...state.requiredPlatforms.map((id) => `!${id}`),
-      ...state.optionalPlatforms,
-    ],
+    requiredPlatforms: state.requiredPlatforms,
+    optionalPlatforms: state.optionalPlatforms,
     message: state.message,
   }
 }
 
 export function FormBuilder() {
   const [state, setState] = useState<BuilderState>({
-    schemaIds: [DEFAULT_SCHEMA_ID],
+    schemaId: DEFAULT_SCHEMA_ID,
     required: [],
     optional: [],
     requiredPlatforms: [],
     optionalPlatforms: [],
-    name: '',
     message: '',
   })
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [schemaPillOpen, setSchemaPillOpen] = useState(false)
 
-  const selectedSchemas = useMemo(() => resolveSchemas(state.schemaIds), [state.schemaIds])
-  const availableAttrs = useMemo(() => unionAttrs(selectedSchemas), [selectedSchemas])
+  const selectedSchema = useMemo(() => resolveSchema(state.schemaId), [state.schemaId])
+  const availableAttrs = selectedSchema?.attrs ?? []
   // Pass a lazy builder instead of a precomputed value — signing reads the
   // latest state, and we don't want a stale closure if the user keeps editing
   // while the wallet is prompting.
@@ -136,19 +117,15 @@ export function FormBuilder() {
       }
     })
 
-  const toggleSchema = (target: BuilderSchema) =>
+  const selectSchema = (target: BuilderSchema) =>
     setState((s) => {
-      const nextIds = s.schemaIds.includes(target.id)
-        ? s.schemaIds.filter((id) => id !== target.id)
-        : [...s.schemaIds, target.id]
-      // Dropping the last schema would break the URL; keep at least one.
-      if (nextIds.length === 0) return s
+      if (s.schemaId === target.id) return s
       // Prune any previously-picked attrs that aren't offered by the new
-      // union so the generated URL never carries orphan keys.
-      const nextKeys = new Set(unionAttrs(resolveSchemas(nextIds)).map((a) => a.key))
+      // schema so the generated URL never carries orphan keys.
+      const nextKeys = new Set(target.attrs.map((a) => a.key))
       return {
         ...s,
-        schemaIds: nextIds,
+        schemaId: target.id,
         required: s.required.filter((k) => nextKeys.has(k)),
         optional: s.optional.filter((k) => nextKeys.has(k)),
       }
@@ -156,17 +133,29 @@ export function FormBuilder() {
 
   return (
     <div className="space-y-8">
+      <CreatorPreviewCard
+        message={state.message}
+        onMessageChange={(message) => setState((s) => ({ ...s, message }))}
+      />
       <div className="rounded-3xl bg-rose-50 p-8 text-rose-900 shadow-sm dark:bg-rose-950/30 dark:text-rose-100 md:p-10">
         <p className="text-[1.4rem] leading-[1.8] md:text-[1.65rem] md:leading-[1.9]">
-          Allow{' '}
+          This link will walk the user through setting up their profile for a{' '}
           <Pill
-            unset={selectedSchemas.length === 0}
-            placeholder="a schema"
-            label={schemasLabel(selectedSchemas)}
+            unset={!selectedSchema}
+            placeholder="schema type"
+            label={selectedSchema?.label ?? 'schema type'}
+            open={schemaPillOpen}
+            onOpenChange={setSchemaPillOpen}
           >
-            <SchemaPicker selectedSchemas={selectedSchemas} onToggle={toggleSchema} />
-          </Pill>{' '}
-          to be registered. Ensure{' '}
+            <SchemaPicker
+              selectedId={state.schemaId}
+              onSelect={(s) => {
+                selectSchema(s)
+                setSchemaPillOpen(false)
+              }}
+            />
+          </Pill>
+          . We will require them to fill out{' '}
           <Pill
             unset={state.required.length === 0}
             placeholder="required fields"
@@ -179,8 +168,8 @@ export function FormBuilder() {
               disabledKeys={state.optional}
               emptyCopy="Pick a schema first."
             />
-          </Pill>{' '}
-          are present. Optionally ask them to fill in{' '}
+          </Pill>
+          . It will be optional for them to fill out{' '}
           <Pill
             unset={state.optional.length === 0}
             placeholder="optional fields"
@@ -194,7 +183,7 @@ export function FormBuilder() {
               emptyCopy="Pick a schema first."
             />
           </Pill>
-          . We also want their{' '}
+          . We will require them to link their{' '}
           <Pill
             unset={state.requiredPlatforms.length === 0}
             placeholder="required accounts"
@@ -205,8 +194,8 @@ export function FormBuilder() {
               onToggle={toggleRequiredPlatform}
               disabledIds={state.optionalPlatforms}
             />
-          </Pill>{' '}
-          accounts to be required, and optionally their{' '}
+          </Pill>
+          , but they can also link their{' '}
           <Pill
             unset={state.optionalPlatforms.length === 0}
             placeholder="optional accounts"
@@ -218,104 +207,11 @@ export function FormBuilder() {
               disabledIds={state.requiredPlatforms}
             />
           </Pill>{' '}
-          accounts to be attested.
+          if they wish.
         </p>
       </div>
 
-      <AdvancedSection
-        open={advancedOpen}
-        onToggle={() => setAdvancedOpen((o) => !o)}
-        name={state.name}
-        onNameChange={(name) => setState((s) => ({ ...s, name }))}
-        message={state.message}
-        onMessageChange={(message) => setState((s) => ({ ...s, message }))}
-      />
-
       <IntentCreator buildConfig={buildConfig} />
-    </div>
-  )
-}
-
-// -----------------------------
-// Advanced options
-// -----------------------------
-
-function AdvancedSection({
-  open,
-  onToggle,
-  name,
-  onNameChange,
-  message,
-  onMessageChange,
-}: {
-  open: boolean
-  onToggle: () => void
-  name: string
-  onNameChange: (v: string) => void
-  message: string
-  onMessageChange: (v: string) => void
-}) {
-  const summaryBits: string[] = []
-  if (name) summaryBits.push(`for ${name}`)
-  if (message) summaryBits.push('note attached')
-  return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
-      >
-        <span>
-          Advanced
-          {summaryBits.length > 0 && (
-            <span className="ml-2 text-xs text-neutral-500">{summaryBits.join(' · ')}</span>
-          )}
-        </span>
-        <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="space-y-4 border-t border-neutral-200 p-4 dark:border-neutral-800">
-          <div className="space-y-2">
-            <label
-              htmlFor="builder-name"
-              className="text-xs font-medium uppercase tracking-wide text-neutral-500"
-            >
-              For (optional)
-            </label>
-            <input
-              id="builder-name"
-              value={name}
-              onChange={(e) => onNameChange(e.target.value)}
-              placeholder="alice.eth"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 font-mono text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            />
-            <p className="text-[11px] text-neutral-400">
-              Leave blank to let the recipient type their own name.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label
-              htmlFor="builder-msg"
-              className="text-xs font-medium uppercase tracking-wide text-neutral-500"
-            >
-              Note for the recipient
-            </label>
-            <textarea
-              id="builder-msg"
-              value={message}
-              onChange={(e) => onMessageChange(e.target.value.slice(0, 280))}
-              rows={3}
-              placeholder="Hey, could you fill this out for me?"
-              className="w-full resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            />
-            <div className="text-right text-[11px] text-neutral-400">{message.length}/280</div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -325,27 +221,29 @@ function AdvancedSection({
 // -----------------------------
 
 function SchemaPicker({
-  selectedSchemas,
-  onToggle,
+  selectedId,
+  onSelect,
 }: {
-  selectedSchemas: BuilderSchema[]
-  onToggle: (s: BuilderSchema) => void
+  selectedId: string
+  onSelect: (s: BuilderSchema) => void
 }) {
-  const selectedIds = new Set(selectedSchemas.map((s) => s.id))
+  const options = BUILDER_SCHEMAS.filter((s) =>
+    (ALLOWED_SCHEMA_IDS as readonly string[]).includes(s.id),
+  )
   return (
     <ul className="space-y-1">
-      {BUILDER_SCHEMAS.map((s) => {
-        const isOn = selectedIds.has(s.id)
+      {options.map((s) => {
+        const isOn = selectedId === s.id
         return (
           <li key={s.id}>
             <button
               type="button"
-              onClick={() => onToggle(s)}
+              onClick={() => onSelect(s)}
               className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               <span
                 className={cn(
-                  'mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                  'mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
                   isOn
                     ? 'border-rose-500 bg-rose-500 text-white'
                     : 'border-neutral-300 dark:border-neutral-600',
@@ -488,13 +386,6 @@ function PlatformPicker({
 // -----------------------------
 // Labels
 // -----------------------------
-
-function schemasLabel(schemas: BuilderSchema[]): string {
-  if (schemas.length === 0) return 'a schema'
-  if (schemas.length === 1) return schemas[0]!.label
-  if (schemas.length === 2) return `${schemas[0]!.label} or ${schemas[1]!.label}`
-  return `${schemas[0]!.label}, ${schemas[1]!.label} +${schemas.length - 2}`
-}
 
 function fieldsLabel(keys: string[], fallback: string): string {
   if (keys.length === 0) return fallback

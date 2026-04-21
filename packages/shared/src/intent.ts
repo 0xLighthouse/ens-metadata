@@ -10,7 +10,10 @@ export interface IntentConfig {
   schemaUris: string[]
   required: string[]
   optional: string[]
-  platforms: IntentPlatform[]
+  /** Platforms the recipient MUST link. Disjoint with optionalPlatforms. */
+  requiredPlatforms: IntentPlatform[]
+  /** Platforms offered as linkable but skippable. Disjoint with requiredPlatforms. */
+  optionalPlatforms: IntentPlatform[]
   message: string
 }
 
@@ -100,20 +103,30 @@ export function validateIntentConfig(
   const schemaUris = asStringArray(c.schemaUris)
   const required = asStringArray(c.required)
   const optional = asStringArray(c.optional)
-  const platformsRaw = asStringArray(c.platforms)
+  const requiredPlatformsRaw = asStringArray(c.requiredPlatforms)
+  const optionalPlatformsRaw = asStringArray(c.optionalPlatforms)
   if (!classValues) return bad('classValues')
   if (!schemaUris || schemaUris.length === 0) return bad('schemaUris')
   if (!required) return bad('required')
   if (!optional) return bad('optional')
-  if (!platformsRaw) return bad('platforms')
+  if (!requiredPlatformsRaw) return bad('requiredPlatforms')
+  if (!optionalPlatformsRaw) return bad('optionalPlatforms')
   if (classValues.length !== schemaUris.length) {
     return { ok: false, error: { field: 'classValues', message: 'must match schemaUris length' } }
   }
-  const platforms = platformsRaw.filter((p): p is IntentPlatform =>
-    (INTENT_PLATFORMS as readonly string[]).includes(p),
-  )
-  if (platforms.length !== platformsRaw.length) {
-    return { ok: false, error: { field: 'platforms', message: 'contains unknown platform' } }
+  const isKnownPlatform = (p: string): p is IntentPlatform =>
+    (INTENT_PLATFORMS as readonly string[]).includes(p)
+  const requiredPlatforms = requiredPlatformsRaw.filter(isKnownPlatform)
+  if (requiredPlatforms.length !== requiredPlatformsRaw.length) {
+    return { ok: false, error: { field: 'requiredPlatforms', message: 'contains unknown platform' } }
+  }
+  const optionalPlatforms = optionalPlatformsRaw.filter(isKnownPlatform)
+  if (optionalPlatforms.length !== optionalPlatformsRaw.length) {
+    return { ok: false, error: { field: 'optionalPlatforms', message: 'contains unknown platform' } }
+  }
+  const platformOverlap = requiredPlatforms.filter((p) => optionalPlatforms.includes(p))
+  if (platformOverlap.length > 0) {
+    return { ok: false, error: { field: 'optionalPlatforms', message: 'overlaps requiredPlatforms' } }
   }
   const overlap = required.filter((k) => optional.includes(k))
   if (overlap.length > 0) {
@@ -130,7 +143,8 @@ export function validateIntentConfig(
     schemaUris,
     required,
     optional,
-    platforms,
+    requiredPlatforms,
+    optionalPlatforms,
     message: c.message,
   }
 

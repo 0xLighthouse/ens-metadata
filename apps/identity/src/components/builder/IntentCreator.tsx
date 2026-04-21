@@ -10,7 +10,7 @@ import {
   hashConfig,
 } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
-import { AlertCircle, Check, Copy, ExternalLink, Wallet } from 'lucide-react'
+import { AlertCircle, Check, Copy, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Hex } from 'viem'
 
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function IntentCreator({ buildConfig }: Props) {
-  const { login, authenticated, user, ready: privyReady } = usePrivy()
+  const { authenticated, user } = usePrivy()
   const { publicClient, walletClient } = useWeb3()
 
   const address = user?.wallet?.address as Hex | undefined
@@ -87,7 +87,7 @@ export function IntentCreator({ buildConfig }: Props) {
 
       setPhase('submitting')
       const { id } = await createIntent({ address, ensName, config, signature, expiry })
-      setShareUrl(`${window.location.origin}/?intent=${id}`)
+      setShareUrl(`${window.location.origin}/${id}`)
       setPhase('success')
     } catch (err) {
       if (err instanceof AttesterError) {
@@ -106,72 +106,12 @@ export function IntentCreator({ buildConfig }: Props) {
     setTimeout(() => setCopied(false), 1800)
   }
 
-  // Gate 1: not signed into Privy yet.
-  if (!authenticated) {
-    return (
-      <GateCard title="Connect your wallet to share this link">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          You need a connected wallet with a primary ENS name so recipients know who's asking.
-        </p>
-        <Button onClick={login} disabled={!privyReady} full>
-          <Wallet className="mr-2 h-4 w-4" />
-          Connect wallet
-        </Button>
-      </GateCard>
-    )
-  }
+  const inFlight = phase === 'signing' || phase === 'submitting'
+  const canCreate =
+    authenticated && !!walletClient && !!address && !ensLoading && !!ensName && !inFlight
 
-  // Gate 2: Privy authed but wallet client not ready yet.
-  if (!walletClient || !address) {
-    return (
-      <GateCard title="Preparing your wallet…">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Waiting for the wallet provider to initialize.
-        </p>
-      </GateCard>
-    )
-  }
-
-  // Gate 3: reverse-record lookup in flight.
-  if (ensLoading) {
-    return (
-      <GateCard title="Looking up your ENS name…">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Reading the primary name for your connected address.
-        </p>
-      </GateCard>
-    )
-  }
-
-  // Gate 4: connected, but no primary ENS — blocked with a helpful link.
-  if (!ensName) {
-    return (
-      <GateCard title="Set a primary ENS name">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Your connected address doesn't have a primary ENS name set. Recipients identify the sender
-          by this name, so it's required.
-        </p>
-        <a
-          href="https://app.ens.domains/"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center text-sm font-medium text-rose-600 hover:underline dark:text-rose-400"
-        >
-          Set one at app.ens.domains
-          <ExternalLink className="ml-1 h-3 w-3" />
-        </a>
-      </GateCard>
-    )
-  }
-
-  // Ready to create. Button state reflects the sign → submit progression.
   return (
     <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-medium uppercase tracking-wider text-neutral-500">Signing as</span>
-        <span className="font-mono text-neutral-700 dark:text-neutral-200">{ensName}</span>
-      </div>
-
       {shareUrl ? (
         <>
           <div className="overflow-x-auto rounded-md bg-neutral-50 px-3 py-2 font-mono text-xs dark:bg-neutral-800">
@@ -195,18 +135,29 @@ export function IntentCreator({ buildConfig }: Props) {
           </div>
         </>
       ) : (
-        <Button
-          full
-          onClick={handleCreate}
-          isLoading={phase === 'signing' || phase === 'submitting'}
-          disabled={phase === 'signing' || phase === 'submitting'}
-        >
+        <Button full onClick={handleCreate} isLoading={inFlight} disabled={!canCreate}>
           {phase === 'signing'
             ? 'Waiting for signature…'
             : phase === 'submitting'
               ? 'Creating link…'
-              : 'Create shareable link'}
+              : 'Get shareable link'}
         </Button>
+      )}
+
+      {authenticated && !ensLoading && !ensName && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          Your connected address has no primary ENS name. Set one at{' '}
+          <a
+            href="https://app.ens.domains/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center font-medium text-rose-600 hover:underline dark:text-rose-400"
+          >
+            app.ens.domains
+            <ExternalLink className="ml-1 h-3 w-3" />
+          </a>
+          .
+        </p>
       )}
 
       {error && (
@@ -215,15 +166,6 @@ export function IntentCreator({ buildConfig }: Props) {
           <span>{error}</span>
         </div>
       )}
-    </div>
-  )
-}
-
-function GateCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-      <div className="text-sm font-medium">{title}</div>
-      {children}
     </div>
   )
 }

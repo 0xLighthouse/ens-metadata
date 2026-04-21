@@ -30,14 +30,14 @@ function isPlatform(s: string): s is Platform {
 }
 
 /**
- * Config decoded from the URL. Each field is independent — agents can
- * request just a proof, just attributes, both, or neither (in which case
- * the wizard runs its default proof-only flow).
+ * Config resolved from a stored intent. Each field is independent — the
+ * creator can request just a proof, just attributes, both, or neither
+ * (in which case the wizard runs its default proof-only flow).
  *
- * `class` and `schema` accept comma-joined values for multi-schema asks.
- * The wizard validates attrs against the union of all schemas but writes
- * only the FIRST class value + schema URI to chain, since ENS text records
- * are single strings and downstream verifiers parse them as such.
+ * `class` and `schema` accept multiple values for multi-schema asks. The
+ * wizard validates attrs against the union of all schemas but writes only
+ * the FIRST class value + schema URI to chain, since ENS text records are
+ * single strings and downstream verifiers parse them as such.
  */
 interface IncomingConfig {
   prefillName: string | null
@@ -58,7 +58,7 @@ interface IncomingConfig {
 }
 
 // SSR-safe default. First server render + first client render both use
-// this; the real URL-derived config is populated in an effect on the
+// this; the real intent-derived config is populated in an effect on the
 // client to avoid a hydration mismatch in the step indicator.
 const DEFAULT_CONFIG: IncomingConfig = {
   prefillName: null,
@@ -71,81 +71,17 @@ const DEFAULT_CONFIG: IncomingConfig = {
   schemaUris: [],
 }
 
-function parseCsv(raw: string | null): string[] {
-  if (!raw) return []
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-function readIncomingConfig(): IncomingConfig {
-  if (typeof window === 'undefined') return DEFAULT_CONFIG
-  const params = new URLSearchParams(window.location.search)
-
-  // platforms=!com.x,org.telegram — ! prefix = required, plain = optional
-  const platformsRaw = params.get('platforms')
-  const platformParts = platformsRaw
-    ? platformsRaw.split(',').map((s) => s.trim()).filter(Boolean)
-    : []
-  const requiredPlatforms = platformParts
-    .filter((s) => s.startsWith('!'))
-    .map((s) => s.slice(1))
-    .filter(isPlatform)
-  const optionalPlatforms = platformParts
-    .filter((s) => !s.startsWith('!'))
-    .filter(isPlatform)
-
-  // Attrs: preferred wire format uses separate required= and optional= params.
-  // Legacy attrs= is supported as "all optional", but ! prefix in attrs=
-  // promotes individual keys to required (e.g. attrs=!email,name).
-  const rawRequired = params.get('required')
-  const rawOptional = params.get('optional')
-  const legacyAttrs = params.get('attrs')
-  let requiredAttrs = parseCsv(rawRequired)
-  let optionalAttrs = parseCsv(rawOptional)
-  if (!rawRequired && !rawOptional && legacyAttrs) {
-    for (const part of legacyAttrs.split(',').map((s) => s.trim()).filter(Boolean)) {
-      if (part.startsWith('!')) {
-        requiredAttrs.push(part.slice(1))
-      } else {
-        optionalAttrs.push(part)
-      }
-    }
-  }
-  // De-dup: anything in required should not also appear in optional.
-  const requiredSet = new Set(requiredAttrs)
-  optionalAttrs = optionalAttrs.filter((k) => !requiredSet.has(k))
-
-  return {
-    prefillName: params.get('name'),
-    requiredPlatforms,
-    optionalPlatforms,
-    platformsRequested: !!platformsRaw,
-    requiredAttrs,
-    optionalAttrs,
-    classValues: parseCsv(params.get('class')),
-    schemaUris: parseCsv(params.get('schema')),
-  }
-}
-
 // Translate a stored IntentConfig (fully resolved at creation) into the
 // shape the wizard already expects. Keeping the projection narrow means
 // all existing step code keeps reading the same `IncomingConfig` interface.
 function adaptIntentConfig(config: IntentConfig): IncomingConfig {
-  const platformParts: string[] = config.platforms
-  const requiredPlatforms = platformParts
-    .filter((s) => s.startsWith('!'))
-    .map((s) => s.slice(1))
-    .filter(isPlatform)
-  const optionalPlatforms = platformParts
-    .filter((s) => !s.startsWith('!'))
-    .filter(isPlatform)
+  const requiredPlatforms = config.requiredPlatforms.filter(isPlatform)
+  const optionalPlatforms = config.optionalPlatforms.filter(isPlatform)
   return {
     prefillName: config.name,
     requiredPlatforms,
     optionalPlatforms,
-    platformsRequested: config.platforms.length > 0,
+    platformsRequested: requiredPlatforms.length + optionalPlatforms.length > 0,
     requiredAttrs: config.required,
     optionalAttrs: config.optional.filter((k: string) => !config.required.includes(k)),
     classValues: config.classValues,
@@ -230,7 +166,11 @@ function loadPersisted(): PersistedState | null {
   }
 }
 
-export function Wizard() {
+interface WizardProps {
+  intentId: string
+}
+
+export function Wizard({ intentId }: WizardProps) {
   const [hydrated, setHydrated] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const [name, setName] = useState('')
@@ -271,9 +211,6 @@ export function Wizard() {
   useEffect(() => {
     let cancelled = false
 
-    // `applyConfig` is shared between the intent branch and the legacy
-    // query-param branch so persistence + initial-state handling stays
-    // identical regardless of how the config was delivered.
     const applyConfig = (config: IncomingConfig) => {
       if (cancelled) return
       setIncomingConfig(config)
@@ -298,39 +235,30 @@ export function Wizard() {
       setHydrated(true)
     }
 
-    const params = new URLSearchParams(window.location.search)
-    const intentId = params.get('intent')
-    if (intentId) {
-      getIntent(intentId)
-        .then((data) => {
-          if (cancelled) return
-          setCreator({
-            ensName: data.creator.ensName,
-            avatar: data.creator.avatar,
-            message: data.config.message,
-          })
-          applyConfig(adaptIntentConfig(data.config))
+    getIntent(intentId)
+      .then((data) => {
+        if (cancelled) return
+        setCreator({
+          ensName: data.creator.ensName,
+          avatar: data.creator.avatar,
+          message: data.config.message,
         })
-        .catch((err: Error) => {
-          if (cancelled) return
-          setIntentError(
-            err.message === 'not_found'
-              ? 'This intent link is invalid or has been removed.'
-              : 'Could not load this intent. Check your connection and retry.',
-          )
-          setHydrated(true)
-        })
-      return () => {
-        cancelled = true
-      }
-    }
+        applyConfig(adaptIntentConfig(data.config))
+      })
+      .catch((err: Error) => {
+        if (cancelled) return
+        setIntentError(
+          err.message === 'not_found'
+            ? 'This intent link is invalid or has been removed.'
+            : 'Could not load this intent. Check your connection and retry.',
+        )
+        setHydrated(true)
+      })
 
-    // Legacy path: pure URL query params, no backend hop.
-    applyConfig(readIncomingConfig())
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [intentId])
 
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return

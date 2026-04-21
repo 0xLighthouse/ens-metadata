@@ -25,15 +25,13 @@ export function CreatorBanner({ ensName, avatar, message }: Props) {
       </div>
       <div className="flex-1 space-y-1">
         <div className="text-sm">
-          <span className="text-neutral-500 dark:text-neutral-400">Asked by </span>
           <span className="font-mono font-medium text-neutral-900 dark:text-neutral-100">
             {ensName}
           </span>
+          <span className="text-neutral-500 dark:text-neutral-400"> says...</span>
         </div>
         {message && (
-          <p className="text-sm italic text-neutral-600 dark:text-neutral-300">
-            &ldquo;{message}&rdquo;
-          </p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">{message}</p>
         )}
       </div>
     </div>
