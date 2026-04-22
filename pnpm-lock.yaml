@@ -137,6 +137,9 @@ importers:
       viem:
         specifier: 2.47.6
         version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
+      zustand:
+        specifier: ^5.0.0
+        version: 5.0.6(@types/react@18.3.23)(react@18.3.1)(use-sync-external-store@1.5.0(react@18.3.1))
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.16
@@ -477,7 +480,7 @@ importers:
         version: 3.18.1(encoding@0.1.13)
       '@turnkey/viem':
         specifier: ^0.14.28
-        version: 0.14.28(@upstash/redis@1.35.1)(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)
+        version: 0.14.28(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)
       jose:
         specifier: ^6.2.2
         version: 6.2.2
@@ -12589,7 +12592,7 @@ snapshots:
       '@turnkey/encoding': 0.6.0
       sha256-uint8array: 0.10.7
 
-  '@turnkey/core@1.14.1(@upstash/redis@1.35.1)(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)':
+  '@turnkey/core@1.14.1(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)':
     dependencies:
       '@turnkey/api-key-stamper': 0.6.5
       '@turnkey/crypto': 2.8.14
@@ -12599,8 +12602,8 @@ snapshots:
       '@turnkey/webauthn-stamper': 0.6.0
       '@wallet-standard/app': 1.1.0
       '@wallet-standard/base': 1.1.0
-      '@walletconnect/sign-client': 2.23.9(@upstash/redis@1.35.1)(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)
-      '@walletconnect/types': 2.23.9(@upstash/redis@1.35.1)
+      '@walletconnect/sign-client': 2.23.9(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)
+      '@walletconnect/types': 2.23.9
       cross-fetch: 3.2.0(encoding@0.1.13)
       ethers: 6.16.0(bufferutil@4.1.0)
       jwt-decode: 4.0.0
@@ -12700,12 +12703,12 @@ snapshots:
 
   '@turnkey/sdk-types@0.14.0': {}
 
-  '@turnkey/viem@0.14.28(@upstash/redis@1.35.1)(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)':
+  '@turnkey/viem@0.14.28(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@noble/curves': 1.8.0
       '@openzeppelin/contracts': 5.6.1
       '@turnkey/api-key-stamper': 0.6.5
-      '@turnkey/core': 1.14.1(@upstash/redis@1.35.1)(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)
+      '@turnkey/core': 1.14.1(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)
       '@turnkey/http': 3.18.1(encoding@0.1.13)
       '@turnkey/sdk-browser': 5.16.1(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)
       '@turnkey/sdk-server': 5.3.0(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(zod@3.25.76)
@@ -13345,7 +13348,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@walletconnect/core@2.23.9(@upstash/redis@1.35.1)(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)':
+  '@walletconnect/core@2.23.9(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)':
     dependencies:
       '@walletconnect/heartbeat': 1.2.2
       '@walletconnect/jsonrpc-provider': 1.0.14
@@ -13358,8 +13361,8 @@ snapshots:
       '@walletconnect/relay-auth': 1.1.0
       '@walletconnect/safe-json': 1.0.2
       '@walletconnect/time': 1.0.2
-      '@walletconnect/types': 2.23.9(@upstash/redis@1.35.1)
-      '@walletconnect/utils': 2.23.9(@upstash/redis@1.35.1)(typescript@5.8.3)(zod@3.25.76)
+      '@walletconnect/types': 2.23.9
+      '@walletconnect/utils': 2.23.9(typescript@5.8.3)(zod@3.25.76)
       '@walletconnect/window-getters': 1.0.1
       es-toolkit: 1.44.0
       events: 3.3.0
@@ -13634,16 +13637,16 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@walletconnect/sign-client@2.23.9(@upstash/redis@1.35.1)(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)':
+  '@walletconnect/sign-client@2.23.9(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)':
     dependencies:
-      '@walletconnect/core': 2.23.9(@upstash/redis@1.35.1)(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)
+      '@walletconnect/core': 2.23.9(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76)
       '@walletconnect/events': 1.0.1
       '@walletconnect/heartbeat': 1.2.2
       '@walletconnect/jsonrpc-utils': 1.0.8
       '@walletconnect/logger': 3.0.2
       '@walletconnect/time': 1.0.2
-      '@walletconnect/types': 2.23.9(@upstash/redis@1.35.1)
-      '@walletconnect/utils': 2.23.9(@upstash/redis@1.35.1)(typescript@5.8.3)(zod@3.25.76)
+      '@walletconnect/types': 2.23.9
+      '@walletconnect/utils': 2.23.9(typescript@5.8.3)(zod@3.25.76)
       events: 3.3.0
     transitivePeerDependencies:
       - '@azure/app-configuration'
@@ -13757,7 +13760,7 @@ snapshots:
       - ioredis
       - uploadthing
 
-  '@walletconnect/types@2.23.9(@upstash/redis@1.35.1)':
+  '@walletconnect/types@2.23.9':
     dependencies:
       '@walletconnect/events': 1.0.1
       '@walletconnect/heartbeat': 1.2.2
@@ -14037,7 +14040,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@walletconnect/utils@2.23.9(@upstash/redis@1.35.1)(typescript@5.8.3)(zod@3.25.76)':
+  '@walletconnect/utils@2.23.9(typescript@5.8.3)(zod@3.25.76)':
     dependencies:
       '@msgpack/msgpack': 3.1.3
       '@noble/ciphers': 1.3.0
@@ -14051,7 +14054,7 @@ snapshots:
       '@walletconnect/relay-auth': 1.1.0
       '@walletconnect/safe-json': 1.0.2
       '@walletconnect/time': 1.0.2
-      '@walletconnect/types': 2.23.9(@upstash/redis@1.35.1)
+      '@walletconnect/types': 2.23.9
       '@walletconnect/window-getters': 1.0.1
       '@walletconnect/window-metadata': 1.0.1
       blakejs: 1.2.1
@@ -16215,7 +16218,7 @@ snapshots:
     dependencies:
       ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  isows@1.0.6(ws@8.18.0(bufferutil@4.1.0)):
+  isows@1.0.6(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
@@ -16227,7 +16230,7 @@ snapshots:
     dependencies:
       ws: 8.18.2(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  isows@1.0.7(ws@8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  isows@1.0.7(ws@8.18.3):
     dependencies:
       ws: 8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
@@ -19436,7 +19439,7 @@ snapshots:
       '@scure/bip32': 1.6.2
       '@scure/bip39': 1.5.4
       abitype: 1.0.8(typescript@5.8.3)(zod@3.25.76)
-      isows: 1.0.6(ws@8.18.0(bufferutil@4.1.0))
+      isows: 1.0.6(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       ox: 0.6.7(typescript@5.8.3)(zod@3.25.76)
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
@@ -19470,7 +19473,7 @@ snapshots:
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.8.3)(zod@3.22.4)
-      isows: 1.0.7(ws@8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      isows: 1.0.7(ws@8.18.3)
       ox: 0.14.7(typescript@5.8.3)(zod@3.22.4)
       ws: 8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
@@ -19487,7 +19490,7 @@ snapshots:
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
-      isows: 1.0.7(ws@8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      isows: 1.0.7(ws@8.18.3)
       ox: 0.14.7(typescript@5.8.3)(zod@3.25.76)
       ws: 8.18.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:

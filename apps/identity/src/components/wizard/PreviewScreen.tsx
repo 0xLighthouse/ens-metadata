@@ -1,11 +1,12 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
+import { Button } from '@/components/ui/button'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { evictSession } from '@/lib/attester-client'
-import { type RecordDiff, diffToWriteMap } from '@/lib/record-diff'
+import { diffToWriteMap } from '@/lib/record-diff'
 import { cn } from '@/lib/utils'
+import { useWizardStore } from '@/stores/wizard'
 import { metadataWriter } from '@ensmetadata/sdk'
 import {
   AlertCircle,
@@ -18,20 +19,13 @@ import {
   Pencil,
   Plus,
 } from 'lucide-react'
+import type { IncomingConfig } from '@/lib/wizard-config'
 import { useMemo, useState } from 'react'
 import { mainnet } from 'viem/chains'
-import type { AttestationProof, UnchangedRecord } from './ComposeScreen'
 
 interface Props {
-  name: string
-  sessionId: string
-  proofs: AttestationProof[]
-  recordDiff: RecordDiff
-  unchangedRecords: UnchangedRecord[]
-  classValue?: string
-  schemaUri?: string
+  incomingConfig: IncomingConfig
   keyLabels: Record<string, string>
-  onBack: () => void
 }
 
 type Phase = 'idle' | 'writing' | 'confirming' | 'done' | 'error'
@@ -55,17 +49,17 @@ function friendlyError(err: unknown): string {
  * table so the user sees one unified list rather than "added/updated/removed"
  * buckets — this is the what-you-get view, not a diff view.
  */
-export function PreviewScreen({
-  name,
-  sessionId,
-  proofs,
-  recordDiff,
-  unchangedRecords,
-  classValue,
-  schemaUri,
-  keyLabels,
-  onBack,
-}: Props) {
+export function PreviewScreen({ incomingConfig, keyLabels }: Props) {
+  const classValue = incomingConfig.classValues[0]
+  const schemaUri = incomingConfig.schemaUris[0]
+
+  const name = useWizardStore((s) => s.name)
+  const sessionId = useWizardStore((s) => s.sessionId)
+  const proofs = useWizardStore((s) => s.proofs)
+  const recordDiff = useWizardStore((s) => s.recordDiff)
+  const unchangedRecords = useWizardStore((s) => s.unchangedRecords)
+  const backToCompose = useWizardStore((s) => s.backToCompose)
+
   const { walletClient, publicClient } = useWeb3()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -196,7 +190,7 @@ export function PreviewScreen({
       setTxHash(hash)
       setPhase('confirming')
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 2 })
-      await evictSession(sessionId).catch(() => {})
+      if (sessionId) await evictSession(sessionId).catch(() => {})
       setPhase('done')
     } catch (err) {
       setError(friendlyError(err))
@@ -348,7 +342,7 @@ export function PreviewScreen({
 
       <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onBack} disabled={busy}>
+          <Button variant="outline" onClick={backToCompose} disabled={busy}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>

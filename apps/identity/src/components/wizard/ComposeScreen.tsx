@@ -1,29 +1,21 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useWeb3 } from '@/contexts/Web3Provider'
-import { attest, bindPlatform, bindWallet, createSession } from '@/lib/attester-client'
-import { getOwnedNames, resolveOwner } from '@/lib/ens'
-import { type RecordDiff, computeRecordDiff } from '@/lib/record-diff'
-import {
-  TELEGRAM_PLATFORM,
-  type DraftFullProof as DraftTelegramProof,
-  type PrivyTelegramAccount,
-  buildTelegramProofFromPrivy,
-} from '@/lib/telegram-proof'
-import {
-  TWITTER_PLATFORM,
-  type DraftFullProof as DraftTwitterProof,
-  type PrivyTwitterAccount,
-  buildTwitterProofFromPrivy,
-} from '@/lib/twitter-proof'
-import type { FetchedSchema } from '@/lib/use-schema'
+import { useAttestationFlow } from '@/hooks/use-attestation-flow'
+import { useEnsConfirmation } from '@/hooks/use-ens-confirmation'
+import { useRecordsPrefill } from '@/hooks/use-records-prefill'
+import { type Platform, useSocialAccounts } from '@/hooks/use-social-accounts'
+import type { FetchedSchema } from '@/lib/schema-resolver'
+import type { PrivyTelegramAccount } from '@/lib/telegram-proof'
+import type { PrivyTwitterAccount } from '@/lib/twitter-proof'
 import { cn, shortAddress } from '@/lib/utils'
-import { metadataReader } from '@ensmetadata/sdk'
-import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
+import type { IncomingConfig } from '@/lib/wizard-config'
+import { useWizardStore } from '@/stores/wizard'
+import { usePrivy } from '@privy-io/react-auth'
 import {
   AlertCircle,
   CheckCircle2,
@@ -34,190 +26,39 @@ import {
 } from 'lucide-react'
 import type { ChangeEvent, TextareaHTMLAttributes } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createSiweMessage } from 'viem/siwe'
-
-type Platform = 'com.x' | 'org.telegram'
-
-export interface AttestationProof {
-  draft: DraftTwitterProof | DraftTelegramProof
-  claimHex: string
-}
-
-/** Schema-declared attributes that already hold the submitted value on
- *  chain, i.e. not part of the diff but still worth showing in the preview's
- *  clean view so the user sees their full post-publish profile. */
-export interface UnchangedRecord {
-  key: string
-  value: string
-}
-
-type EnsPhase = 'idle' | 'checking-owner' | 'creating-session'
-type SignPhase = 'idle' | 'awaiting-siwe' | 'binding' | 'attesting'
 
 interface Props {
-  name: string
-  defaultName?: string
-  sessionId: string | null
-  nonce: string | null
-  attrsValues: Record<string, string>
-  requiredAttrs: string[]
-  optionalAttrs: string[]
-  classValue?: string
-  schemaUri?: string
+  incomingConfig: IncomingConfig
   schema: FetchedSchema | null
   keyLabels: Record<string, string>
-  requiredPlatforms: Platform[]
-  optionalPlatforms: Platform[]
-  platformsRequested: boolean
-  onNameChange: (next: string) => void
-  onSessionChange: (sessionId: string | null, nonce: string | null) => void
-  onAttrsChange: (values: Record<string, string>) => void
-  onAttestation: (
-    proofs: AttestationProof[],
-    recordDiff: RecordDiff,
-    unchanged: UnchangedRecord[],
-  ) => void
 }
 
-export function ComposeScreen({
-  name,
-  defaultName,
-  sessionId,
-  nonce,
-  attrsValues,
-  requiredAttrs,
-  optionalAttrs,
-  classValue,
-  schemaUri,
-  schema,
-  keyLabels,
-  requiredPlatforms,
-  optionalPlatforms,
-  platformsRequested,
-  onNameChange,
-  onSessionChange,
-  onAttrsChange,
-  onAttestation,
-}: Props) {
+export function ComposeScreen({ incomingConfig, schema, keyLabels }: Props) {
   const {
-    login,
-    logout,
-    authenticated,
-    user,
-    ready,
-    linkTwitter,
-    linkTelegram,
-    unlinkTwitter,
-    unlinkTelegram,
-  } = usePrivy()
-  const { wallets } = useWallets()
-  const { walletClient, publicClient, isInitialized } = useWeb3()
+    requiredAttrs,
+    optionalAttrs,
+    classValues,
+    schemaUris,
+    requiredPlatforms,
+    optionalPlatforms,
+    platformsRequested,
+  } = incomingConfig
+  const classValue = classValues[0]
+  const schemaUri = schemaUris[0]
 
+  const { login, logout, authenticated, user, ready } = usePrivy()
+  const { walletClient, isInitialized } = useWeb3()
   const address = user?.wallet?.address as `0x${string}` | undefined
 
-  // Privy exposes linked social accounts both as top-level convenience fields
-  // (`user.twitter`, `user.telegram`) and inside `user.linkedAccounts`. They
-  // should mirror each other, but we've seen cases where the convenience
-  // field trails the array after OAuth completes — so we accept either.
-  const twitter: PrivyTwitterAccount | null = useMemo(() => {
-    if (user?.twitter) return user.twitter as PrivyTwitterAccount
-    const entry = user?.linkedAccounts?.find(
-      (a) => (a as { type?: string }).type === 'twitter_oauth',
-    ) as (PrivyTwitterAccount & { type?: string }) | undefined
-    return entry ?? null
-  }, [user])
+  const attrsValues = useWizardStore((s) => s.attrsValues)
+  const setAttrValue = useWizardStore((s) => s.setAttrValue)
 
-  const telegram: PrivyTelegramAccount | null = useMemo(() => {
-    if (user?.telegram) return user.telegram as PrivyTelegramAccount
-    const entry = user?.linkedAccounts?.find(
-      (a) => (a as { type?: string }).type === 'telegram',
-    ) as (PrivyTelegramAccount & { type?: string }) | undefined
-    return entry ?? null
-  }, [user])
+  const ens = useEnsConfirmation()
+  const socials = useSocialAccounts()
 
-  const confirmed = sessionId !== null && nonce !== null
-
-  // --- Section 01: ENS confirmation ---
-  const [draftName, setDraftName] = useState(
-    name || defaultName || '',
-  )
-  const [ensPhase, setEnsPhase] = useState<EnsPhase>('idle')
-  const [ensError, setEnsError] = useState<string | null>(null)
-  const [ownedNames, setOwnedNames] = useState<string[]>([])
-  const [nameDropdownOpen, setNameDropdownOpen] = useState(false)
-
-  // Keep the draft in sync when parent-provided name changes (e.g. persisted restore).
-  useEffect(() => {
-    if (name && name !== draftName) setDraftName(name)
-    // We only care about external name changes, not user edits.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name])
-
-  // Fetch the connected wallet's owned ENS names for autocomplete. Silent
-  // fallback: a subgraph failure just means no suggestions, not an error.
-  useEffect(() => {
-    if (!address) {
-      setOwnedNames([])
-      return
-    }
-    let cancelled = false
-    getOwnedNames(publicClient, address).then((names) => {
-      if (!cancelled) setOwnedNames(names)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [address, publicClient])
-
-  const filteredOwnedNames = useMemo(() => {
-    const q = draftName.trim().toLowerCase()
-    if (!q) return ownedNames
-    return ownedNames.filter((n) => n.toLowerCase().includes(q))
-  }, [draftName, ownedNames])
-
-  const handleConfirmEns = async () => {
-    setEnsError(null)
-    const trimmed = draftName.trim().toLowerCase()
-    if (!trimmed) {
-      setEnsError('Enter your ENS name.')
-      return
-    }
-    if (!trimmed.includes('.')) {
-      setEnsError("That doesn't look like a valid ENS name.")
-      return
-    }
-    if (!address) {
-      setEnsError('Connect a wallet first.')
-      return
-    }
-    try {
-      setEnsPhase('checking-owner')
-      const owner = await resolveOwner(publicClient, trimmed)
-      if (!owner) throw new Error(`Could not resolve owner for ${trimmed}.`)
-      if (owner.toLowerCase() !== address.toLowerCase()) {
-        throw new Error(
-          `${trimmed} is managed by ${shortAddress(owner)}, but you're connected as ${shortAddress(
-            address,
-          )}. Did you pick the right wallet?`,
-        )
-      }
-      setEnsPhase('creating-session')
-      const session = await createSession()
-      onNameChange(trimmed)
-      onSessionChange(session.sessionId, session.nonce)
-      setEnsPhase('idle')
-    } catch (err) {
-      setEnsError(err instanceof Error ? err.message : String(err))
-      setEnsPhase('idle')
-    }
-  }
-
-  const handleChangeEns = () => {
-    onSessionChange(null, null)
-    setEnsError(null)
-  }
-
-  // --- Section 02: on-chain pre-fill for attrs ---
+  // Union of every text-record key we care about: form attrs plus the
+  // structural class/schema, which we read to compare against the submission
+  // but never display as form inputs.
   const allRequestedAttrs = useMemo(
     () => [...requiredAttrs, ...optionalAttrs],
     [requiredAttrs, optionalAttrs],
@@ -230,50 +71,19 @@ export function ComposeScreen({
     return [...new Set(keys)]
   }, [allRequestedAttrs, classValue, schemaUri])
 
-  const [loadedRecords, setLoadedRecords] = useState<Record<string, string | null> | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { loadedRecords, loadError, attrsLoaded } = useRecordsPrefill({
+    allKeys,
+    allRequestedAttrs,
+  })
 
-  // Load existing records once the session is confirmed. We only need them
-  // to pre-fill the form and to diff against at publish time.
-  useEffect(() => {
-    if (!confirmed || !publicClient || allKeys.length === 0 || !name) {
-      if (!confirmed) {
-        setLoadedRecords(null)
-        setLoadError(null)
-      }
-      return
-    }
-    let cancelled = false
-    ;(async () => {
-      try {
-        const reader = metadataReader()(publicClient)
-        const result = await reader.getMetadata({ name, keys: allKeys })
-        if (cancelled) return
-        const properties = result.properties as Record<string, string | null>
-        setLoadedRecords(properties)
-        // Pre-fill empty inputs with what's already on chain.
-        const nextValues = { ...attrsValues }
-        let changed = false
-        for (const key of allRequestedAttrs) {
-          const existing = properties[key]
-          if (typeof existing === 'string' && existing && !nextValues[key]) {
-            nextValues[key] = existing
-            changed = true
-          }
-        }
-        if (changed) onAttrsChange(nextValues)
-      } catch (err) {
-        if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : String(err))
-        setLoadedRecords({})
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  // attrsValues intentionally omitted — we don't want to re-fetch on every keystroke.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmed, publicClient, name, allKeys])
+  const attestation = useAttestationFlow({
+    loadedRecords,
+    allRequestedAttrs,
+    classValue,
+    schemaUri,
+    twitter: socials.twitter,
+    telegram: socials.telegram,
+  })
 
   const missingRequiredAttrs = useMemo(() => {
     return requiredAttrs.filter((k) => {
@@ -282,11 +92,6 @@ export function ComposeScreen({
     })
   }, [requiredAttrs, attrsValues])
 
-  const setAttrValue = (key: string, value: string) => {
-    onAttrsChange({ ...attrsValues, [key]: value })
-  }
-
-  // --- Section 03: social accounts ---
   // Which platforms to show. Required ∪ optional; if neither is specified,
   // fall back to the full catalog (the default "proof-only" flow).
   const visiblePlatforms: Platform[] = useMemo(() => {
@@ -295,203 +100,19 @@ export function ComposeScreen({
     return platformsRequested ? [] : ['com.x', 'org.telegram']
   }, [requiredPlatforms, optionalPlatforms, platformsRequested])
 
-  const isLinked = (p: Platform) =>
-    (p === 'com.x' && !!twitter) || (p === 'org.telegram' && !!telegram)
-  const allRequiredLinked = requiredPlatforms.every(isLinked)
+  const allRequiredLinked = requiredPlatforms.every(socials.isLinked)
 
-  const [linkError, setLinkError] = useState<string | null>(null)
-  const [disconnectingPlatform, setDisconnectingPlatform] = useState<Platform | null>(null)
-
-  const handleLink = (p: Platform) => {
-    setLinkError(null)
-    try {
-      if (p === 'com.x') linkTwitter()
-      else linkTelegram()
-    } catch (err) {
-      setLinkError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  const handleUnlink = async (p: Platform) => {
-    setDisconnectingPlatform(p)
-    setLinkError(null)
-    try {
-      if (p === 'com.x' && twitter) await unlinkTwitter(twitter.subject)
-      if (p === 'org.telegram' && telegram) await unlinkTelegram(telegram.telegramUserId)
-    } catch (err) {
-      setLinkError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setDisconnectingPlatform(null)
-    }
-  }
-
-  // --- Bottom action: create attestation + transition ---
-  const [signPhase, setSignPhase] = useState<SignPhase>('idle')
-  const [signError, setSignError] = useState<string | null>(null)
-  const isSigning = signPhase !== 'idle'
-
-  const anyLinked = !!twitter || !!telegram
-  const attrsLoaded = loadedRecords !== null
-
-  // Can the user create the attestation? They need a confirmed session, all
-  // required attrs filled, all required accounts linked, and at least one
-  // proof OR attribute change if nothing else. We let empty-everything slip
-  // so the attester error bubbles up naturally if the user tries.
   const canCreate =
-    confirmed &&
+    ens.confirmed &&
     !!walletClient &&
     !!address &&
     missingRequiredAttrs.length === 0 &&
     allRequiredLinked &&
     attrsLoaded &&
-    !isSigning
-
-  const handleCreateAttestation = async () => {
-    if (!address || !walletClient) return
-    if (telegram && !telegram.username) {
-      setSignError(
-        'Your Telegram account has no public @username. Set one and re-link.',
-      )
-      return
-    }
-    setSignError(null)
-
-    try {
-      let proofsOut: AttestationProof[] = []
-
-      // Only run the SIWE+bind+attest flow when there's at least one social
-      // to attest. With no linked accounts, there's nothing to sign for —
-      // we just diff the attrs and go straight to preview.
-      if (anyLinked) {
-        // Mint a fresh session right before attestation. The wizard is
-        // single-page now, so reusing the session from when the user confirmed
-        // their ENS name only invites "session expired" errors when they sit
-        // on the form too long.
-        const session = await createSession()
-        onSessionChange(session.sessionId, session.nonce)
-        const freshSessionId = session.sessionId
-        const freshNonce = session.nonce
-
-        const issuer = wallets[0]?.address ?? address
-
-        // SIWE message binds the signature to this ENS name + every linked
-        // handle, so the attester can't be tricked into swapping in a
-        // different account behind our back.
-        const resources: string[] = [
-          `ens:${name}`,
-          ...(twitter ? [`social:${TWITTER_PLATFORM}:${twitter.username}`] : []),
-          ...(telegram?.username ? [`social:${TELEGRAM_PLATFORM}:${telegram.username}`] : []),
-        ]
-
-        setSignPhase('awaiting-siwe')
-        const message = createSiweMessage({
-          address: issuer as `0x${string}`,
-          chainId: publicClient?.chain?.id ?? 1,
-          domain: window.location.host,
-          nonce: freshNonce,
-          uri: window.location.origin,
-          version: '1',
-          statement:
-            'Sign this message to confirm your intent to link the resources listed below. This will not make any changes to your ENS profile.',
-          resources,
-          issuedAt: new Date(),
-        })
-        const signature = await walletClient.signMessage({
-          account: issuer as `0x${string}`,
-          message,
-        })
-
-        setSignPhase('binding')
-        await bindWallet({ sessionId: freshSessionId, message, signature })
-        const privyAccessToken = (await getAccessToken().catch(() => null)) ?? undefined
-        await Promise.all([
-          twitter
-            ? bindPlatform({
-                sessionId: freshSessionId,
-                platform: TWITTER_PLATFORM,
-                payload: {
-                  privyAccessToken,
-                  uid: twitter.subject,
-                  handle: twitter.username,
-                },
-              })
-            : null,
-          telegram?.username
-            ? bindPlatform({
-                sessionId: freshSessionId,
-                platform: TELEGRAM_PLATFORM,
-                payload: {
-                  privyAccessToken,
-                  uid: telegram.telegramUserId,
-                  handle: telegram.username,
-                },
-              })
-            : null,
-        ])
-
-        setSignPhase('attesting')
-        const result = await attest({ sessionId: freshSessionId, name })
-
-        proofsOut = result.attestations.map((entry) => {
-          if (entry.platform === TWITTER_PLATFORM && twitter) {
-            return {
-              draft: buildTwitterProofFromPrivy({
-                twitter,
-                issuerAddress: issuer as `0x${string}`,
-                ensName: name,
-              }),
-              claimHex: entry.claimHex,
-            }
-          }
-          if (entry.platform === TELEGRAM_PLATFORM && telegram) {
-            return {
-              draft: buildTelegramProofFromPrivy({
-                telegram,
-                issuerAddress: issuer as `0x${string}`,
-                ensName: name,
-              }),
-              claimHex: entry.claimHex,
-            }
-          }
-          throw new Error(`Unexpected attestation platform: ${entry.platform}`)
-        })
-      }
-
-      // Build the attr diff (includes class/schema) so the preview screen
-      // can render a proper add/update/remove view and the publish step can
-      // write the right text records.
-      const desired: Record<string, string> = { ...attrsValues }
-      if (classValue) desired.class = classValue
-      if (schemaUri) desired.schema = schemaUri
-      const diff = computeRecordDiff(loadedRecords ?? {}, desired)
-
-      // Schema-declared attrs whose on-chain value already matches the
-      // submission (i.e. not in the diff) — shown in the preview's clean
-      // view for a complete post-publish picture.
-      const changedKeys = new Set<string>([
-        ...diff.added.map((a) => a.key),
-        ...diff.updated.map((u) => u.key),
-        ...diff.removed.map((r) => r.key),
-      ])
-      const unchanged: UnchangedRecord[] = []
-      for (const key of allRequestedAttrs) {
-        if (changedKeys.has(key)) continue
-        const existing = loadedRecords?.[key]
-        if (typeof existing === 'string' && existing.length > 0) {
-          unchanged.push({ key, value: existing })
-        }
-      }
-
-      setSignPhase('idle')
-      onAttestation(proofsOut, diff, unchanged)
-    } catch (err) {
-      setSignError(err instanceof Error ? err.message : String(err))
-      setSignPhase('idle')
-    }
-  }
+    !attestation.isSigning
 
   const previewLabel = (() => {
-    switch (signPhase) {
+    switch (attestation.signPhase) {
       case 'awaiting-siwe':
         return 'Waiting for signature…'
       case 'binding':
@@ -499,7 +120,7 @@ export function ComposeScreen({
       case 'attesting':
         return 'Generating attestation…'
       default:
-        return anyLinked ? 'Prepare attestation and preview changes' : 'Preview changes'
+        return socials.anyLinked ? 'Prepare attestation and preview changes' : 'Preview changes'
     }
   })()
 
@@ -527,106 +148,41 @@ export function ComposeScreen({
                     {shortAddress(address)}
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={logout} disabled={isSigning}>
+                <Button variant="ghost" size="sm" onClick={logout} disabled={attestation.isSigning}>
                   Disconnect
                 </Button>
               </div>
             )}
 
-            {authenticated && (
-              confirmed ? (
+            {authenticated &&
+              (ens.confirmed ? (
                 <div className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700">
                   <div className="min-w-0 text-sm">
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                      ENS name
-                    </div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">ENS name</div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
                       <span className="font-mono font-medium text-neutral-900 dark:text-neutral-100">
-                        {name}
+                        {ens.name}
                       </span>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleChangeEns} disabled={isSigning}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={ens.changeEns}
+                    disabled={attestation.isSigning}
+                  >
                     Change
                   </Button>
                 </div>
               ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    handleConfirmEns()
-                  }}
-                  className="space-y-2"
-                >
-                  <Label htmlFor="ens-name">ENS name</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="ens-name"
-                        placeholder="alice.eth"
-                        value={draftName}
-                        onChange={(e) => {
-                          setDraftName(e.target.value)
-                          setNameDropdownOpen(true)
-                        }}
-                        onFocus={() => setNameDropdownOpen(true)}
-                        onBlur={() => setNameDropdownOpen(false)}
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        autoComplete="off"
-                        disabled={!isInitialized || ensPhase !== 'idle'}
-                        role="combobox"
-                        aria-expanded={nameDropdownOpen && filteredOwnedNames.length > 0}
-                        aria-autocomplete="list"
-                      />
-                      {nameDropdownOpen && filteredOwnedNames.length > 0 && (
-                        <ul
-                          role="listbox"
-                          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
-                        >
-                          {filteredOwnedNames.map((n) => (
-                            <li key={n} role="option" aria-selected={n === draftName}>
-                              <button
-                                type="button"
-                                // onMouseDown (not onClick) + preventDefault keeps the
-                                // input focused so onBlur doesn't close the dropdown
-                                // before the selection registers.
-                                onMouseDown={(e) => {
-                                  e.preventDefault()
-                                  setDraftName(n)
-                                  setNameDropdownOpen(false)
-                                }}
-                                className="block w-full truncate px-3 py-1.5 text-left font-mono text-sm text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                              >
-                                {n}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={!isInitialized || !draftName.trim() || ensPhase !== 'idle'}
-                      isLoading={ensPhase !== 'idle'}
-                    >
-                      {ensPhase === 'checking-owner'
-                        ? 'Checking…'
-                        : ensPhase === 'creating-session'
-                          ? 'Opening…'
-                          : 'Confirm'}
-                    </Button>
-                  </div>
-                </form>
-              )
-            )}
+                <EnsConfirmForm ens={ens} disabled={!isInitialized} />
+              ))}
 
-            {ensError && (
+            {ens.error && (
               <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{ensError}</span>
+                <span>{ens.error}</span>
               </div>
             )}
           </div>
@@ -642,16 +198,15 @@ export function ComposeScreen({
                   ? "Your organization's profile"
                   : 'Your profile'
             }
-            active={confirmed}
+            active={ens.confirmed}
             inactiveHint="Confirm your ENS name above to continue."
             accent="green"
           >
             <div className="space-y-4">
               {loadError && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                  Couldn't load existing records (
-                  <span className="font-mono">{loadError}</span>). Submitting new values may
-                  overwrite existing data.
+                  Couldn't load existing records (<span className="font-mono">{loadError}</span>).
+                  Submitting new values may overwrite existing data.
                 </div>
               )}
               {allRequestedAttrs.map((key) => {
@@ -697,7 +252,7 @@ export function ComposeScreen({
             number={allRequestedAttrs.length > 0 ? '03' : '02'}
             title="Social accounts"
             description="Link the accounts you want to attest. Required accounts must be linked before you can continue."
-            active={confirmed}
+            active={ens.confirmed}
             inactiveHint="Confirm your ENS name above to continue."
             accent="green"
           >
@@ -708,19 +263,19 @@ export function ComposeScreen({
                     key={p}
                     platform={p}
                     required={requiredPlatforms.includes(p)}
-                    twitter={twitter}
-                    telegram={telegram}
-                    onLink={() => handleLink(p)}
-                    onUnlink={() => handleUnlink(p)}
-                    disconnecting={disconnectingPlatform === p}
-                    disabled={isSigning}
+                    twitter={socials.twitter}
+                    telegram={socials.telegram}
+                    onLink={() => socials.link(p)}
+                    onUnlink={() => socials.unlink(p)}
+                    disconnecting={socials.disconnectingPlatform === p}
+                    disabled={attestation.isSigning}
                   />
                 ))}
               </div>
-              {linkError && (
+              {socials.linkError && (
                 <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{linkError}</span>
+                  <span>{socials.linkError}</span>
                 </div>
               )}
             </div>
@@ -729,8 +284,13 @@ export function ComposeScreen({
       </GuidedCard>
 
       <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-        <Button full onClick={handleCreateAttestation} disabled={!canCreate} isLoading={isSigning}>
-          {signPhase === 'awaiting-siwe' ? (
+        <Button
+          full
+          onClick={attestation.createAttestation}
+          disabled={!canCreate}
+          isLoading={attestation.isSigning}
+        >
+          {attestation.signPhase === 'awaiting-siwe' ? (
             <>
               <FileSignature className="mr-2 h-4 w-4" />
               {previewLabel}
@@ -739,13 +299,13 @@ export function ComposeScreen({
             previewLabel
           )}
         </Button>
-        {signError && (
+        {attestation.signError && (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{signError}</span>
+            <span>{attestation.signError}</span>
           </div>
         )}
-        {!canCreate && confirmed && (
+        {!canCreate && ens.confirmed && (
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {missingRequiredAttrs.length > 0
               ? `Fill in required fields: ${missingRequiredAttrs
@@ -758,6 +318,92 @@ export function ComposeScreen({
         )}
       </div>
     </div>
+  )
+}
+
+// -----------------------------
+// ENS confirm form (draft input + autocomplete)
+// -----------------------------
+
+function EnsConfirmForm({
+  ens,
+  disabled,
+}: {
+  ens: ReturnType<typeof useEnsConfirmation>
+  disabled: boolean
+}) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const inFlight = ens.phase !== 'idle'
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        ens.confirm()
+      }}
+      className="space-y-2"
+    >
+      <Label htmlFor="ens-name">ENS name</Label>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            id="ens-name"
+            placeholder="alice.eth"
+            value={ens.draftName}
+            onChange={(e) => {
+              ens.setDraftName(e.target.value)
+              setDropdownOpen(true)
+            }}
+            onFocus={() => setDropdownOpen(true)}
+            onBlur={() => setDropdownOpen(false)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            disabled={disabled || inFlight}
+            role="combobox"
+            aria-expanded={dropdownOpen && ens.ownedNames.length > 0}
+            aria-autocomplete="list"
+          />
+          {dropdownOpen && ens.ownedNames.length > 0 && (
+            <ul
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+            >
+              {ens.ownedNames.map((n) => (
+                <li key={n} role="option" aria-selected={n === ens.draftName}>
+                  <button
+                    type="button"
+                    // onMouseDown + preventDefault keeps the input focused so
+                    // onBlur doesn't close the dropdown before the selection
+                    // registers.
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      ens.setDraftName(n)
+                      setDropdownOpen(false)
+                    }}
+                    className="block w-full truncate px-3 py-1.5 text-left font-mono text-sm text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    {n}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <Button
+          type="submit"
+          disabled={disabled || !ens.draftName.trim() || inFlight}
+          isLoading={inFlight}
+        >
+          {ens.phase === 'checking-owner'
+            ? 'Checking…'
+            : ens.phase === 'creating-session'
+              ? 'Opening…'
+              : 'Confirm'}
+        </Button>
+      </div>
+    </form>
   )
 }
 
@@ -786,14 +432,9 @@ function PlatformRow({
 }) {
   const label = platform === 'com.x' ? 'X.com' : 'Telegram'
   const linked = platform === 'com.x' ? !!twitter : !!telegram
-  const handle =
-    platform === 'com.x'
-      ? twitter?.username ?? null
-      : telegram?.username ?? null
+  const handle = platform === 'com.x' ? (twitter?.username ?? null) : (telegram?.username ?? null)
   const avatarUrl =
-    platform === 'com.x'
-      ? twitter?.profilePictureUrl ?? null
-      : telegram?.photoUrl ?? null
+    platform === 'com.x' ? (twitter?.profilePictureUrl ?? null) : (telegram?.photoUrl ?? null)
   const helperText =
     platform === 'com.x'
       ? 'Log in to X and approve access. Only your X handle will be made public. No other data will be stored or shared.'
@@ -807,11 +448,8 @@ function PlatformRow({
         linked && 'bg-green-50/60 dark:bg-green-950/20',
       )}
     >
-      {/* Left column: platform name + Required tag (reserved height). */}
       <div className="sm:w-28 sm:shrink-0">
-        <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-          {label}
-        </div>
+        <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{label}</div>
         <div className="mt-1">
           {linked ? (
             <span className="inline-block rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-700 dark:bg-green-900/50 dark:text-green-300">
@@ -831,7 +469,6 @@ function PlatformRow({
         </div>
       </div>
 
-      {/* Center column: helper text OR linked identity. */}
       <div className="min-w-0 flex-1">
         {linked ? (
           <div className="flex items-center justify-center gap-3">
@@ -857,7 +494,6 @@ function PlatformRow({
         )}
       </div>
 
-      {/* Right column: Link / Unlink button. */}
       <div className="sm:shrink-0">
         {linked ? (
           <Button
@@ -893,7 +529,6 @@ type AutoGrowInputProps = Omit<
 }
 
 // Textarea styled to match `<Input>` but grows vertically with its content.
-// We use rows={1} as the baseline and resize on every value change.
 function AutoGrowInput({ value, onChange, className, ...props }: AutoGrowInputProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
