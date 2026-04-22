@@ -27,7 +27,7 @@ export interface WizardState {
   hasHydrated: boolean
 
   // Actions
-  prefillEnsName: (ensName: string) => void
+  seedEnsName: (ensName: string) => void
   confirmEns: (args: { ensName: string; sessionId: string; nonce: string }) => void
   clearSession: () => void
   setAttrValue: (key: string, value: string) => void
@@ -59,7 +59,7 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
 
         // Only seed the name if nothing has been entered yet. Creator-provided
         // prefill loses to a user draft or a persisted value on purpose.
-        prefillEnsName: (ensName) => set((s) => (s.ensName ? s : { ensName })),
+        seedEnsName: (ensName) => set((s) => (s.ensName ? s : { ensName })),
 
         confirmEns: ({ ensName, sessionId, nonce }) => set({ ensName, sessionId, nonce }),
 
