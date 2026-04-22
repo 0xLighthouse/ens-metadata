@@ -106,6 +106,10 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     () => [...requiredAttrs, ...optionalAttrs],
     [requiredAttrs, optionalAttrs],
   )
+  const requestedPlatformSet = useMemo(
+    () => new Set<Platform>([...requiredPlatforms, ...optionalPlatforms]),
+    [requiredPlatforms, optionalPlatforms],
+  )
   const requiredAttrSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
   const textRecordKeys = useMemo(() => {
     const keys = [...requestedAttrs]
@@ -145,8 +149,8 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     requestedAttrs,
     classValue,
     schemaUri,
-    twitter: socials.twitter,
-    telegram: socials.telegram,
+    twitter: requestedPlatformSet.has('com.x') ? socials.twitter : null,
+    telegram: requestedPlatformSet.has('org.telegram') ? socials.telegram : null,
   })
 
   const missingRequiredAttrs = useMemo(
