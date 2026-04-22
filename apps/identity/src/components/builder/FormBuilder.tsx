@@ -208,8 +208,8 @@ export function FormBuilder() {
         <GuidedCard>
           <GuidedSection
             number="01"
-            title="What type of profile do you want to create?"
-            description="Pick the kind of entity this profile represents."
+            title="What type of user is this form intended for?"
+            description="Pick the type of entity this profile will represent."
             active
           >
             <ProfileTypePicker
@@ -221,7 +221,7 @@ export function FormBuilder() {
 
           <GuidedSection
             number="02"
-            title="What do you want to ask your users for?"
+            title="What details do you want from your users?"
             description="Pick the attributes you want on the form."
             active={q1Answered}
           >
@@ -252,7 +252,7 @@ export function FormBuilder() {
           <GuidedSection
             number="04"
             title="Which social accounts do you want to verify?"
-            description="Users can prove ownership of a social account and attach an attestation. Required accounts must be linked before they can continue."
+            description="Users can prove ownership of a social account and generate an attestation. Required accounts must be linked before they can continue."
             active={q1Answered}
           >
             <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />

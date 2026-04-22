@@ -147,7 +147,7 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
                 </>
               ) : (
                 <>
-                  <Copy className="mr-2 h-4 w-4" /> Copy link to form
+                  <Copy className="mr-2 h-4 w-4" /> Copy link
                 </>
               )}
             </Button>
