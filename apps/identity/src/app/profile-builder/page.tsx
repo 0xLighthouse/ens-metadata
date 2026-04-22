@@ -6,7 +6,7 @@ export default function FormBuilderPage() {
       <header className="mx-auto mb-10 max-w-3xl text-center">
         <h1 className="text-h1 mb-3">ENS Profile Builder</h1>
         <p className="text-subtitle text-neutral-500 dark:text-neutral-400">
-         Make your selections below to describe what type of profile you want your users to publish, then send them the link. 
+          Define the attributes for your users' public ENS profile, then share the form with them.
         </p>
       </header>
       <div className="mx-auto max-w-3xl">

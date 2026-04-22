@@ -113,7 +113,7 @@ export function CreatorPreviewCard({ message, onMessageChange }: Props) {
           value={message}
           onChange={(e) => onMessageChange(e.target.value.slice(0, 280))}
           rows={2}
-          placeholder="(Optional) Enter a message to appear at the top of the form..."
+          placeholder="(Optional) A message for your users"
           className="w-full resize-none rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm text-neutral-600 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none dark:border-neutral-700 dark:text-neutral-300 dark:placeholder:text-neutral-500"
         />
       </div>

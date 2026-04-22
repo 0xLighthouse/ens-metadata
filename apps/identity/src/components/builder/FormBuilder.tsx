@@ -221,8 +221,8 @@ export function FormBuilder() {
 
           <GuidedSection
             number="02"
-            title="What would you like to ask about?"
-            description="Pick all attributes the user might fill in."
+            title="What do you want to ask your users for?"
+            description="Pick the attributes you want on the form."
             active={q1Answered}
           >
             <ChipAddField
@@ -239,7 +239,7 @@ export function FormBuilder() {
           <GuidedSection
             number="03"
             title="Which of these are required?"
-            description="Users will be required to fill these in before they are allowed to continue."
+            description="Users must fill these in before they can submit."
             active={q1Answered && q2Answered}
           >
             <RequiredToggleField
@@ -251,8 +251,8 @@ export function FormBuilder() {
 
           <GuidedSection
             number="04"
-            title="Social account linking"
-            description="Users can prove ownership of their social media accounts and add an attestation to their profile. For any account marked 'required', the user will not be able to continue until they link their account."
+            title="Which social accounts do you want to verify?"
+            description="Users can prove ownership of a social account and attach an attestation. Required accounts must be linked before they can continue."
             active={q1Answered}
           >
             <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />

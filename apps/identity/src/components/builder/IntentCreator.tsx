@@ -137,6 +137,9 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
             {shareUrl}
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" full onClick={handleMakeChanges}>
+              <PencilLine className="mr-2 h-4 w-4" /> Edit form
+            </Button>
             <Button onClick={copyLink} full>
               {copied ? (
                 <>
@@ -144,12 +147,9 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
                 </>
               ) : (
                 <>
-                  <Copy className="mr-2 h-4 w-4" /> Copy link
+                  <Copy className="mr-2 h-4 w-4" /> Copy link to form
                 </>
               )}
-            </Button>
-            <Button variant="outline" full onClick={handleMakeChanges}>
-              <PencilLine className="mr-2 h-4 w-4" /> Make changes
             </Button>
           </div>
         </>
