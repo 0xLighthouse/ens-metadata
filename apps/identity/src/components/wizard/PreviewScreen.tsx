@@ -262,8 +262,8 @@ export function PreviewScreen({
           title="Final review"
           description={
             view === 'pretty'
-              ? 'This is how your profile will look after you publish.'
-              : 'Every text record that will be written on chain.'
+              ? `The following details will be published to ${name}.`
+              : `The following text records will be written to ${name}.`
           }
           active
           accent="green"
@@ -350,7 +350,7 @@ export function PreviewScreen({
         <div className="flex gap-2">
           <Button variant="outline" onClick={onBack} disabled={busy}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Edit
+            Back
           </Button>
           <Button full onClick={runPublish} isLoading={busy} disabled={busy || !hasAnything}>
             {phase === 'writing'

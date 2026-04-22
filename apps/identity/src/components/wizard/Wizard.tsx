@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { getIntent } from '@/lib/attester-client'
+import type { IntentResponse } from '@/lib/attester-client'
 import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import { useSchema } from '@/lib/use-schema'
 import { formatKeyName } from '@/lib/utils'
@@ -41,17 +41,6 @@ interface IncomingConfig {
   optionalAttrs: string[]
   classValues: string[]
   schemaUris: string[]
-}
-
-const DEFAULT_CONFIG: IncomingConfig = {
-  prefillName: null,
-  requiredPlatforms: [],
-  optionalPlatforms: [],
-  platformsRequested: false,
-  requiredAttrs: [],
-  optionalAttrs: [],
-  classValues: [],
-  schemaUris: [],
 }
 
 function adaptIntentConfig(config: IntentConfig): IncomingConfig {
@@ -118,9 +107,20 @@ function loadPersisted(intentId: string): PersistedState | null {
 
 interface WizardProps {
   intentId: string
+  intent: IntentResponse
 }
 
-export function Wizard({ intentId }: WizardProps) {
+export function Wizard({ intentId, intent }: WizardProps) {
+  const incomingConfig = useMemo(() => adaptIntentConfig(intent.config), [intent.config])
+  const creator = useMemo<CreatorInfo>(
+    () => ({
+      ensName: intent.creator.ensName,
+      avatar: intent.creator.avatar,
+      message: intent.config.message,
+    }),
+    [intent],
+  )
+
   const [hydrated, setHydrated] = useState(false)
   const [screen, setScreen] = useState<Screen>('compose')
   const [name, setName] = useState('')
@@ -130,10 +130,6 @@ export function Wizard({ intentId }: WizardProps) {
   const [recordDiff, setRecordDiff] = useState<RecordDiff>(EMPTY_DIFF)
   const [unchangedRecords, setUnchangedRecords] = useState<UnchangedRecord[]>([])
   const [attrsValues, setAttrsValues] = useState<Record<string, string>>({})
-
-  const [incomingConfig, setIncomingConfig] = useState<IncomingConfig>(DEFAULT_CONFIG)
-  const [creator, setCreator] = useState<CreatorInfo | null>(null)
-  const [intentError, setIntentError] = useState<string | null>(null)
 
   // Schema fetch + validation runs at the wizard root. A broken schema URI
   // compromises the entire submission (we'd write `schema = ipfs://garbage`)
@@ -147,57 +143,16 @@ export function Wizard({ intentId }: WizardProps) {
     ...incomingConfig.optionalAttrs,
   ])
 
+  // Restore persisted draft for this intent id. The page keys Wizard on id,
+  // so this mount-effect runs exactly once per intent.
   useEffect(() => {
-    let cancelled = false
-    // Pause saves while the new intent loads — prevents the save effect
-    // from firing with stale state under the new intent's key before
-    // applyConfig has had a chance to reset/overlay values.
-    setHydrated(false)
-
-    const applyConfig = (config: IncomingConfig) => {
-      if (cancelled) return
-      setIncomingConfig(config)
-      const persisted = loadPersisted(intentId)
-
-      // Wipe the strictly-ephemeral state on every load — proofs bind to a
-      // specific SIWE resource set and always regenerate on publish, and the
-      // preview screen is a computed downstream view of that.
-      setProofs([])
-      setRecordDiff(EMPTY_DIFF)
-      setUnchangedRecords([])
-      setScreen('compose')
-
-      setName(config.prefillName ?? persisted?.name ?? '')
-      setSessionId(persisted?.sessionId ?? null)
-      setNonce(persisted?.nonce ?? null)
-      setAttrsValues(persisted?.attrsValues ?? {})
-      setHydrated(true)
-    }
-
-    getIntent(intentId)
-      .then((data) => {
-        if (cancelled) return
-        setCreator({
-          ensName: data.creator.ensName,
-          avatar: data.creator.avatar,
-          message: data.config.message,
-        })
-        applyConfig(adaptIntentConfig(data.config))
-      })
-      .catch((err: Error) => {
-        if (cancelled) return
-        setIntentError(
-          err.message === 'not_found'
-            ? 'This intent link is invalid or has been removed.'
-            : 'Could not load this intent. Check your connection and retry.',
-        )
-        setHydrated(true)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [intentId])
+    const persisted = loadPersisted(intentId)
+    setName(incomingConfig.prefillName ?? persisted?.name ?? '')
+    setSessionId(persisted?.sessionId ?? null)
+    setNonce(persisted?.nonce ?? null)
+    setAttrsValues(persisted?.attrsValues ?? {})
+    setHydrated(true)
+  }, [intentId, incomingConfig.prefillName])
 
   useEffect(() => {
     if (!hydrated || typeof window === 'undefined') return
@@ -218,24 +173,6 @@ export function Wizard({ intentId }: WizardProps) {
       }),
     )
   }, [resolvedSchema, incomingConfig.requiredAttrs, incomingConfig.optionalAttrs])
-
-  if (intentError) {
-    return (
-      <div className="mx-auto max-w-3xl w-full">
-        <Card>
-          <CardHeader>
-            <CardTitle>Intent unavailable</CardTitle>
-            <CardDescription>{intentError}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Ask whoever sent you this link to generate a new one from the profile builder.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   if (schemaError) {
     return (
@@ -292,7 +229,7 @@ export function Wizard({ intentId }: WizardProps) {
 
   return (
     <div className="mx-auto max-w-3xl w-full">
-      {creator && creator.message && (
+      {creator.message && (
         <CreatorBanner
           ensName={creator.ensName}
           avatar={creator.avatar}
