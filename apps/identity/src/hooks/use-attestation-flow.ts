@@ -1,6 +1,7 @@
 'use client'
 
 import { useWeb3 } from '@/contexts/Web3Provider'
+import type { AttestationProof, UnchangedRecord } from '@/lib/attestation-types'
 import { attest, bindPlatform, bindWallet, createSession } from '@/lib/attester-client'
 import { type RecordDiff, computeRecordDiff } from '@/lib/record-diff'
 import {
@@ -13,7 +14,6 @@ import {
   TWITTER_PLATFORM,
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
-import type { AttestationProof, UnchangedRecord } from '@/lib/attestation-types'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
 import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState } from 'react'

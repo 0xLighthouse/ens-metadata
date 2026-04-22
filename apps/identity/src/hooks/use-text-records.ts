@@ -21,10 +21,7 @@ export interface TextRecordsResult {
  * `keys` should be memoized by the caller — reference changes retrigger the
  * fetch.
  */
-export function useTextRecords(
-  ensName: string | null,
-  keys: readonly string[],
-): TextRecordsResult {
+export function useTextRecords(ensName: string | null, keys: readonly string[]): TextRecordsResult {
   const { publicClient } = useWeb3()
   const [records, setRecords] = useState<Record<string, string | null> | null>(null)
   const [error, setError] = useState<string | null>(null)
