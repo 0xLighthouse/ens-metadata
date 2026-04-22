@@ -88,7 +88,9 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
       })
 
       setPhase('submitting')
-      const { id } = await createIntent({ address, ensName, config, signature, expiry })
+      const body = { address, ensName, config, signature, expiry }
+      console.log('[intent] POST /api/intent body:', JSON.stringify(body, null, 2))
+      const { id } = await createIntent(body)
       setShareUrl(`${window.location.origin}/${id}`)
       setPhase('success')
       onGeneratedChange?.(true)

@@ -205,59 +205,59 @@ export function FormBuilder() {
         )}
         aria-disabled={linkLocked}
       >
-      <GuidedCard>
-        <GuidedSection
-          number="01"
-          title="What type of profile do you want to create?"
-          description="Pick the kind of entity this profile represents."
-          active
-        >
-          <ProfileTypePicker
-            options={schemaOptions}
-            value={state.schemaId}
-            onChange={selectSchema}
-          />
-        </GuidedSection>
+        <GuidedCard>
+          <GuidedSection
+            number="01"
+            title="What type of profile do you want to create?"
+            description="Pick the kind of entity this profile represents."
+            active
+          >
+            <ProfileTypePicker
+              options={schemaOptions}
+              value={state.schemaId}
+              onChange={selectSchema}
+            />
+          </GuidedSection>
 
-        <GuidedSection
-          number="02"
-          title="What would you like to ask about?"
-          description="Pick all attributes the user might fill in."
-          active={q1Answered}
-        >
-          <ChipAddField
-            options={attrChipOptions}
-            selected={state.chosenOrder}
-            onToggle={toggleAttrChosen}
-            addLabel="Add attribute"
-            emptyPopoverCopy={
-              availableAttrs.length === 0 ? 'Pick a profile type first.' : undefined
-            }
-          />
-        </GuidedSection>
+          <GuidedSection
+            number="02"
+            title="What would you like to ask about?"
+            description="Pick all attributes the user might fill in."
+            active={q1Answered}
+          >
+            <ChipAddField
+              options={attrChipOptions}
+              selected={state.chosenOrder}
+              onToggle={toggleAttrChosen}
+              addLabel="Add attribute"
+              emptyPopoverCopy={
+                availableAttrs.length === 0 ? 'Pick a profile type first.' : undefined
+              }
+            />
+          </GuidedSection>
 
-        <GuidedSection
-          number="03"
-          title="Which of these are required?"
-          description="Users will be required to fill these in before they are allowed to continue."
-          active={q1Answered && q2Answered}
-        >
-          <RequiredToggleField
-            attrs={chosenAttrs}
-            required={state.required}
-            onToggle={toggleAttrRequired}
-          />
-        </GuidedSection>
+          <GuidedSection
+            number="03"
+            title="Which of these are required?"
+            description="Users will be required to fill these in before they are allowed to continue."
+            active={q1Answered && q2Answered}
+          >
+            <RequiredToggleField
+              attrs={chosenAttrs}
+              required={state.required}
+              onToggle={toggleAttrRequired}
+            />
+          </GuidedSection>
 
-        <GuidedSection
-          number="04"
-          title="Social account linking"
-          description="Users can prove ownership of their social media accounts and add an attestation to their profile. For any account marked 'required', the user will not be able to continue until they link their account."
-          active={q1Answered}
-        >
-          <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />
-        </GuidedSection>
-      </GuidedCard>
+          <GuidedSection
+            number="04"
+            title="Social account linking"
+            description="Users can prove ownership of their social media accounts and add an attestation to their profile. For any account marked 'required', the user will not be able to continue until they link their account."
+            active={q1Answered}
+          >
+            <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />
+          </GuidedSection>
+        </GuidedCard>
       </div>
 
       <IntentCreator
@@ -569,9 +569,9 @@ function ThreeStateControl({
   onChange: (next: PlatformState) => void
 }) {
   const options: Array<{ value: PlatformState; label: string }> = [
-    { value: 'off', label: 'Off' },
-    { value: 'optional', label: 'Optional' },
+    { value: 'off', label: 'Disabled' },
     { value: 'required', label: 'Required' },
+    { value: 'optional', label: 'Optional' },
   ]
   return (
     <div
