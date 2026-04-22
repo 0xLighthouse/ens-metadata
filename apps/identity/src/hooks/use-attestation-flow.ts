@@ -13,7 +13,7 @@ import {
   TWITTER_PLATFORM,
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
-import type { AttestationProof, UnchangedRecord } from '@/lib/wizard-types'
+import type { AttestationProof, UnchangedRecord } from '@/lib/attestation-types'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
 import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState } from 'react'
@@ -56,7 +56,7 @@ export function useAttestationFlow({
   const [signError, setSignError] = useState<string | null>(null)
 
   const isSigning = signPhase !== 'idle'
-  const anyLinked = !!twitter || !!telegram
+  const hasLinkedAccount = !!twitter || !!telegram
 
   const createAttestation = async () => {
     if (!address || !walletClient) return
@@ -69,7 +69,7 @@ export function useAttestationFlow({
     try {
       let proofsOut: AttestationProof[] = []
 
-      if (anyLinked) {
+      if (hasLinkedAccount) {
         // Fresh session right before attestation. Reusing the ENS-confirm
         // session only invites "session expired" errors if the user sits on
         // the form too long.
@@ -198,7 +198,6 @@ export function useAttestationFlow({
     signPhase,
     signError,
     isSigning,
-    anyLinked,
     createAttestation,
   }
 }

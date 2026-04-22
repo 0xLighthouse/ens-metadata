@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { useAttestationFlow } from '@/hooks/use-attestation-flow'
-import { useRecordsPrefill } from '@/hooks/use-records-prefill'
 import { type Platform, useSocialAccounts } from '@/hooks/use-social-accounts'
+import { useTextRecords } from '@/hooks/use-text-records'
 import { useVerifyEns } from '@/hooks/use-verify-ens'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import type { PrivyTelegramAccount } from '@/lib/telegram-proof'
 import type { PrivyTwitterAccount } from '@/lib/twitter-proof'
 import { cn, shortAddress } from '@/lib/utils'
-import { useWizardStore } from '@/stores/wizard'
+import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
 import {
@@ -52,6 +52,8 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
 
   const attrsValues = useWizardStore((s) => s.attrsValues)
   const setAttrValue = useWizardStore((s) => s.setAttrValue)
+  const setAttrsValues = useWizardStore((s) => s.setAttrsValues)
+  const storeApi = useWizardStoreApi()
 
   const ens = useVerifyEns()
   const socials = useSocialAccounts()
@@ -63,18 +65,39 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
     () => [...requiredAttrs, ...optionalAttrs],
     [requiredAttrs, optionalAttrs],
   )
-  const requiredSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
-  const allKeys = useMemo(() => {
+  const requiredAttrSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
+  const textRecordKeys = useMemo(() => {
     const keys = [...requestedAttrs]
     if (classValue) keys.push('class')
     if (schemaUri) keys.push('schema')
     return [...new Set(keys)]
   }, [requestedAttrs, classValue, schemaUri])
 
-  const { loadedRecords, loadError, attrsLoaded } = useRecordsPrefill({
-    allKeys,
-    requestedAttrs,
-  })
+  const {
+    records: loadedRecords,
+    error: loadError,
+    loaded: attrsLoaded,
+  } = useTextRecords(ens.confirmed ? ens.ensName : null, textRecordKeys)
+
+  // Pre-fill any empty attribute inputs with whatever's already on chain, so
+  // the publish-time diff treats untouched fields as "keep" instead of "remove".
+  // One-shot per records load; we read attrsValues imperatively so typing
+  // doesn't retrigger the effect.
+  useEffect(() => {
+    if (!loadedRecords) return
+    const currentAttrs = storeApi.getState().attrsValues
+    const nextValues = { ...currentAttrs }
+    let changed = false
+    for (const key of requestedAttrs) {
+      const existing = loadedRecords[key]
+      if (typeof existing === 'string' && existing && !nextValues[key]) {
+        nextValues[key] = existing
+        changed = true
+      }
+    }
+    if (changed) setAttrsValues(nextValues)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedRecords])
 
   const attestation = useAttestationFlow({
     loadedRecords,
@@ -100,14 +123,14 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
     return platformsRequested ? [] : ['com.x', 'org.telegram']
   }, [requiredPlatforms, optionalPlatforms, platformsRequested])
 
-  const allRequiredLinked = requiredPlatforms.every(socials.isLinked)
+  const requiredAccountsLinked = requiredPlatforms.every(socials.isLinked)
 
   const canCreate =
     ens.confirmed &&
     !!walletClient &&
     !!address &&
     missingRequiredAttrs.length === 0 &&
-    allRequiredLinked &&
+    requiredAccountsLinked &&
     attrsLoaded &&
     !attestation.isSigning
 
@@ -120,7 +143,9 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
       case 'attesting':
         return 'Generating attestation…'
       default:
-        return socials.anyLinked ? 'Prepare attestation and preview changes' : 'Preview changes'
+        return socials.hasLinkedAccount
+          ? 'Prepare attestation and preview changes'
+          : 'Preview changes'
     }
   })()
 
@@ -211,7 +236,7 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
               )}
               {requestedAttrs.map((key) => {
                 const value = attrsValues[key] ?? ''
-                const isRequired = requiredSet.has(key)
+                const isRequired = requiredAttrSet.has(key)
                 const prop = schema?.properties?.[key]
                 const helpText = prop?.description
                 const placeholder =
@@ -311,7 +336,7 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
               ? `Fill in required fields: ${missingRequiredAttrs
                   .map((k) => keyLabels[k] ?? k)
                   .join(', ')}.`
-              : !allRequiredLinked
+              : !requiredAccountsLinked
                 ? 'Link your required accounts to continue.'
                 : null}
           </p>

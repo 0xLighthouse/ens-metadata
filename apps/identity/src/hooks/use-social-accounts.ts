@@ -72,6 +72,6 @@ export function useSocialAccounts() {
     unlink,
     linkError,
     disconnectingPlatform,
-    anyLinked: !!twitter || !!telegram,
+    hasLinkedAccount: !!twitter || !!telegram,
   }
 }
