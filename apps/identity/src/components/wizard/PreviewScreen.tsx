@@ -53,7 +53,7 @@ export function PreviewScreen({ config, keyLabels }: Props) {
   const classValue = config.classValues[0]
   const schemaUri = config.schemaUris[0]
 
-  const name = useWizardStore((s) => s.name)
+  const ensName = useWizardStore((s) => s.ensName)
   const sessionId = useWizardStore((s) => s.sessionId)
   const proofs = useWizardStore((s) => s.proofs)
   const recordDiff = useWizardStore((s) => s.recordDiff)
@@ -186,7 +186,7 @@ export function PreviewScreen({ config, keyLabels }: Props) {
 
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)
-      const { txHash: hash } = await writer.setMetadata({ name, records: recordsToWrite })
+      const { txHash: hash } = await writer.setMetadata({ name: ensName, records: recordsToWrite })
       setTxHash(hash)
       setPhase('confirming')
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 2 })
@@ -208,7 +208,7 @@ export function PreviewScreen({ config, keyLabels }: Props) {
           <GuidedSection
             number="✓"
             title="Records published"
-            description={`Updates written to ${name}.`}
+            description={`Updates written to ${ensName}.`}
             active
             accent="green"
           >
@@ -233,7 +233,7 @@ export function PreviewScreen({ config, keyLabels }: Props) {
                   </a>
                 )}
                 <a
-                  href={`/proofs/${name}`}
+                  href={`/proofs/${ensName}`}
                   className="inline-flex items-center rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-neutral-50 dark:text-neutral-900"
                 >
                   View proof
@@ -256,8 +256,8 @@ export function PreviewScreen({ config, keyLabels }: Props) {
           title="Final review"
           description={
             view === 'pretty'
-              ? `The following details will be published to ${name}.`
-              : `The following text records will be written to ${name}.`
+              ? `The following details will be published to ${ensName}.`
+              : `The following text records will be written to ${ensName}.`
           }
           active
           accent="green"

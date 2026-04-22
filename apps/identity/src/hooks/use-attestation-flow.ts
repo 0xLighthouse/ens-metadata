@@ -23,7 +23,7 @@ export type SignPhase = 'idle' | 'awaiting-siwe' | 'binding' | 'attesting'
 
 interface Args {
   loadedRecords: Record<string, string | null> | null
-  allRequestedAttrs: string[]
+  requestedAttrs: string[]
   classValue?: string
   schemaUri?: string
   twitter: PrivyTwitterAccount | null
@@ -38,7 +38,7 @@ interface Args {
  */
 export function useAttestationFlow({
   loadedRecords,
-  allRequestedAttrs,
+  requestedAttrs,
   classValue,
   schemaUri,
   twitter,
@@ -49,7 +49,7 @@ export function useAttestationFlow({
   const { user } = usePrivy()
   const address = user?.wallet?.address as `0x${string}` | undefined
 
-  const name = useWizardStore((s) => s.name)
+  const ensName = useWizardStore((s) => s.ensName)
   const storeApi = useWizardStoreApi()
 
   const [signPhase, setSignPhase] = useState<SignPhase>('idle')
@@ -74,14 +74,16 @@ export function useAttestationFlow({
         // session only invites "session expired" errors if the user sits on
         // the form too long.
         const session = await createSession()
-        storeApi.getState().confirmEns({ name, sessionId: session.sessionId, nonce: session.nonce })
+        storeApi
+          .getState()
+          .confirmEns({ ensName, sessionId: session.sessionId, nonce: session.nonce })
 
         const issuer = wallets[0]?.address ?? address
 
         // SIWE binds the signature to this ENS name + every linked handle, so
         // the attester can't swap in a different account behind our back.
         const resources: string[] = [
-          `ens:${name}`,
+          `ens:${ensName}`,
           ...(twitter ? [`social:${TWITTER_PLATFORM}:${twitter.username}`] : []),
           ...(telegram?.username ? [`social:${TELEGRAM_PLATFORM}:${telegram.username}`] : []),
         ]
@@ -133,7 +135,7 @@ export function useAttestationFlow({
         ])
 
         setSignPhase('attesting')
-        const result = await attest({ sessionId: session.sessionId, name })
+        const result = await attest({ sessionId: session.sessionId, name: ensName })
 
         proofsOut = result.attestations.map((entry) => {
           if (entry.platform === TWITTER_PLATFORM && twitter) {
@@ -141,7 +143,7 @@ export function useAttestationFlow({
               draft: buildTwitterProofFromPrivy({
                 twitter,
                 issuerAddress: issuer as `0x${string}`,
-                ensName: name,
+                ensName,
               }),
               claimHex: entry.claimHex,
             }
@@ -151,7 +153,7 @@ export function useAttestationFlow({
               draft: buildTelegramProofFromPrivy({
                 telegram,
                 issuerAddress: issuer as `0x${string}`,
-                ensName: name,
+                ensName,
               }),
               claimHex: entry.claimHex,
             }
@@ -176,7 +178,7 @@ export function useAttestationFlow({
         ...diff.removed.map((r) => r.key),
       ])
       const unchanged: UnchangedRecord[] = []
-      for (const key of allRequestedAttrs) {
+      for (const key of requestedAttrs) {
         if (changedKeys.has(key)) continue
         const existing = loadedRecords?.[key]
         if (typeof existing === 'string' && existing.length > 0) {

@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useWeb3 } from '@/contexts/Web3Provider'
 import { useAttestationFlow } from '@/hooks/use-attestation-flow'
-import { useEnsConfirmation } from '@/hooks/use-ens-confirmation'
 import { useRecordsPrefill } from '@/hooks/use-records-prefill'
 import { type Platform, useSocialAccounts } from '@/hooks/use-social-accounts'
+import { useVerifyEns } from '@/hooks/use-verify-ens'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import type { PrivyTelegramAccount } from '@/lib/telegram-proof'
 import type { PrivyTwitterAccount } from '@/lib/twitter-proof'
@@ -53,32 +53,32 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
   const attrsValues = useWizardStore((s) => s.attrsValues)
   const setAttrValue = useWizardStore((s) => s.setAttrValue)
 
-  const ens = useEnsConfirmation()
+  const ens = useVerifyEns()
   const socials = useSocialAccounts()
 
   // Union of every text-record key we care about: form attrs plus the
   // structural class/schema, which we read to compare against the submission
   // but never display as form inputs.
-  const allRequestedAttrs = useMemo(
+  const requestedAttrs = useMemo(
     () => [...requiredAttrs, ...optionalAttrs],
     [requiredAttrs, optionalAttrs],
   )
   const requiredSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
   const allKeys = useMemo(() => {
-    const keys = [...allRequestedAttrs]
+    const keys = [...requestedAttrs]
     if (classValue) keys.push('class')
     if (schemaUri) keys.push('schema')
     return [...new Set(keys)]
-  }, [allRequestedAttrs, classValue, schemaUri])
+  }, [requestedAttrs, classValue, schemaUri])
 
   const { loadedRecords, loadError, attrsLoaded } = useRecordsPrefill({
     allKeys,
-    allRequestedAttrs,
+    requestedAttrs,
   })
 
   const attestation = useAttestationFlow({
     loadedRecords,
-    allRequestedAttrs,
+    requestedAttrs,
     classValue,
     schemaUri,
     twitter: socials.twitter,
@@ -162,21 +162,21 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
                       <span className="font-mono font-medium text-neutral-900 dark:text-neutral-100">
-                        {ens.name}
+                        {ens.ensName}
                       </span>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={ens.changeEns}
+                    onClick={ens.reset}
                     disabled={attestation.isSigning}
                   >
                     Change
                   </Button>
                 </div>
               ) : (
-                <EnsConfirmForm ens={ens} disabled={!isInitialized} />
+                <EnsVerification ens={ens} disabled={!isInitialized} />
               ))}
 
             {ens.error && (
@@ -188,7 +188,7 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
           </div>
         </GuidedSection>
 
-        {allRequestedAttrs.length > 0 && (
+        {requestedAttrs.length > 0 && (
           <GuidedSection
             number="02"
             title={
@@ -209,7 +209,7 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
                   Submitting new values may overwrite existing data.
                 </div>
               )}
-              {allRequestedAttrs.map((key) => {
+              {requestedAttrs.map((key) => {
                 const value = attrsValues[key] ?? ''
                 const isRequired = requiredSet.has(key)
                 const prop = schema?.properties?.[key]
@@ -249,7 +249,7 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
 
         {visiblePlatforms.length > 0 && (
           <GuidedSection
-            number={allRequestedAttrs.length > 0 ? '03' : '02'}
+            number={requestedAttrs.length > 0 ? '03' : '02'}
             title="Social accounts"
             description="Link the accounts you want to attest. Required accounts must be linked before you can continue."
             active={ens.confirmed}
@@ -325,11 +325,11 @@ export function ComposeScreen({ config, schema, keyLabels }: Props) {
 // ENS confirm form (draft input + autocomplete)
 // -----------------------------
 
-function EnsConfirmForm({
+function EnsVerification({
   ens,
   disabled,
 }: {
-  ens: ReturnType<typeof useEnsConfirmation>
+  ens: ReturnType<typeof useVerifyEns>
   disabled: boolean
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -339,7 +339,7 @@ function EnsConfirmForm({
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        ens.confirm()
+        ens.verify()
       }}
       className="space-y-2"
     >

@@ -10,7 +10,7 @@ interface Args {
   allKeys: string[]
   /** Keys the form exposes as inputs. Used to decide which loaded values should
    *  pre-fill the form — class/schema load but don't pre-fill. */
-  allRequestedAttrs: string[]
+  requestedAttrs: string[]
 }
 
 /**
@@ -18,9 +18,9 @@ interface Args {
  * empty attribute inputs with what's already on chain. Runs exactly once
  * per confirmed session — we don't re-fetch on keystrokes.
  */
-export function useRecordsPrefill({ allKeys, allRequestedAttrs }: Args) {
+export function useRecordsPrefill({ allKeys, requestedAttrs }: Args) {
   const { publicClient } = useWeb3()
-  const name = useWizardStore((s) => s.name)
+  const ensName = useWizardStore((s) => s.ensName)
   const confirmed = useWizardStore((s) => s.sessionId !== null)
   const storeApi = useWizardStoreApi()
 
@@ -28,7 +28,7 @@ export function useRecordsPrefill({ allKeys, allRequestedAttrs }: Args) {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!confirmed || !publicClient || allKeys.length === 0 || !name) {
+    if (!confirmed || !publicClient || allKeys.length === 0 || !ensName) {
       if (!confirmed) {
         setLoadedRecords(null)
         setLoadError(null)
@@ -39,7 +39,7 @@ export function useRecordsPrefill({ allKeys, allRequestedAttrs }: Args) {
     ;(async () => {
       try {
         const reader = metadataReader()(publicClient)
-        const result = await reader.getMetadata({ name, keys: allKeys })
+        const result = await reader.getMetadata({ name: ensName, keys: allKeys })
         if (cancelled) return
         const properties = result.properties as Record<string, string | null>
         setLoadedRecords(properties)
@@ -49,7 +49,7 @@ export function useRecordsPrefill({ allKeys, allRequestedAttrs }: Args) {
         const currentAttrs = storeApi.getState().attrsValues
         const nextValues = { ...currentAttrs }
         let changed = false
-        for (const key of allRequestedAttrs) {
+        for (const key of requestedAttrs) {
           const existing = properties[key]
           if (typeof existing === 'string' && existing && !nextValues[key]) {
             nextValues[key] = existing
@@ -67,7 +67,7 @@ export function useRecordsPrefill({ allKeys, allRequestedAttrs }: Args) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmed, publicClient, name, allKeys])
+  }, [confirmed, publicClient, ensName, allKeys])
 
   return {
     loadedRecords,

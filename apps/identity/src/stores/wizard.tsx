@@ -11,7 +11,7 @@ export type WizardScreen = 'compose' | 'preview'
 
 export interface WizardState {
   // Persisted (see `partialize` below) — survives reloads and the OAuth round-trip.
-  name: string
+  ensName: string
   sessionId: string | null
   nonce: string | null
   attrsValues: Record<string, string>
@@ -27,8 +27,8 @@ export interface WizardState {
   hasHydrated: boolean
 
   // Actions
-  prefillName: (name: string) => void
-  confirmEns: (args: { name: string; sessionId: string; nonce: string }) => void
+  prefillEnsName: (ensName: string) => void
+  confirmEns: (args: { ensName: string; sessionId: string; nonce: string }) => void
   clearSession: () => void
   setAttrValue: (key: string, value: string) => void
   setAttrsValues: (values: Record<string, string>) => void
@@ -45,7 +45,7 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
   return createStore<WizardState>()(
     persist(
       (set) => ({
-        name: '',
+        ensName: '',
         sessionId: null,
         nonce: null,
         attrsValues: {},
@@ -59,9 +59,9 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
 
         // Only seed the name if nothing has been entered yet. Creator-provided
         // prefill loses to a user draft or a persisted value on purpose.
-        prefillName: (name) => set((s) => (s.name ? s : { name })),
+        prefillEnsName: (ensName) => set((s) => (s.ensName ? s : { ensName })),
 
-        confirmEns: ({ name, sessionId, nonce }) => set({ name, sessionId, nonce }),
+        confirmEns: ({ ensName, sessionId, nonce }) => set({ ensName, sessionId, nonce }),
 
         // Wipe every bit of state that was anchored to the old session. Proofs
         // bind to a specific SIWE resource set, so carrying them forward would
@@ -90,7 +90,7 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
       {
         name: `wizard:${intentId}`,
         partialize: (s) => ({
-          name: s.name,
+          ensName: s.ensName,
           sessionId: s.sessionId,
           nonce: s.nonce,
           attrsValues: s.attrsValues,

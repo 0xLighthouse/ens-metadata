@@ -29,14 +29,14 @@ function WizardBody({ intent, schema, keyLabels }: Omit<WizardProps, 'intentId'>
   const hasHydrated = useWizardStore((s) => s.hasHydrated)
   const screen = useWizardStore((s) => s.screen)
   const sessionId = useWizardStore((s) => s.sessionId)
-  const prefillName = useWizardStore((s) => s.prefillName)
+  const prefillEnsName = useWizardStore((s) => s.prefillEnsName)
 
   // Seed the creator-provided name once, and only when nothing has claimed
-  // the field yet — the store's `prefillName` is a no-op otherwise.
+  // the field yet — the store's `prefillEnsName` is a no-op otherwise.
   useEffect(() => {
     if (!hasHydrated) return
-    if (config.name) prefillName(config.name)
-  }, [hasHydrated, config.name, prefillName])
+    if (config.name) prefillEnsName(config.name)
+  }, [hasHydrated, config.name, prefillEnsName])
 
   // Brief gate while zustand's persist middleware rehydrates from localStorage.
   // Schema + intent are already resolved server-side, so this is the only

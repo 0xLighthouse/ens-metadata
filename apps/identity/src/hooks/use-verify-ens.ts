@@ -18,17 +18,17 @@ export type EnsPhase = 'idle' | 'checking-owner' | 'creating-session'
  * the hook. The hook commits to the store only when ownership is proven and
  * a session has been minted.
  */
-export function useEnsConfirmation() {
+export function useVerifyEns() {
   const { publicClient } = useWeb3()
   const { user } = usePrivy()
   const address = user?.wallet?.address as `0x${string}` | undefined
 
-  const name = useWizardStore((s) => s.name)
+  const ensName = useWizardStore((s) => s.ensName)
   const confirmed = useWizardStore((s) => s.sessionId !== null && s.nonce !== null)
-  const confirmEnsInStore = useWizardStore((s) => s.confirmEns)
+  const confirmEns = useWizardStore((s) => s.confirmEns)
   const clearSession = useWizardStore((s) => s.clearSession)
 
-  const [draftName, setDraftName] = useState(name)
+  const [draftName, setDraftName] = useState(ensName)
   const [phase, setPhase] = useState<EnsPhase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [ownedNames, setOwnedNames] = useState<string[]>([])
@@ -36,9 +36,9 @@ export function useEnsConfirmation() {
   // Keep draft in sync when the store-backed name changes externally (e.g.
   // persisted restore). We don't mirror user typing — `draftName` owns that.
   useEffect(() => {
-    if (name && name !== draftName) setDraftName(name)
+    if (ensName && ensName !== draftName) setDraftName(ensName)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name])
+  }, [ensName])
 
   // Silent autocomplete: a subgraph failure just means no suggestions.
   useEffect(() => {
@@ -61,7 +61,7 @@ export function useEnsConfirmation() {
     return ownedNames.filter((n) => n.toLowerCase().includes(q))
   }, [draftName, ownedNames])
 
-  const confirm = async () => {
+  const verify = async () => {
     setError(null)
     const trimmed = draftName.trim().toLowerCase()
     if (!trimmed) {
@@ -89,7 +89,7 @@ export function useEnsConfirmation() {
       }
       setPhase('creating-session')
       const session = await createSession()
-      confirmEnsInStore({ name: trimmed, sessionId: session.sessionId, nonce: session.nonce })
+      confirmEns({ ensName: trimmed, sessionId: session.sessionId, nonce: session.nonce })
       setPhase('idle')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -97,20 +97,20 @@ export function useEnsConfirmation() {
     }
   }
 
-  const changeEns = () => {
+  const reset = () => {
     clearSession()
     setError(null)
   }
 
   return {
-    name,
+    ensName,
     confirmed,
     draftName,
     setDraftName,
     phase,
     error,
     ownedNames: filteredOwnedNames,
-    confirm,
-    changeEns,
+    verify,
+    reset,
   }
 }
