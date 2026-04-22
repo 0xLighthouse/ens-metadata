@@ -1,8 +1,7 @@
 import { Wizard } from '@/components/wizard/Wizard'
 import { WizardErrorCard } from '@/components/wizard/WizardErrorCard'
 import { AttesterError, type IntentResponse, getIntent } from '@/lib/attester-client'
-import { type FetchedSchema, resolveSchemas } from '@/lib/schema-resolver'
-import { adaptIntentConfig, buildKeyLabels } from '@/lib/wizard-config'
+import { type FetchedSchema, buildKeyLabels, resolveSchemas } from '@/lib/schema-resolver'
 import { notFound } from 'next/navigation'
 
 interface Props {
@@ -20,20 +19,17 @@ export default async function IntentWizardPage({ params }: Props) {
     throw err
   }
 
-  const incomingConfig = adaptIntentConfig(intent.config)
+  const config = intent.config
 
   let schema: FetchedSchema | null = null
   let schemaError: string | null = null
   try {
-    schema = await resolveSchemas(incomingConfig.schemaUris, [
-      ...incomingConfig.requiredAttrs,
-      ...incomingConfig.optionalAttrs,
-    ])
+    schema = await resolveSchemas(config.schemaUris, [...config.required, ...config.optional])
   } catch (err) {
     schemaError = err instanceof Error ? err.message : String(err)
   }
 
-  const keyLabels = buildKeyLabels(schema, incomingConfig)
+  const keyLabels = buildKeyLabels(schema, config)
 
   return (
     <main className="min-h-screen px-4 py-12 md:py-20">
@@ -76,21 +72,14 @@ export default async function IntentWizardPage({ params }: Props) {
               <div className="break-words font-medium">{schemaError}</div>
               <div className="text-xs">
                 Schema URI:{' '}
-                <span className="break-all font-mono">{incomingConfig.schemaUris.join(', ')}</span>
+                <span className="break-all font-mono">{config.schemaUris.join(', ')}</span>
               </div>
             </>
           }
           hint="Talk to whoever sent you the link — the agent or tool generating these URLs probably has a typo or a stale schema reference."
         />
       ) : (
-        <Wizard
-          key={id}
-          intentId={id}
-          intent={intent}
-          incomingConfig={incomingConfig}
-          schema={schema}
-          keyLabels={keyLabels}
-        />
+        <Wizard key={id} intentId={id} intent={intent} schema={schema} keyLabels={keyLabels} />
       )}
     </main>
   )

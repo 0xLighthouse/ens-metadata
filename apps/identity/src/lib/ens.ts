@@ -20,10 +20,7 @@ export async function resolveOwner(client: EnsPublicClient, name: string) {
  * unreachable — callers should treat that as "no autocomplete available"
  * rather than an error state.
  */
-export async function getOwnedNames(
-  client: EnsPublicClient,
-  address: Address,
-): Promise<string[]> {
+export async function getOwnedNames(client: EnsPublicClient, address: Address): Promise<string[]> {
   try {
     const result = await getNamesForAddress(client, { address, pageSize: 1000 })
     const names = result

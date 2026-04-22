@@ -13,8 +13,8 @@ import type { FetchedSchema } from '@/lib/schema-resolver'
 import type { PrivyTelegramAccount } from '@/lib/telegram-proof'
 import type { PrivyTwitterAccount } from '@/lib/twitter-proof'
 import { cn, shortAddress } from '@/lib/utils'
-import type { IncomingConfig } from '@/lib/wizard-config'
 import { useWizardStore } from '@/stores/wizard'
+import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
 import {
   AlertCircle,
@@ -28,23 +28,23 @@ import type { ChangeEvent, TextareaHTMLAttributes } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface Props {
-  incomingConfig: IncomingConfig
+  config: IntentConfig
   schema: FetchedSchema | null
   keyLabels: Record<string, string>
 }
 
-export function ComposeScreen({ incomingConfig, schema, keyLabels }: Props) {
+export function ComposeScreen({ config, schema, keyLabels }: Props) {
   const {
-    requiredAttrs,
-    optionalAttrs,
+    required: requiredAttrs,
+    optional: optionalAttrs,
     classValues,
     schemaUris,
     requiredPlatforms,
     optionalPlatforms,
-    platformsRequested,
-  } = incomingConfig
+  } = config
   const classValue = classValues[0]
   const schemaUri = schemaUris[0]
+  const platformsRequested = requiredPlatforms.length + optionalPlatforms.length > 0
 
   const { login, logout, authenticated, user, ready } = usePrivy()
   const { walletClient, isInitialized } = useWeb3()

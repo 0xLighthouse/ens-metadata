@@ -1,4 +1,6 @@
+import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { isEnsip5Global } from './ensip-5'
+import { formatKeyName } from './utils'
 
 /**
  * Minimal JSON Schema property shape — just the bits the wizard reads
@@ -106,4 +108,22 @@ export async function resolveSchemas(
   }
 
   return merged
+}
+
+/**
+ * Map every attribute key the intent asks for to a human-readable label.
+ * The schema's `title` wins; otherwise we format the key as Title Case.
+ * Used by both compose and preview so naming stays consistent across screens.
+ */
+export function buildKeyLabels(
+  schema: FetchedSchema | null,
+  config: IntentConfig,
+): Record<string, string> {
+  const allKeys = [...config.required, ...config.optional]
+  return Object.fromEntries(
+    allKeys.map((key) => {
+      const title = schema?.properties?.[key]?.title
+      return [key, title ?? formatKeyName(key)]
+    }),
+  )
 }

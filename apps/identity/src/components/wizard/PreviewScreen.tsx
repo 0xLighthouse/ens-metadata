@@ -8,6 +8,7 @@ import { diffToWriteMap } from '@/lib/record-diff'
 import { cn } from '@/lib/utils'
 import { useWizardStore } from '@/stores/wizard'
 import { metadataWriter } from '@ensmetadata/sdk'
+import type { IntentConfig } from '@ensmetadata/shared/intent'
 import {
   AlertCircle,
   ArrowLeft,
@@ -19,12 +20,11 @@ import {
   Pencil,
   Plus,
 } from 'lucide-react'
-import type { IncomingConfig } from '@/lib/wizard-config'
 import { useMemo, useState } from 'react'
 import { mainnet } from 'viem/chains'
 
 interface Props {
-  incomingConfig: IncomingConfig
+  config: IntentConfig
   keyLabels: Record<string, string>
 }
 
@@ -49,9 +49,9 @@ function friendlyError(err: unknown): string {
  * table so the user sees one unified list rather than "added/updated/removed"
  * buckets — this is the what-you-get view, not a diff view.
  */
-export function PreviewScreen({ incomingConfig, keyLabels }: Props) {
-  const classValue = incomingConfig.classValues[0]
-  const schemaUri = incomingConfig.schemaUris[0]
+export function PreviewScreen({ config, keyLabels }: Props) {
+  const classValue = config.classValues[0]
+  const schemaUri = config.schemaUris[0]
 
   const name = useWizardStore((s) => s.name)
   const sessionId = useWizardStore((s) => s.sessionId)

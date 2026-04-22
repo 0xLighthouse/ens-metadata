@@ -2,7 +2,7 @@
 
 import type { PrivyTelegramAccount } from '@/lib/telegram-proof'
 import type { PrivyTwitterAccount } from '@/lib/twitter-proof'
-import type { Platform } from '@/lib/wizard-config'
+import type { IntentPlatform as Platform } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
 import { useMemo, useState } from 'react'
 
