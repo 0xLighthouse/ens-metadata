@@ -9,21 +9,15 @@ import { useState } from 'react'
 
 export type PublishPhase = 'idle' | 'writing' | 'confirming' | 'done' | 'error'
 
-interface Args {
-  classValue?: string
-  schemaUri?: string
-}
-
 /**
  * Drives the on-chain publish: write the batched records, wait for
  * confirmations, evict the attester session. The returned state machine is
  * the single source of truth for the preview screen's render branches.
  */
-export function usePublishFlow({ classValue, schemaUri }: Args) {
+export function usePublishFlow() {
   const { walletClient, publicClient } = useWeb3()
   const ensName = useWizardStore((s) => s.ensName)
   const sessionId = useWizardStore((s) => s.sessionId)
-  const proofs = useWizardStore((s) => s.proofs)
   const recordDiff = useWizardStore((s) => s.recordDiff)
 
   const [phase, setPhase] = useState<PublishPhase>('idle')
@@ -32,11 +26,7 @@ export function usePublishFlow({ classValue, schemaUri }: Args) {
 
   // Only changes gate the Publish button — unchanged records are display-only.
   const hasAnything =
-    recordDiff.added.length +
-      recordDiff.updated.length +
-      recordDiff.removed.length +
-      proofs.length >
-    0
+    recordDiff.added.length + recordDiff.updated.length + recordDiff.removed.length > 0
 
   const busy = phase === 'writing' || phase === 'confirming'
 
@@ -55,15 +45,6 @@ export function usePublishFlow({ classValue, schemaUri }: Args) {
 
     try {
       const recordsToWrite = diffToWriteMap(recordDiff)
-      if (classValue) recordsToWrite.class = classValue
-      if (schemaUri) recordsToWrite.schema = schemaUri
-      for (const { draft, records } of proofs) {
-        // Plain handle record: <platform> = "<handle>"
-        recordsToWrite[draft.claim.p] = draft.claim.h
-        // Handle attestation and uid attestation, each keyed by attester.
-        recordsToWrite[records.handle.key] = records.handle.hex
-        recordsToWrite[records.uid.key] = records.uid.hex
-      }
 
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)

@@ -84,6 +84,17 @@ export function createSession(): Promise<CreateSessionResponse> {
   return postJson<CreateSessionResponse>('/api/session')
 }
 
+export interface AttesterInfoResponse {
+  /** ENS name the worker uses in attestation record keys. */
+  attester: string
+  /** Address the attester ENS resolves to; null if the worker couldn't resolve it. */
+  signerAddress: string | null
+}
+
+export function attesterInfo(): Promise<AttesterInfoResponse> {
+  return getJson<AttesterInfoResponse>('/')
+}
+
 export interface BindWalletArgs {
   sessionId: string
   message: string

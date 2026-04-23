@@ -3,7 +3,6 @@
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
 import { usePublishFlow } from '@/hooks/use-publish-flow'
 import { useWizardStore } from '@/stores/wizard'
-import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { useState } from 'react'
 import { PreviewPretty } from './components/PreviewPretty'
 import { PreviewRaw } from './components/PreviewRaw'
@@ -12,7 +11,6 @@ import { PublishSuccessCard } from './components/PublishSuccessCard'
 import { type PreviewMode, ViewTogglePill } from './components/ViewTogglePill'
 
 interface Props {
-  config: IntentConfig
   keyLabels: Record<string, string>
 }
 
@@ -21,11 +19,9 @@ interface Props {
  * selected + the publish action bar. Flips to the success card once the
  * publish flow confirms.
  */
-export function PreviewScreen({ config, keyLabels }: Props) {
-  const classValue = config.classValues[0]
-  const schemaUri = config.schemaUris[0]
+export function PreviewScreen({ keyLabels }: Props) {
   const ensName = useWizardStore((s) => s.ensName)
-  const publish = usePublishFlow({ classValue, schemaUri })
+  const publish = usePublishFlow()
   const [view, setView] = useState<PreviewMode>('pretty')
 
   if (publish.phase === 'done') {
@@ -48,11 +44,7 @@ export function PreviewScreen({ config, keyLabels }: Props) {
           active
           accent="green"
         >
-          {view === 'pretty' ? (
-            <PreviewPretty keyLabels={keyLabels} />
-          ) : (
-            <PreviewRaw classValue={classValue} schemaUri={schemaUri} />
-          )}
+          {view === 'pretty' ? <PreviewPretty keyLabels={keyLabels} /> : <PreviewRaw />}
         </GuidedSection>
       </GuidedCard>
 

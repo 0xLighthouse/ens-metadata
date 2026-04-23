@@ -166,12 +166,18 @@ export function useAttestationFlow({
         })
       }
 
-      // Attr diff (including class/schema) powers the preview screen and the
-      // eventual on-chain writes.
+      // Everything that could be written on-chain goes through the diff —
+      // attrs, class/schema, plain handle records, and attestation envelopes.
+      // Keys whose on-chain value already matches drop out in computeDelta.
       const attrsValues = storeApi.getState().attrsValues
       const desired: Record<string, string> = { ...attrsValues }
       if (classValue) desired.class = classValue
       if (schemaUri) desired.schema = schemaUri
+      for (const { draft, records } of proofsOut) {
+        desired[draft.claim.p] = draft.claim.h
+        desired[records.handle.key] = records.handle.hex
+        desired[records.uid.key] = records.uid.hex
+      }
       const diff: RecordDiff = computeRecordDiff(loadedRecords ?? {}, desired)
 
       // Attrs whose on-chain value already matches the submission — shown in

@@ -27,11 +27,12 @@ export function useTextRecords(ensName: string | null, keys: readonly string[]):
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ensName || !publicClient || keys.length === 0) {
-      setRecords(null)
-      setError(null)
-      return
-    }
+    // Reset on every deps change so `loaded` reflects the new fetch, not the
+    // previous keys' result. React bails on null→null, so this is a no-op on
+    // mount but correctly models "refetching" when keys expand.
+    setRecords(null)
+    setError(null)
+    if (!ensName || !publicClient || keys.length === 0) return
     let cancelled = false
     ;(async () => {
       try {

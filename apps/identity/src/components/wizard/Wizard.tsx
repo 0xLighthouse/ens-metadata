@@ -68,7 +68,7 @@ function WizardBody({ intent, schema, keyLabels }: Omit<WizardProps, 'intentId'>
         <ComposeScreen config={config} schema={schema} keyLabels={keyLabels} />
       )}
 
-      {screen === 'preview' && sessionId && <PreviewScreen config={config} keyLabels={keyLabels} />}
+      {screen === 'preview' && sessionId && <PreviewScreen keyLabels={keyLabels} />}
     </div>
   )
 }

@@ -4,16 +4,10 @@ import { useWizardStore } from '@/stores/wizard'
 import { useMemo } from 'react'
 import { StatusBadge } from './StatusBadge'
 
-interface Props {
-  classValue?: string
-  schemaUri?: string
-}
-
 /** Raw text-record view: every key that will be written on-chain, verbatim,
  *  including structural class/schema and the full envelope hex for each proof. */
-export function PreviewRaw({ classValue, schemaUri }: Props) {
+export function PreviewRaw() {
   const recordDiff = useWizardStore((s) => s.recordDiff)
-  const proofs = useWizardStore((s) => s.proofs)
 
   const rows = useMemo(() => {
     type RawRow = {
@@ -24,29 +18,18 @@ export function PreviewRaw({ classValue, schemaUri }: Props) {
     }
     const out: RawRow[] = []
 
-    if (classValue) out.push({ key: 'class', status: 'added', newValue: classValue })
-    if (schemaUri) out.push({ key: 'schema', status: 'added', newValue: schemaUri })
-
     for (const a of recordDiff.added) {
-      if (a.key === 'class' || a.key === 'schema') continue
       out.push({ key: a.key, status: 'added', newValue: a.next })
     }
     for (const u of recordDiff.updated) {
-      if (u.key === 'class' || u.key === 'schema') continue
       out.push({ key: u.key, status: 'updated', newValue: u.next, prevValue: u.prev })
     }
     for (const r of recordDiff.removed) {
       out.push({ key: r.key, status: 'removed', prevValue: r.prev })
     }
 
-    for (const { draft, records } of proofs) {
-      out.push({ key: draft.claim.p, status: 'added', newValue: draft.claim.h })
-      out.push({ key: records.handle.key, status: 'added', newValue: records.handle.hex })
-      out.push({ key: records.uid.key, status: 'added', newValue: records.uid.hex })
-    }
-
     return out
-  }, [classValue, schemaUri, recordDiff, proofs])
+  }, [recordDiff])
 
   if (rows.length === 0) {
     return <p className="text-sm text-neutral-500">Nothing will change.</p>

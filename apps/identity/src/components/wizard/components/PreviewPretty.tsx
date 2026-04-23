@@ -28,18 +28,30 @@ export function PreviewPretty({ keyLabels }: Props) {
     }> = []
     const seen = new Set<string>()
 
+    // Keys the pretty view represents via the proof pill: the envelope keys
+    // (would otherwise render as raw hex) and the plain platform handle
+    // (redundant with the pill). The raw view still shows both.
+    const proofKeys = new Set<string>()
+    for (const { draft, records } of proofs) {
+      proofKeys.add(records.handle.key)
+      proofKeys.add(records.uid.key)
+      proofKeys.add(draft.claim.p)
+    }
+    const skip = (key: string) =>
+      seen.has(key) || key === 'class' || key === 'schema' || proofKeys.has(key)
+
     for (const a of recordDiff.added) {
-      if (seen.has(a.key) || a.key === 'class' || a.key === 'schema') continue
+      if (skip(a.key)) continue
       rows.push({ key: a.key, value: a.next, tone: 'added' })
       seen.add(a.key)
     }
     for (const u of recordDiff.updated) {
-      if (seen.has(u.key) || u.key === 'class' || u.key === 'schema') continue
+      if (skip(u.key)) continue
       rows.push({ key: u.key, value: u.next, tone: 'updated' })
       seen.add(u.key)
     }
     for (const r of unchangedRecords) {
-      if (seen.has(r.key) || r.key === 'class' || r.key === 'schema') continue
+      if (skip(r.key)) continue
       rows.push({ key: r.key, value: r.value, tone: 'unchanged' })
       seen.add(r.key)
     }

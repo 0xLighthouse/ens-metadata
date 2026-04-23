@@ -5,11 +5,20 @@ import { useAttestationFlow } from '@/hooks/use-attestation-flow'
 import { type Platform, useSocialAccounts } from '@/hooks/use-social-accounts'
 import { useTextRecords } from '@/hooks/use-text-records'
 import { useVerifyEns } from '@/hooks/use-verify-ens'
+import { attesterInfo } from '@/lib/attester-client'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
+import { handleAttestationRecordKey, uidAttestationRecordKey } from '@ensmetadata/sdk'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
-import { type ReactNode, createContext, useContext, useEffect, useMemo } from 'react'
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 
 type Ens = ReturnType<typeof useVerifyEns>
 type Socials = ReturnType<typeof useSocialAccounts>
@@ -111,12 +120,46 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     [requiredPlatforms, optionalPlatforms],
   )
   const requiredAttrSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
+
+  // Attester ENS powers the attestation record keys we need to pre-load so
+  // already-published attestations show up as "unchanged" in the diff. Fetched
+  // once from the worker's `GET /`.
+  const [attesterEns, setAttesterEns] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    attesterInfo()
+      .then((info) => {
+        if (!cancelled) setAttesterEns(info.attester)
+      })
+      .catch(() => {
+        // Non-fatal: the wizard still works, existing attestations just won't
+        // be recognised in the diff preview.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const platformList = useMemo(
+    () => Array.from(new Set<Platform>([...requiredPlatforms, ...optionalPlatforms])),
+    [requiredPlatforms, optionalPlatforms],
+  )
+
   const textRecordKeys = useMemo(() => {
     const keys = [...requestedAttrs]
     if (classValue) keys.push('class')
     if (schemaUri) keys.push('schema')
+    // Platform IDs (e.g. `com.x`) double as the plain-handle record keys.
+    // Load them so the publish diff can skip records that already match.
+    keys.push(...platformList)
+    if (attesterEns) {
+      for (const p of platformList) {
+        keys.push(handleAttestationRecordKey(p, attesterEns))
+        keys.push(uidAttestationRecordKey(p, attesterEns))
+      }
+    }
     return [...new Set(keys)]
-  }, [requestedAttrs, classValue, schemaUri])
+  }, [requestedAttrs, classValue, schemaUri, platformList, attesterEns])
 
   const {
     records: loadedRecords,
