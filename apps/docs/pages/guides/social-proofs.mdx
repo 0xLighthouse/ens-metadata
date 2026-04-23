@@ -30,7 +30,7 @@ Your wallet only signs the SIWE message and the on-chain write transaction.
 
 The attestation gets written to the resolver as a hex-encoded parameterized text record:
 
-```
+```sh
 alice.eth
   ├── social-proofs[com.x]          = "0xda61747374..."
   └── social-proofs[org.telegram]   = "0xda61747374..."
@@ -73,64 +73,72 @@ if (result.valid) {
 }
 ```
 
-The SDK's `verifyProof` runs these checks:
+## Attestation format
 
-| Check | Fails with | Meaning |
+Attestations are encoded using CBOR format, identified by tag `1635021684` (`0x61747374`, the ASCII encoding of "`atst`").
+
+### Envelope
+
+```sh
+Tag(1635021684) [
+  1,                                // envelope version
+  <bytes>,                          // payload (described below)
+  <bytes 20>,                       // signer
+  <bytes 65>,                       // signature — EIP-191 over keccak256(payload)
+]
+```
+
+### Payload
+
+The payload contains the data that makes up the actual identity claim and is encoded using [DAG-CBOR](https://www.npmjs.com/package/@ipld/dag-cbor).
+
+| Field | Key | Description |
 | --- | --- | --- |
-| Decode the attestation and its payload | `decode-error` | Bytes are corrupt or not a valid attestation |
-| Recover the signer from the signature | `bad-signature` | Attestation was tampered with |
-| Recovered attester is in the trusted set | `untrusted-attester` | Attester is not in your allow-list |
-| Payload address matches the current ENS owner | `wrong-owner` | Name transferred since attestation |
-| `now - issuedAt` within `maxAge` (if set) | `stale` | Proof is older than your threshold |
+| Name | `n` | The ENS name the attestation is bound to. |
+| Address | `a` | The wallet address that owns or manages the ENS name. |
+| Platform | `p` | Reverse-DNS platform identifier, e.g. `com.x` or `org.telegram` |
+| Handle | `h` | Social handle at the time of attestation. A handle change invalidates the proof and requires a new attestation. |
+| Blind uid | `u` | An attester-signed hash of the platform user ID. Consumers who know the raw uid can verify it locally (see below). |
+| Issued at | `t` | Unix timestamp in seconds. |
 
-There is no global registry of trusted attesters. Each consumer configures its own `trustedAttesters` set and `maxAge` threshold independently.
+### Blind UID
 
-### Verifying the uid binding
+It is important to note that the `blind uid (u)` field in the signed payload is NOT the raw platform user id. It's a **signature** over the hash of the platform and uid, produced by the attester:
 
-The SDK confirms the attestation is structurally valid and signed by a trusted attester, but it does not check that the blinded uid binds to a specific platform user. Only the consumer knows the raw platform uid (for example, from a Telegram chat context). After `verifyProof` returns valid, verify the binding locally:
+```sh
+u = personalSign(keccak256("platform:rawUid"), attesterKey)
+```
+
+For example, for Telegram user `12345` on platform `org.telegram`:
+
+```sh
+hash = keccak256(toBytes("org.telegram:12345"))
+u    = attesterKey.signMessage({ message: { raw: hash } })
+```
+
+This is a 65-byte EIP-191 signature, stored as raw bytes in the CBOR payload.
+
+#### Verifying the blind uid
+
+If you know the platform uid for the user, you can verify that it matches what is included in the attestation:
 
 ```ts
 import { keccak256, recoverMessageAddress, toBytes } from 'viem'
 
 // 1. Compute the same hash the attester signed
-const hash = keccak256(toBytes(`org.telegram:${knownTgUid}`))
+const hash = keccak256(toBytes(`org.telegram:${knownUid}`))
 
 // 2. Recover the signer from the uid signature
 const recovered = await recoverMessageAddress({
   message: { raw: hash },
-  signature: result.uid as `0x${string}`,
+  signature: envelope.payload.blindUid as `0x${string}`,
 })
 
 // 3. Check it matches the attester address
-if (recovered.toLowerCase() === result.attester.toLowerCase()) {
-  // The attester endorsed this exact platform:uid pair
+if (recovered.toLowerCase() === attesterAddress.toLowerCase()) {
+  // ✓ The attester endorsed this exact platform:uid pair
 }
 ```
-
-This check is pure local `ecrecover` with no network call. The uid field and the attestation signature both recover to the same attester address, which is the invariant that ties the platform identity to the on-chain proof.
-
-Without this check, a valid attestation only proves that a user who owned the specified handle at the time also owned access to the wallet. Doing this check confirms the original owner of the handle is still the owner who owns the handle today.
-
-## Attestation format
-
-Each attestation is a CBOR-tagged array identified by tag `1635021684` (`0x61747374`, the ASCII encoding of "atst"). The tag makes the format self-describing: any tool reading the text record can detect the tag and know how to decode the rest.
-
-The attestation contains a version number (`1` for this format), the encoded payload, an attester address, and the attester's EIP-191 signature over the payload hash. The attester address stored in the attestation is an unsigned hint for lookup purposes; the true attester identity is always recovered from the signature.
-
-### Payload fields
-
-The signed payload contains the data that makes up the actual identity claim. Field names are abbreviated to single characters to reduce on-chain storage cost:
-
-| Field | Key | Description |
-| --- | --- | --- |
-| Platform | `p` | Reverse-DNS platform identifier, e.g. `com.x` or `org.telegram` |
-| Handle | `h` | Social handle at the time of attestation. Because this field is signed, a handle change invalidates the proof and requires a new attestation. |
-| Blinded uid | `u` | An attester-signed hash of the platform user ID. Consumers who know the raw uid can verify it locally (see "Verifying the uid binding" above). |
-| Name | `n` | The ENS name the attestation is bound to, providing replay protection. |
-| Issued at | `t` | Unix timestamp in seconds. There is no expiry field; freshness is left to the verifier's `maxAge` policy. |
-| Address | `a` | The wallet address observed via SIWE during the attestation session. |
-
-The payload is encoded using dag-cbor (RFC 8949 Core Deterministic Encoding), which guarantees byte-identical output across implementations and runs. This is required because the signature covers the hash of the encoded payload bytes: if re-encoding produced different bytes, verification would fail.
 
 ## Related
 
