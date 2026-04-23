@@ -3,9 +3,14 @@ title: Attestations
 weight: 5
 ---
 
-# Linking social accounts to an ENS name
+# Attesting social attributes with ENS
 
-This guide explains how to attach a verifiable social-account attestation to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X and Telegram; the same scheme extends to any platform with a server-verifiable login. Platform identifiers use reverse-DNS notation (`com.x` for X, `org.telegram` for Telegram) and are stored as parameterized ENS text records under the `attestations` and `uid` keys.
+This guide explains how to attach a compact, verifiable attestation to an ENS name. Supported platforms today are:
+
+* X (`com.x`)
+* Telegram (`org.telegram`)
+
+The same scheme applies to any platform with a server-verifiable login, and extends to other private attributes (OAuth subject ids, email addresses, and so on).
 
 ## How it works
 
@@ -15,18 +20,18 @@ An attestation is a signed record written to an ENS text record by the name's ow
 2. **The attestation** — a CBOR-encoded envelope with an EIP-191 signature over a reconstructable DAG-CBOR payload (platform, handle *or* private uid, ENS name, owner address, timestamp). The attester signs; the name owner publishes on-chain.
 3. **The text record** — a parameterized key on the ENS name (for example `attestations[com.x][atst.lighthousegov.eth]`), holding the attestation envelope.
 
-Verification requires only the text record and two local `ecrecover` operations.
+Verification is purely local: one `ecrecover` against the envelope signature, compared to the current resolution of the attester's ENS name. No attester call required at verify time.
 
-## Step 1: Create the proof
+## Step 1: Create the attestation
 
-1. Open the proofs app and connect the wallet that controls the ENS name you want to attest.
+1. Open the attestations app and connect the wallet that controls the ENS name you want to attest.
 2. Sign the SIWE message. This proves to the attester that the current session controls this wallet.
 3. Link your social account: X via OAuth, or Telegram via the Login Widget.
 4. The attester signs the attestation and returns the encoded bytes.
 
 ## Step 2: Publish the text record
 
-The user's social media handle is written to their ENS name as a text record. The attestation is written as a separate text record, parameterized by the platform and the attester's address.
+The user's social media handle is written to their ENS name as a text record. The attestation is written as a separate text record, parameterized by the platform and the attester's ENS name.
 
 ```sh
 alice.eth
@@ -36,17 +41,14 @@ alice.eth
   └── attestations[org.telegram][attester.eth] = "0xda61747374..."
 ```
 
-## Verifying the proof
+## Verifying the attestation
 
-To verify a proof that has been published to an ENS name, first collect the following details:
+To verify an attestation that has been published to an ENS name, first collect the following details:
 
-1. The full ENS name (`name.eth`) or subname (`alice.name.eth`) under which the proof was published.
+1. The full ENS name (`name.eth`) or subname (`alice.name.eth`) under which the attestation was published.
 2. The address of the manager of the ENS name (or if the address is a wrapped name, the address of the owner).
 3. The ENS name of the attester, and the attestation record itself.
 4. Look up which address the attester's ENS name resolves to. This is the signer's address.
-
-{/*
-//// Pass in these details to the SDK
 
 ### SDK verification
 
@@ -77,9 +79,9 @@ const uidResult = await client.verifyUidAttestation({
   name: 'alice.eth',
   platform: 'com.x',
   uid: '12345',
-  attester: 'atst.lighthousegov.eth',
+  attester: 'atst.lighthousegov.eth', // optional, defaults to this
 })
-``` */}
+```
 
 ## Attestation format
 
@@ -105,13 +107,13 @@ The payload for the signature is encoded using [DAG-CBOR](https://www.npmjs.com/
 | Handle | `h` | The value of the text record matching the platform namespace. (e.g. `alice` for `com.x`) |
 | Issued at | `t` | The timestamp from the attestation. |
 
-Generate the DAG-CBOR encoded form of the above fields, and hash it with keccak256 to regenerate the payload that was signed by the attester. You can now verify against the signature included in the attestation.
+Encode the above fields as canonical DAG-CBOR, then hash the bytes with keccak256 to get the digest the attester signed. Recover the signer from the digest plus the signature and compare to the address the attester's ENS name currently resolves to.
 
-## Blind UID proofs
+## Private UID attestations
 
-A non-public user identifier (like those used internally by social media accounts and exposed during an OAuth flow) can also be attested nd published to the user's ENS name without revealing the private UID. Consumers who already know the user's private UID can verify the proof, but those who do not know it will not be able to reveal it from the attestation.
+A non-public user identifier (like the stable id exposed during an OAuth flow, or a Telegram numeric id) can also be attested and published to the user's ENS name without revealing the UID itself. Consumers who already know the user's UID can verify the attestation; those who don't cannot recover it from the record.
 
-UID attestations are published to the user's ENS name under the `uid` record, parameterized by the platform and the attester's address.
+UID attestations are published to the user's ENS name under the `uid` record, parameterized by the platform and the attester's ENS name.
 
 ```sh
 alice.eth
@@ -119,7 +121,7 @@ alice.eth
   └── uid[org.telegram][attester.eth] = "0xda61747374..."
 ```
 
-These proofs follow the same format as described above, however the payload is slightly different:
+These attestations follow the same format as the handle variant above; the payload differs in one field:
 
 | Field | Key | Description |
 | --- | --- | --- |
@@ -129,7 +131,7 @@ These proofs follow the same format as described above, however the payload is s
 | UID | `u` | The non-public user identifier. (e.g. `12345` for `com.x`) |
 | Issued at | `t` | The timestamp from the attestation. |
 
-Using the above details from the user's ENS name, plus the private UID that has been received from an Oauth flow or other method, you can regenerate the signed payload and verify the proof.
+Using the above details from the user's ENS name, plus the private UID received from an OAuth flow or another out-of-band method, you can regenerate the signed payload and verify the attestation.
 
 ## Key rotation
 
