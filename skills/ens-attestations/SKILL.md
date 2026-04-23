@@ -21,10 +21,12 @@ Don't use this skill for general ENS name resolution (use viem's `getEnsAddress`
 
 Attestations come in two flavors, each stored in its own text record:
 
-- **Handle attestation** — binds a public handle (`@vitalik`) to the ENS name. Record key: `attestations[<platform>][<0xattester>]`.
-- **UID attestation** — binds a *private* platform uid (OAuth `sub`, Telegram numeric id) to the ENS name. Record key: `uid[<platform>][<0xattester>]`.
+- **Handle attestation** — binds a public handle (`@vitalik`) to the ENS name. Record key: `attestations[<platform>][<attester.eth>]`.
+- **UID attestation** — binds a *private* platform uid (OAuth `sub`, Telegram numeric id) to the ENS name. Record key: `uid[<platform>][<attester.eth>]`.
 
 You typically want the UID variant: it's the only one that cryptographically ties the name to the specific user id you already have. The handle record tells you "this handle was claimed"; the uid record tells you "this user is the same one you're talking to."
+
+The `<attester.eth>` segment of the record key is an ENS name (e.g. `atst.lighthousegov.eth`). The SDK resolves that name to an address at verify time — rotating the attester's ENS `addr` record retires the prior signing key and instantly invalidates every signature made with it.
 
 ## Setup
 
@@ -39,12 +41,13 @@ const client = createPublicClient({
   transport: http(process.env.RPC_URL),
 })
 
-// The attester address you trust. Each deployed attester has a single signing
-// key whose address is what gets stamped into the record key; pass that here.
-const TRUSTED_ATTESTER = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf' as const
+// The attester ENS name you trust. The SDK resolves this to the current
+// signing address at verify time. Defaults to `atst.lighthousegov.eth`
+// if you omit the attester option entirely.
+const TRUSTED_ATTESTER = 'atst.lighthousegov.eth'
 ```
 
-Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, a mainnet RPC URL, and the trusted attester address(es).
+Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, a mainnet RPC URL, and the trusted attester ENS name.
 
 ## Verify a uid attestation
 
@@ -91,12 +94,13 @@ const result = await verifyHandleAttestation(
 
 Both `verifyHandleAttestation` and `verifyUidAttestation`:
 
-1. Read the envelope from the parameterized record (`attestations[<p>][<att>]` or `uid[<p>][<att>]`).
-2. Resolve the current ENS owner.
-3. Read auxiliary context: for a handle attestation, read the plain `<platform>` text record; for a uid attestation, the raw uid you passed.
-4. Reconstruct the canonical DAG-CBOR payload from those values plus the envelope timestamp.
-5. `keccak256(payload)`, `ecrecover` against the signature, compare to the trusted attester address.
-6. Apply freshness threshold if configured.
+1. Read the envelope from the parameterized record (`attestations[<p>][<attester.eth>]` or `uid[<p>][<attester.eth>]`).
+2. Resolve the current ENS owner of the name being verified.
+3. Resolve the attester's ENS name to its current address (the signing key).
+4. Read auxiliary context: for a handle attestation, read the plain `<platform>` text record; for a uid attestation, the raw uid you passed.
+5. Reconstruct the canonical DAG-CBOR payload from those values plus the envelope timestamp.
+6. `keccak256(payload)`, `ecrecover` against the signature, compare to the attester's resolved address.
+7. Apply freshness threshold if configured.
 
 ### Failure reasons
 
@@ -105,7 +109,8 @@ Both `verifyHandleAttestation` and `verifyUidAttestation`:
 | `missing` | No record under the parameterized key, or (for handle attestations) no `<platform>` text record. | Send the user a wizard link; poll. |
 | `decode-error` | Record bytes don't parse as a v2 envelope. | Treat as adversarial or corrupted. |
 | `unsupported-version` | Envelope version isn't v2. | Upgrade the SDK. |
-| `bad-signature` | Reconstructed payload doesn't match the signature — could be wrong owner (name transferred), wrong handle/uid supplied, or a different attester. | Check you passed the right attester address and the user hasn't transferred the name. |
+| `attester-not-resolved` | The attester ENS name has no current `addr` record — nothing under that name is verifiable until the ENS is fixed. | Inspect your `attester` option; if it's correct, the attester's operator has not pointed the name at a signing key. |
+| `bad-signature` | Reconstructed payload doesn't match the signature — could be wrong owner (name transferred), wrong handle/uid supplied, a rotated key, or a different attester entirely. | Check you passed the right attester name; confirm the user hasn't transferred the name. |
 | `stale` | `now - issuedAt > maxAge`. | Only fires if you set `maxAge`. Ask the user to re-issue. |
 
 `result.recovered` (when present) holds the address ecrecover returned; if it's a valid-looking address but not your trusted attester, a different attester signed this or the payload reconstruction was wrong.
@@ -140,15 +145,15 @@ Attestations are stored as hex-encoded CBOR in parameterized ENS text records:
 
 ```
 alice.eth
-  ├── com.x                                                = "alice"               # plain handle
-  ├── attestations[com.x][0x7E5F…]                         = "0xda61747374…"       # handle attestation
-  ├── uid[com.x][0x7E5F…]                                  = "0xda61747374…"       # uid attestation
-  ├── org.telegram                                         = "alice"
-  ├── attestations[org.telegram][0x7E5F…]                  = "0xda61747374…"
-  └── uid[org.telegram][0x7E5F…]                           = "0xda61747374…"
+  ├── com.x                                                  = "alice"           # plain handle
+  ├── attestations[com.x][atst.lighthousegov.eth]            = "0xda61747374…"   # handle attestation
+  ├── uid[com.x][atst.lighthousegov.eth]                     = "0xda61747374…"   # uid attestation
+  ├── org.telegram                                           = "alice"
+  ├── attestations[org.telegram][atst.lighthousegov.eth]     = "0xda61747374…"
+  └── uid[org.telegram][atst.lighthousegov.eth]              = "0xda61747374…"
 ```
 
-Each value starts with `0xDA` (CBOR tag header) followed by tag `1635021684` (`0x61747374`, ASCII for `atst`). The attester's address is in the record key, not the envelope.
+Each value starts with `0xDA` (CBOR tag header) followed by tag `1635021684` (`0x61747374`, ASCII for `atst`). The attester's **ENS name** is in the record key; the SDK resolves it to an address at verify time.
 
 ### Envelope (v2)
 
@@ -186,7 +191,9 @@ UID payload:
 
 There is exactly one cryptographic binding in the system: **the envelope signature over the reconstructed payload**. A valid signature from an attester you trust means the attester saw a user who controlled `payload.addr` at `payload.t` and could log into `payload.platform` as `payload.h` or `payload.u`.
 
-The attester's address lives in the record key. If you're verifying an attestation signed by an attester you don't trust, don't read it in the first place — pick records under `attestations[<p>][<your-trusted-attester>]`.
+The attester's **ENS name** lives in the record key; the signing address is whatever that name resolves to *right now*. If you're verifying an attestation signed by an attester you don't trust, don't read it in the first place — pick records under `attestations[<p>][<your-trusted-attester-ens>]`.
+
+**Key rotation**: the attester's operator can rotate the signing key simply by updating the `addr` record on its ENS name. Older signatures made with the retired key stop verifying the moment the resolution changes. No blockchain transaction, no special "revocation" step — just an ENS resolver update.
 
 The wallet's only roles are (1) publishing the signed envelope and (2) being the ENS name owner. It does not sign the attestation.
 

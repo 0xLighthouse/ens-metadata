@@ -62,21 +62,23 @@ const client = createPublicClient({
   chain: addEnsContracts(mainnet),
   transport: http(),
 }).extend(attestationVerifier({
-  trustedAttesters: ['0x...'],
   maxAge: 90 * 24 * 60 * 60, // optional: reject attestations older than 90 days
 }))
 
-const result = await client.verifyAttestation({
+// Handle attestation — verifies the public handle on the `com.x` text record.
+const handleResult = await client.verifyHandleAttestation({
   name: 'alice.eth',
   platform: 'com.x',
+  attester: 'atst.lighthousegov.eth', // optional, defaults to this
 })
 
-if (result.valid) {
-  console.log('handle:', result.handle)
-  console.log('uid:', result.uid)
-  console.log('attester:', result.attester)
-  console.log('issued:', new Date(result.issuedAt * 1000).toISOString())
-}
+// UID attestation — verifies a private uid you already know (e.g. from OAuth).
+const uidResult = await client.verifyUidAttestation({
+  name: 'alice.eth',
+  platform: 'com.x',
+  uid: '12345',
+  attester: 'atst.lighthousegov.eth',
+})
 ``` */}
 
 ## Attestation format
@@ -128,6 +130,10 @@ These proofs follow the same format as described above, however the payload is s
 | Issued at | `t` | The timestamp from the attestation. |
 
 Using the above details from the user's ENS name, plus the private UID that has been received from an Oauth flow or other method, you can regenerate the signed payload and verify the proof.
+
+## Key rotation
+
+The `attester.eth` segment in every record key is an ENS name, not a raw address. Verifiers resolve it to an address at verify time and check the signature against the current resolution. This gives the attester a simple, on-chain way to rotate signing keys: update the `addr` record on the attester's ENS name, and every signature made by the retired key stops verifying the moment that resolution takes effect. No transaction on the user's ENS name, no revocation list — just an ENS resolver update by the attester operator.
 
 ## Related
 
