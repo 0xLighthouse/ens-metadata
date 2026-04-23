@@ -1,7 +1,12 @@
-import { encodeEnvelope, signClaim } from '@ensmetadata/sdk'
+import {
+  encodeEnvelope,
+  handleAttestationRecordKey,
+  signHandleClaim,
+  signUidClaim,
+  uidAttestationRecordKey,
+} from '@ensmetadata/sdk'
 import { bytesToHex, isAddress } from 'viem'
 import { attesterWallet } from '../attester'
-import { blindUid } from '../blind'
 import { jsonResponse } from '../cors'
 import type { Env } from '../env'
 
@@ -16,9 +21,12 @@ import type { Env } from '../env'
  * Body: { sessionId, name }
  *   - name: ENS name being attested
  *
- * Response: { attestations: [{ claimHex, platform, handle, attester }] }
- * One entry per bound platform. Each claimHex is the signed v1 envelope
- * ready to write directly to the `social-proofs[<platform>]` ENS text record.
+ * Response: { attestations: [{ platform, handle, attester, records }] }
+ * where `records` contains pre-built text-record key/value pairs ready to
+ * write to the resolver:
+ *   - `handleKey`, `handleHex` — `attestations[<platform>][<attester>]`
+ *   - `uidKey`, `uidHex` — `uid[<platform>][<attester>]`
+ *   - `platform`, `handle` — the plain `<platform>` text record
  */
 export async function handleAttest(env: Env, request: Request): Promise<Response> {
   let body: {
@@ -52,8 +60,6 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
       { status: 409 },
     )
   }
-  // When the client used the multi-platform signing flow, verify the ENS name
-  // matches what was in the signed message. Skipped for old-style sessions.
   if (session.siweResources.length > 0 && !session.siweResources.includes(`ens:${name}`)) {
     return jsonResponse(
       env,
@@ -73,26 +79,29 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
 
   try {
     const wallet = await attesterWallet(env)
+    const attester = wallet.account?.address
+    if (!attester) throw new Error('attester wallet has no account')
+    const addr = session.wallet!
 
     const attestations = await Promise.all(
       session.platforms.map(async (binding) => {
-        const blinded = await blindUid(binding.platform, binding.uid, wallet)
-        const envelope = await signClaim(
-          {
-            platform: binding.platform,
-            handle: binding.handle,
-            uid: blinded,
-            name,
-            addr: session.wallet!,
-          },
-          wallet,
-        )
-        const claimHex = bytesToHex(encodeEnvelope(envelope))
+        const [handleEnvelope, uidEnvelope] = await Promise.all([
+          signHandleClaim(
+            { platform: binding.platform, handle: binding.handle, name, addr },
+            wallet,
+          ),
+          signUidClaim({ platform: binding.platform, uid: binding.uid, name, addr }, wallet),
+        ])
         return {
-          claimHex,
           platform: binding.platform,
           handle: binding.handle,
-          attester: envelope.attester,
+          attester,
+          records: {
+            handleKey: handleAttestationRecordKey(binding.platform, attester),
+            handleHex: bytesToHex(encodeEnvelope(handleEnvelope)),
+            uidKey: uidAttestationRecordKey(binding.platform, attester),
+            uidHex: bytesToHex(encodeEnvelope(uidEnvelope)),
+          },
         }
       }),
     )
