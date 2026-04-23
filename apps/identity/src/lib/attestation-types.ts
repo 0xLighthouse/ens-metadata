@@ -10,10 +10,8 @@ export interface AttestationProof {
   draft: DraftTwitterProof | DraftTelegramProof
   attester: string
   records: {
-    handleKey: string
-    handleHex: string
-    uidKey: string
-    uidHex: string
+    handle: { key: string; hex: string }
+    uid: { key: string; hex: string }
   }
 }
 

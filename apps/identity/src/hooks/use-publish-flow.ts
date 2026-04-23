@@ -61,8 +61,8 @@ export function usePublishFlow({ classValue, schemaUri }: Args) {
         // Plain handle record: <platform> = "<handle>"
         recordsToWrite[draft.claim.p] = draft.claim.h
         // Handle attestation and uid attestation, each keyed by attester.
-        recordsToWrite[records.handleKey] = records.handleHex
-        recordsToWrite[records.uidKey] = records.uidHex
+        recordsToWrite[records.handle.key] = records.handle.hex
+        recordsToWrite[records.uid.key] = records.uid.hex
       }
 
       setPhase('writing')

@@ -123,10 +123,8 @@ export interface AttestationEntry {
   attester: string
   /** Pre-built text-record key/value pairs to write on-chain. */
   records: {
-    handleKey: string
-    handleHex: string
-    uidKey: string
-    uidHex: string
+    handle: { key: string; hex: string }
+    uid: { key: string; hex: string }
   }
 }
 

@@ -24,9 +24,11 @@ import type { Env } from '../env'
  * Response: { attestations: [{ platform, handle, attester, records }] }
  * where `records` contains pre-built text-record key/value pairs ready to
  * write to the resolver:
- *   - `handleKey`, `handleHex` — `attestations[<platform>][<attester>]`
- *   - `uidKey`, `uidHex` — `uid[<platform>][<attester>]`
- *   - `platform`, `handle` — the plain `<platform>` text record
+ *   - `records.handle.key / .hex` — `attestations[<platform>][<attester>]`
+ *   - `records.uid.key / .hex`    — `uid[<platform>][<attester>]`
+ *
+ * The plain `<platform> = <handle>` record is written by the client; the
+ * worker only returns the handle string so the client can form it.
  */
 export async function handleAttest(env: Env, request: Request): Promise<Response> {
   let body: {
@@ -97,10 +99,14 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
           handle: binding.handle,
           attester,
           records: {
-            handleKey: handleAttestationRecordKey(binding.platform, attester),
-            handleHex: bytesToHex(encodeEnvelope(handleEnvelope)),
-            uidKey: uidAttestationRecordKey(binding.platform, attester),
-            uidHex: bytesToHex(encodeEnvelope(uidEnvelope)),
+            handle: {
+              key: handleAttestationRecordKey(binding.platform, attester),
+              hex: bytesToHex(encodeEnvelope(handleEnvelope)),
+            },
+            uid: {
+              key: uidAttestationRecordKey(binding.platform, attester),
+              hex: bytesToHex(encodeEnvelope(uidEnvelope)),
+            },
           },
         }
       }),

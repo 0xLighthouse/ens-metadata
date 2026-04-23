@@ -48,7 +48,7 @@ export function PreviewPretty({ keyLabels }: Props) {
       const platform = draft.claim.p
       const handle = draft.claim.h
       rows.push({
-        key: records.handleKey,
+        key: records.handle.key,
         label: PLATFORM_LABELS[platform] ?? platform,
         value: `@${handle}`,
         tone: 'added',

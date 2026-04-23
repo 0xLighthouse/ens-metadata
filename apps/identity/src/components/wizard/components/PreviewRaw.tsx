@@ -41,8 +41,8 @@ export function PreviewRaw({ classValue, schemaUri }: Props) {
 
     for (const { draft, records } of proofs) {
       out.push({ key: draft.claim.p, status: 'added', newValue: draft.claim.h })
-      out.push({ key: records.handleKey, status: 'added', newValue: records.handleHex })
-      out.push({ key: records.uidKey, status: 'added', newValue: records.uidHex })
+      out.push({ key: records.handle.key, status: 'added', newValue: records.handle.hex })
+      out.push({ key: records.uid.key, status: 'added', newValue: records.uid.hex })
     }
 
     return out
