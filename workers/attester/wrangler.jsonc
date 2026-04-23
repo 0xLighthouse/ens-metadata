@@ -11,9 +11,9 @@
   // matches hostname-safe characters. The Vercel preview entries are
   // scoped to the project suffix so only our previews are allowed.
   "vars": {
-    "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app,*-8640p.vercel.app",
+    "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app,stage.identity.ensmetadata.app,*-8640p.vercel.app",
     "SESSION_TTL_SECONDS": "900",
-    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app,https://*-8640p.vercel.app",
+    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app,https://stage.identity.ensmetadata.app,https://*-8640p.vercel.app",
     // Attester ENS name used in v2 record keys. Verifiers resolve this
     // to an address at verify time; rotating the ENS addr record retires
     // the old signing key and invalidates older signatures.
