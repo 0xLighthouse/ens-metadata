@@ -91,11 +91,17 @@ export const AGENT_SCHEMA: Schema = {
       parameterType: 'array',
       description: 'An array of trust models supported by the agent',
     },
-    '^social-proofs(\\[[^\\]]+\\])?$': {
+    '^attestations\\[[^\\]]+\\]\\[[^\\]]+\\]$': {
       type: 'string',
       parameterType: 'map',
       description:
-        'An attestation of ownership for a social media account',
+        'A handle attestation proving the named social account is bound to this ENS name.',
+    },
+    '^uid\\[[^\\]]+\\]\\[[^\\]]+\\]$': {
+      type: 'string',
+      parameterType: 'map',
+      description:
+        'A uid attestation binding the private platform uid to this ENS name. Verifiers must already know the raw uid to verify.',
     },
   },
   required: ['class', 'schema'],

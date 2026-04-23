@@ -64,11 +64,17 @@ export const PERSON_SCHEMA: Schema = {
     },
   },
   patternProperties: {
-    '^social-proofs(\\[[^\\]]+\\])?$': {
+    '^attestations\\[[^\\]]+\\]\\[[^\\]]+\\]$': {
       type: 'string',
       parameterType: 'map',
       description:
-        'An attestation of ownership for a social media account',
+        'A handle attestation proving the named social account is bound to this ENS name.',
+    },
+    '^uid\\[[^\\]]+\\]\\[[^\\]]+\\]$': {
+      type: 'string',
+      parameterType: 'map',
+      description:
+        'A uid attestation binding the private platform uid to this ENS name. Verifiers must already know the raw uid to verify.',
     },
   },
   required: ['class', 'schema'],
