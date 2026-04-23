@@ -30,6 +30,7 @@ export interface WizardState {
   seedEnsName: (ensName: string) => void
   confirmEns: (args: { ensName: string; sessionId: string; nonce: string }) => void
   clearSession: () => void
+  resetForm: () => void
   setAttrValue: (key: string, value: string) => void
   setAttrsValues: (values: Record<string, string>) => void
   commitAttestation: (
@@ -73,6 +74,22 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
             proofs: [],
             recordDiff: EMPTY_DIFF,
             unchangedRecords: [],
+          }),
+
+        // Full reset: clears the ENS name and every form entry in addition to
+        // what clearSession touches. Used when the user changes ENS name or
+        // disconnects the wallet — in both cases the old inputs no longer
+        // belong to the new context.
+        resetForm: () =>
+          set({
+            ensName: '',
+            sessionId: null,
+            nonce: null,
+            attrsValues: {},
+            proofs: [],
+            recordDiff: EMPTY_DIFF,
+            unchangedRecords: [],
+            screen: 'compose',
           }),
 
         setAttrValue: (key, value) =>

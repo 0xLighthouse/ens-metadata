@@ -26,7 +26,7 @@ export function useVerifyEns() {
   const ensName = useWizardStore((s) => s.ensName)
   const confirmed = useWizardStore((s) => s.sessionId !== null && s.nonce !== null)
   const confirmEns = useWizardStore((s) => s.confirmEns)
-  const clearSession = useWizardStore((s) => s.clearSession)
+  const resetForm = useWizardStore((s) => s.resetForm)
 
   const [draftName, setDraftName] = useState(ensName)
   const [phase, setPhase] = useState<EnsPhase>('idle')
@@ -98,7 +98,8 @@ export function useVerifyEns() {
   }
 
   const reset = () => {
-    clearSession()
+    resetForm()
+    setDraftName('')
     setError(null)
   }
 

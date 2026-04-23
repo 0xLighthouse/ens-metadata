@@ -19,6 +19,7 @@ export function AttributesSection() {
     classValue,
     loadError,
     ens,
+    authenticated,
   } = useCompose()
 
   if (requestedAttrs.length === 0) return null
@@ -33,7 +34,7 @@ export function AttributesSection() {
             ? "Your organization's profile"
             : 'Your profile'
       }
-      active={ens.confirmed}
+      active={authenticated && ens.confirmed}
       inactiveHint="Confirm your ENS name above to continue."
       accent="green"
     >

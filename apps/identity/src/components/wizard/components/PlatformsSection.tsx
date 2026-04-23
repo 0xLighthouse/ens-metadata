@@ -7,8 +7,15 @@ import { PlatformRow } from './PlatformRow'
 
 /** Section 03 (or 02 when no attrs requested): social account linking. */
 export function PlatformsSection() {
-  const { visiblePlatforms, requiredPlatforms, requestedAttrs, socials, attestation, ens } =
-    useCompose()
+  const {
+    visiblePlatforms,
+    requiredPlatforms,
+    requestedAttrs,
+    socials,
+    attestation,
+    ens,
+    authenticated,
+  } = useCompose()
 
   if (visiblePlatforms.length === 0) return null
 
@@ -17,7 +24,7 @@ export function PlatformsSection() {
       number={requestedAttrs.length > 0 ? '03' : '02'}
       title="Social accounts"
       description="Link the accounts you want to attest. Required accounts must be linked before you can continue."
-      active={ens.confirmed}
+      active={authenticated && ens.confirmed}
       inactiveHint="Confirm your ENS name above to continue."
       accent="green"
     >
