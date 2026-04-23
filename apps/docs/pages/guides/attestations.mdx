@@ -20,16 +20,7 @@ An attestation is a signed record written to an ENS text record by the name's ow
 2. **The attestation** — a CBOR-encoded envelope with an EIP-191 signature over a reconstructable DAG-CBOR payload (platform, handle *or* private uid, ENS name, owner address, timestamp). The attester signs; the name owner publishes on-chain.
 3. **The text record** — a parameterized key on the ENS name (for example `attestations[com.x][atst.lighthousegov.eth]`), holding the attestation envelope.
 
-Verification is purely local: one `ecrecover` against the envelope signature, compared to the current resolution of the attester's ENS name. No attester call required at verify time.
-
-## Step 1: Create the attestation
-
-1. Open the attestations app and connect the wallet that controls the ENS name you want to attest.
-2. Sign the SIWE message. This proves to the attester that the current session controls this wallet.
-3. Link your social account: X via OAuth, or Telegram via the Login Widget.
-4. The attester signs the attestation and returns the encoded bytes.
-
-## Step 2: Publish the text record
+## What gets written on-chain
 
 The user's social media handle is written to their ENS name as a text record. The attestation is written as a separate text record, parameterized by the platform and the attester's ENS name.
 
@@ -42,13 +33,6 @@ alice.eth
 ```
 
 ## Verifying the attestation
-
-To verify an attestation that has been published to an ENS name, first collect the following details:
-
-1. The full ENS name (`name.eth`) or subname (`alice.name.eth`) under which the attestation was published.
-2. The address of the manager of the ENS name (or if the address is a wrapped name, the address of the owner).
-3. The ENS name of the attester, and the attestation record itself.
-4. Look up which address the attester's ENS name resolves to. This is the signer's address.
 
 ### SDK verification
 
@@ -83,7 +67,16 @@ const uidResult = await client.verifyUidAttestation({
 })
 ```
 
-## Attestation format
+### Manual verification
+
+To verify an attestation that has been published to an ENS name, first collect the following details:
+
+1. The full ENS name (`name.eth`) or subname (`alice.name.eth`) under which the attestation was published.
+2. The address of the manager of the ENS name (or if the address is a wrapped name, the address of the owner).
+3. The ENS name of the attester, and the attestation record itself.
+4. Look up which address the attester's ENS name resolves to. This is the signer's address.
+
+#### Attestation format
 
 Attestations are encoded using CBOR format, identified by tag `1635021684` (`0x61747374`, the ASCII encoding of "`atst`"), using the following structure:
 
@@ -95,7 +88,7 @@ Tag(1635021684) [
 ]
 ```
 
-### Payload
+#### Payload
 
 The payload for the signature is encoded using [DAG-CBOR](https://www.npmjs.com/package/@ipld/dag-cbor). The payload can be recreated using the following key names, and the values from the steps listed above:
 
@@ -109,7 +102,7 @@ The payload for the signature is encoded using [DAG-CBOR](https://www.npmjs.com/
 
 Encode the above fields as canonical DAG-CBOR, then hash the bytes with keccak256 to get the digest the attester signed. Recover the signer from the digest plus the signature and compare to the address the attester's ENS name currently resolves to.
 
-## Private UID attestations
+#### Private UID attestations
 
 A non-public user identifier (like the stable id exposed during an OAuth flow, or a Telegram numeric id) can also be attested and published to the user's ENS name without revealing the UID itself. Consumers who already know the user's UID can verify the attestation; those who don't cannot recover it from the record.
 
@@ -132,10 +125,6 @@ These attestations follow the same format as the handle variant above; the paylo
 | Issued at | `t` | The timestamp from the attestation. |
 
 Using the above details from the user's ENS name, plus the private UID received from an OAuth flow or another out-of-band method, you can regenerate the signed payload and verify the attestation.
-
-## Key rotation
-
-The `attester.eth` segment in every record key is an ENS name, not a raw address. Verifiers resolve it to an address at verify time and check the signature against the current resolution. This gives the attester a simple, on-chain way to rotate signing keys: update the `addr` record on the attester's ENS name, and every signature made by the retired key stops verifying the moment that resolution takes effect. No transaction on the user's ENS name, no revocation list — just an ENS resolver update by the attester operator.
 
 ## Related
 
