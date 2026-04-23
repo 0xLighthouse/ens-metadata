@@ -1,4 +1,4 @@
-import { CLAIM_VERSION, ENVELOPE_TAG } from '@ensmetadata/sdk'
+import { CLAIM_VERSION, DEFAULT_ATTESTER_ENS, ENVELOPE_TAG } from '@ensmetadata/sdk'
 import { attesterWallet } from './attester'
 import { jsonResponse, preflightResponse } from './cors'
 import type { Env } from './env'
@@ -34,10 +34,10 @@ export default {
     const path = url.pathname
 
     if (request.method === 'GET' && path === '/') {
-      let attester: string | undefined
+      let signerAddress: string | undefined
       try {
         const wallet = await attesterWallet(env)
-        attester = wallet.account?.address
+        signerAddress = wallet.account?.address
       } catch (err) {
         console.error('info: failed to resolve attester', err)
       }
@@ -45,7 +45,8 @@ export default {
         service: 'ensmetadata-attester',
         version: CLAIM_VERSION,
         tag: ENVELOPE_TAG,
-        attester: attester ?? null,
+        attester: env.ATTESTER_ENS ?? DEFAULT_ATTESTER_ENS,
+        signerAddress: signerAddress ?? null,
         endpoints: [
           'POST /api/session',
           'POST /api/session/wallet',

@@ -146,6 +146,7 @@ export function useAttestationFlow({
                 ensName,
               }),
               attester: entry.attester,
+              signerAddress: entry.signerAddress,
               records: entry.records,
             }
           }
@@ -157,6 +158,7 @@ export function useAttestationFlow({
                 ensName,
               }),
               attester: entry.attester,
+              signerAddress: entry.signerAddress,
               records: entry.records,
             }
           }

@@ -13,7 +13,11 @@
   "vars": {
     "SIWE_DOMAIN": "localhost:3001,identity.ensmetadata.app,*-8640p.vercel.app",
     "SESSION_TTL_SECONDS": "900",
-    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app,https://*-8640p.vercel.app"
+    "TRUSTED_ORIGIN": "http://localhost:3001,https://identity.ensmetadata.app,https://*-8640p.vercel.app",
+    // Attester ENS name used in v2 record keys. Verifiers resolve this
+    // to an address at verify time; rotating the ENS addr record retires
+    // the old signing key and invalidates older signatures.
+    "ATTESTER_ENS": "atst.lighthousegov.eth"
   },
   // Each session is its own Durable Object instance, addressed by session id.
   // The instance holds the SIWE nonce + bound wallet + bound platform; an

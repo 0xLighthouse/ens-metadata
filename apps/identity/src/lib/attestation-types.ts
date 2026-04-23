@@ -8,7 +8,10 @@ import type { DraftFullProof as DraftTwitterProof } from '@/lib/twitter-proof'
  */
 export interface AttestationProof {
   draft: DraftTwitterProof | DraftTelegramProof
+  /** Attester ENS name — the identity stamped into each record key. */
   attester: string
+  /** Address the attester ENS currently resolves to (informational). */
+  signerAddress: string
   records: {
     handle: { key: string; hex: string }
     uid: { key: string; hex: string }

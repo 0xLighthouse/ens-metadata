@@ -119,8 +119,10 @@ export interface AttestationEntry {
   platform: string
   /** Display handle. */
   handle: string
-  /** Attester address. */
+  /** Attester ENS name — what goes into the record keys. */
   attester: string
+  /** Current resolved signing address (informational; derived from attester ENS). */
+  signerAddress: string
   /** Pre-built text-record key/value pairs to write on-chain. */
   records: {
     handle: { key: string; hex: string }

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ATTESTER_ENS,
   encodeEnvelope,
   handleAttestationRecordKey,
   signHandleClaim,
@@ -21,11 +22,13 @@ import type { Env } from '../env'
  * Body: { sessionId, name }
  *   - name: ENS name being attested
  *
- * Response: { attestations: [{ platform, handle, attester, records }] }
- * where `records` contains pre-built text-record key/value pairs ready to
+ * Response: { attestations: [{ platform, handle, attester, signerAddress, records }] }
+ * where `attester` is the ENS name used in the record keys,
+ * `signerAddress` is the current resolved signing key (informational),
+ * and `records` holds pre-built text-record key/value pairs ready to
  * write to the resolver:
- *   - `records.handle.key / .hex` — `attestations[<platform>][<attester>]`
- *   - `records.uid.key / .hex`    — `uid[<platform>][<attester>]`
+ *   - `records.handle.key / .hex` — `attestations[<platform>][<attester.eth>]`
+ *   - `records.uid.key / .hex`    — `uid[<platform>][<attester.eth>]`
  *
  * The plain `<platform> = <handle>` record is written by the client; the
  * worker only returns the handle string so the client can form it.
@@ -81,8 +84,9 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
 
   try {
     const wallet = await attesterWallet(env)
-    const attester = wallet.account?.address
-    if (!attester) throw new Error('attester wallet has no account')
+    const signerAddress = wallet.account?.address
+    if (!signerAddress) throw new Error('attester wallet has no account')
+    const attesterEns = env.ATTESTER_ENS ?? DEFAULT_ATTESTER_ENS
     const addr = session.wallet!
 
     const attestations = await Promise.all(
@@ -97,14 +101,15 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
         return {
           platform: binding.platform,
           handle: binding.handle,
-          attester,
+          attester: attesterEns,
+          signerAddress,
           records: {
             handle: {
-              key: handleAttestationRecordKey(binding.platform, attester),
+              key: handleAttestationRecordKey(binding.platform, attesterEns),
               hex: bytesToHex(encodeEnvelope(handleEnvelope)),
             },
             uid: {
-              key: uidAttestationRecordKey(binding.platform, attester),
+              key: uidAttestationRecordKey(binding.platform, attesterEns),
               hex: bytesToHex(encodeEnvelope(uidEnvelope)),
             },
           },

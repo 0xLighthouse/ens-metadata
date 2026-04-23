@@ -26,6 +26,11 @@ export interface Env {
   SESSION_TTL_SECONDS: string
   TRUSTED_ORIGIN: string
 
+  // Attester ENS name used as the identity in v2 record keys
+  // (attestations[<p>][<ATTESTER_ENS>] and uid[<p>][<ATTESTER_ENS>]).
+  // Falls back to the SDK's DEFAULT_ATTESTER_ENS when unset.
+  ATTESTER_ENS?: string
+
   // Mainnet RPC URL for ENS reverse/avatar resolution during intent creation.
   // Secret — set via `wrangler secret put ENS_RPC_URL` or .dev.vars.
   ENS_RPC_URL?: string
