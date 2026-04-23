@@ -29,7 +29,7 @@ export interface WizardState {
   // Actions
   seedEnsName: (ensName: string) => void
   confirmEns: (args: { ensName: string; sessionId: string; nonce: string }) => void
-  clearSession: () => void
+  resetForm: () => void
   setAttrValue: (key: string, value: string) => void
   setAttrsValues: (values: Record<string, string>) => void
   commitAttestation: (
@@ -63,16 +63,21 @@ export function createWizardStore(intentId: string): StoreApi<WizardState> {
 
         confirmEns: ({ ensName, sessionId, nonce }) => set({ ensName, sessionId, nonce }),
 
-        // Wipe every bit of state that was anchored to the old session. Proofs
-        // bind to a specific SIWE resource set, so carrying them forward would
-        // silently attest the wrong thing.
-        clearSession: () =>
+        // Wipe every bit of state anchored to the old signer — the ENS name,
+        // session, form entries, and any proofs. Used when the user changes
+        // ENS name or disconnects the wallet; the old inputs no longer belong
+        // to the new context, and proofs bind to a specific SIWE resource
+        // set so carrying them forward would silently attest the wrong thing.
+        resetForm: () =>
           set({
+            ensName: '',
             sessionId: null,
             nonce: null,
+            attrsValues: {},
             proofs: [],
             recordDiff: EMPTY_DIFF,
             unchangedRecords: [],
+            screen: 'compose',
           }),
 
         setAttrValue: (key, value) =>

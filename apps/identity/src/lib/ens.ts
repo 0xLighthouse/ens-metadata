@@ -4,10 +4,21 @@
 // directly — no dedicated setProof helper in the SDK.
 
 import { getOwner } from '@ensdomains/ensjs/public'
-import { getNamesForAddress } from '@ensdomains/ensjs/subgraph'
+import { GraphQLClient, gql } from 'graphql-request'
 import type { Address } from 'viem'
 // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
 type EnsPublicClient = any
+
+const ENSNODE_URL = process.env.NEXT_PUBLIC_ENSNODE_URL ?? 'https://api.alpha.ensnode.io/subgraph'
+const ensNodeClient = new GraphQLClient(ENSNODE_URL)
+
+const QUERY_NAMES_FOR_ADDRESS = gql`
+  query NamesForAddress($address: String!) {
+    domains(where: { or: [{ owner: $address }, { wrappedOwnerId: $address }] }) {
+      name
+    }
+  }
+`
 
 export async function resolveOwner(client: EnsPublicClient, name: string) {
   const result = await getOwner(client, { name })
@@ -16,15 +27,19 @@ export async function resolveOwner(client: EnsPublicClient, name: string) {
 
 /**
  * Returns every ENS name (including subnames) the address owns or wraps,
- * sorted alphabetically. Silently returns an empty list if the subgraph is
+ * sorted alphabetically. Silently returns an empty list if ensnode is
  * unreachable — callers should treat that as "no autocomplete available"
- * rather than an error state.
+ * rather than an error state. Capped at 100 results (subgraph default).
  */
-export async function getOwnedNames(client: EnsPublicClient, address: Address): Promise<string[]> {
+export async function getOwnedNames(_client: EnsPublicClient, address: Address): Promise<string[]> {
   try {
-    const result = await getNamesForAddress(client, { address, pageSize: 1000 })
-    const names = result
-      .map((r: { name?: string | null }) => r.name)
+    const resp = await ensNodeClient.request<{ domains: { name: string | null }[] }>(
+      QUERY_NAMES_FOR_ADDRESS,
+      // Subgraph stores addresses as lowercase hex strings.
+      { address: address.toLowerCase() },
+    )
+    const names = resp.domains
+      .map((d) => d.name)
       .filter((n): n is string => typeof n === 'string' && n.length > 0)
     return Array.from(new Set(names)).sort()
   } catch {

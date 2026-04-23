@@ -15,7 +15,6 @@ export interface PrivyTelegramAccount {
   username: string | null
   firstName: string | null
   lastName: string | null
-  photoUrl: string | null
 }
 
 /** Draft proof document for a Telegram attestation. */

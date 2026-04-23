@@ -35,7 +35,7 @@ export default async function IntentWizardPage({ params }: Props) {
     <main className="min-h-screen px-4 py-12 md:py-20">
       <header className="mx-auto mb-10 max-w-3xl text-center">
         <h1 className="text-h1 mb-3">Complete your profile</h1>
-        {!schemaError && (
+        {!schemaError && !config.message && (
           <p className="text-body inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-neutral-500 dark:text-neutral-400">
             {intent.creator.avatar ? (
               <img
