@@ -11,11 +11,11 @@ export {
   verifyClaim,
   CLAIM_VERSION,
   ENVELOPE_TAG,
-} from './proof'
+} from './attestation'
 export {
-  proofVerifier,
-  verifyProof,
-  type ProofVerifierConfig,
+  attestationVerifier,
+  verifyAttestation,
+  type AttestationVerifierConfig,
 } from './verify'
 
 export type {
@@ -39,6 +39,6 @@ export type {
   VerifyClaimOptions,
   VerifyClaimResult,
   VerifyFailureReason,
-  VerifyProofOptions,
+  VerifyAttestationOptions,
   VerifyResult,
-} from './proof-types'
+} from './attestation-types'

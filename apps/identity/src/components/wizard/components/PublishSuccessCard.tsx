@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** Terminal success state after a confirmed publish. Shows the tx hash and
- *  links out to Etherscan + the public proof page. */
+ *  links out to Etherscan. */
 export function PublishSuccessCard({ txHash }: Props) {
   const ensName = useWizardStore((s) => s.ensName)
   const explorerUrl = txHash ? `${mainnet.blockExplorers.default.url}/tx/${txHash}` : null
@@ -33,8 +33,8 @@ export function PublishSuccessCard({ txHash }: Props) {
                 {txHash && <div className="font-mono text-xs break-all">{txHash}</div>}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {explorerUrl && (
+            {explorerUrl && (
+              <div className="flex flex-wrap gap-2">
                 <a
                   href={explorerUrl}
                   target="_blank"
@@ -44,14 +44,8 @@ export function PublishSuccessCard({ txHash }: Props) {
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                   Etherscan
                 </a>
-              )}
-              <a
-                href={`/proofs/${ensName}`}
-                className="inline-flex items-center rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-neutral-50 dark:text-neutral-900"
-              >
-                View proof
-              </a>
-            </div>
+              </div>
+            )}
           </div>
         </GuidedSection>
       </GuidedCard>

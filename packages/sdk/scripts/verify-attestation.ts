@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Dev script — look up and verify a social proof on an ENS name via the SDK.
+ * Dev script — look up and verify a social attestation on an ENS name via the SDK.
  *
  * Usage:
- *   pnpm --filter @ensmetadata/sdk verify-proof <ens-name> [platform]
+ *   pnpm --filter @ensmetadata/sdk verify-attestation <ens-name> [platform]
  *
  * Examples:
- *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth
- *   pnpm --filter @ensmetadata/sdk verify-proof lighthousegov.eth com.x
+ *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth
+ *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth com.x
  *
  * Env:
  *   RPC_URL            — optional mainnet RPC endpoint (falls back to a public one)
@@ -17,7 +17,7 @@
 import { addEnsContracts } from '@ensdomains/ensjs'
 import { http, type Address, type PublicClient, createPublicClient, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
-import { verifyProof } from '../src/verify.js'
+import { verifyAttestation } from '../src/verify.js'
 
 const DEV_ATTESTER = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf' as Address
 const PROD_ATTESTER = '0xf82A259381f5632A0b12E6720C8C216B7c659783' as Address
@@ -58,11 +58,11 @@ function kv(key: string, value: string | number | undefined): void {
 }
 
 function usage(): never {
-  console.error(`Usage: verify-proof <ens-name> [platform]
+  console.error(`Usage: verify-attestation <ens-name> [platform]
 
 Examples:
-  verify-proof lighthousegov.eth
-  verify-proof lighthousegov.eth com.x`)
+  verify-attestation lighthousegov.eth
+  verify-attestation lighthousegov.eth com.x`)
   process.exit(1)
 }
 
@@ -101,9 +101,9 @@ async function main(): Promise<void> {
     console.log(`  ${c('gray', 'Trusted att ')} ${trustedAttesters.join(', ')}`)
   }
 
-  header('Calling SDK verifyProof')
+  header('Calling SDK verifyAttestation')
   console.log(
-    c('dim', `  verifyProof(client, config, { name: '${name}', platform: '${platform}' })`),
+    c('dim', `  verifyAttestation(client, config, { name: '${name}', platform: '${platform}' })`),
   )
   console.log(c('dim', `  -> reads ENS text record "social-proofs[${platform}]"`))
   console.log(c('dim', '  -> hex-decodes + dag-cbor decodes the v1 envelope'))
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
   console.log(c('dim', '  -> verifies inner.addr === current ENS owner'))
 
   const start = Date.now()
-  const result = await verifyProof(client, { trustedAttesters }, { name, platform })
+  const result = await verifyAttestation(client, { trustedAttesters }, { name, platform })
   const elapsed = Date.now() - start
 
   header(`Result  ${c('gray', `(${elapsed}ms)`)}`)

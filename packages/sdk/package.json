@@ -16,7 +16,7 @@
     "build": "tsup",
     "test": "vitest run",
     "lint": "biome check .",
-    "verify-proof": "tsx scripts/verify-proof.ts",
+    "verify-attestation": "tsx scripts/verify-attestation.ts",
     "prepublishOnly": "pnpm build && pnpm test && pnpm lint"
   },
   "dependencies": {

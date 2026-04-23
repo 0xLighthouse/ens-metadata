@@ -12,8 +12,8 @@ import {
   encodePayload,
   signClaim,
   verifyClaim,
-} from '../proof'
-import type { Envelope, PayloadFields } from '../proof-types'
+} from '../attestation'
+import type { Envelope, PayloadFields } from '../attestation-types'
 
 // Fixed test keys — not secret, never used outside tests.
 const ATTESTER_PRIVATE_KEY =

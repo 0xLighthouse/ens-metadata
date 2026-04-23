@@ -21,7 +21,7 @@ Don't use this skill for general ENS name resolution (use `viem`'s `getEnsAddres
 
 ```ts
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { verifyProof } from '@ensmetadata/sdk'
+import { verifyAttestation } from '@ensmetadata/sdk'
 import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 
@@ -44,7 +44,7 @@ Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, plus a mainnet RP
 The on-chain `claim.uid` is a **signature** — `personalSign(keccak256("platform:rawUid"), attesterKey)`. To verify the binding, compute the same hash from the uid you know and `ecrecover` the signature. If the recovered address matches the attester address (`claim.att`), the binding is confirmed. No brute-force path — you can't produce a valid signature without the attester key.
 
 ```ts
-import { verifyProof } from '@ensmetadata/sdk'
+import { verifyAttestation } from '@ensmetadata/sdk'
 import { keccak256, recoverMessageAddress, toBytes } from 'viem'
 
 async function verifyUidBinding(
@@ -61,7 +61,7 @@ async function verifyUidBinding(
 }
 
 export async function checkTelegram(ensName: string, expectedTgUid: string) {
-  const result = await verifyProof(
+  const result = await verifyAttestation(
     client,
     { trustedAttesters },
     { name: ensName, platform: 'org.telegram' },
@@ -151,7 +151,7 @@ https://proofs.example.com/?name=alice.eth&class=Person&schema=ipfs://QmSHkLh…
 https://proofs.example.com/?name=alice.eth&platforms=org.telegram&class=Person&schema=ipfs://QmSHkLh…&attrs=alias,avatar
 ```
 
-After sending the link, **poll** `verifyProof` (or `getEnsText` for non-proof attributes) until the records land. The wizard takes minutes — pin to IPFS, attester signs, ENS write — so polling at ~30s intervals is reasonable. There's no callback or webhook from the wizard back to you; the agent owns its own state machine.
+After sending the link, **poll** `verifyAttestation` (or `getEnsText` for non-proof attributes) until the records land. The wizard takes minutes — pin to IPFS, attester signs, ENS write — so polling at ~30s intervals is reasonable. There's no callback or webhook from the wizard back to you; the agent owns its own state machine.
 
 ## Failure modes and what they mean
 

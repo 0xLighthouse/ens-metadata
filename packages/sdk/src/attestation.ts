@@ -17,7 +17,7 @@ import type {
   SignClaimWalletClient,
   VerifyClaimOptions,
   VerifyClaimResult,
-} from './proof-types'
+} from './attestation-types'
 
 /** Current claim schema version. */
 export const CLAIM_VERSION = 1

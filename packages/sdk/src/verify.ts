@@ -3,15 +3,15 @@ import type { Address, Hex, PublicClient } from 'viem'
 import { hexToBytes, isAddress } from 'viem'
 import { getEnsText } from 'viem/actions'
 import { normalize } from 'viem/ens'
-import { decodeEnvelope, decodePayload, verifyClaim } from './proof'
-import type { VerifyProofOptions, VerifyResult } from './proof-types'
+import { decodeEnvelope, decodePayload, verifyClaim } from './attestation'
+import type { VerifyAttestationOptions, VerifyResult } from './attestation-types'
 
 /**
- * Configuration for the proof verifier extension. The trusted-attester list
- * is required at extension construction time; per-call overrides can be
+ * Configuration for the attestation verifier extension. The trusted-attester
+ * list is required at extension construction time; per-call overrides can be
  * added later if needed.
  */
-export interface ProofVerifierConfig {
+export interface AttestationVerifierConfig {
   trustedAttesters: readonly Address[]
   /** Max age in seconds. If `now - issuedAt > maxAge`, the claim is stale. */
   maxAge?: number
@@ -24,10 +24,10 @@ const TEXT_KEY_PREFIX = 'social-proofs'
  * envelope, and verify its attester signature + ownership against the
  * current ENS owner.
  */
-async function verifyProofImpl(
+async function verifyAttestationImpl(
   client: PublicClient,
-  config: ProofVerifierConfig,
-  opts: VerifyProofOptions,
+  config: AttestationVerifierConfig,
+  opts: VerifyAttestationOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
   const textKey = `${TEXT_KEY_PREFIX}[${opts.platform}]`
@@ -89,16 +89,17 @@ async function verifyProofImpl(
   }
 }
 
-export function proofVerifier(config: ProofVerifierConfig) {
+export function attestationVerifier(config: AttestationVerifierConfig) {
   return (client: PublicClient) => ({
-    verifyProof: (opts: VerifyProofOptions) => verifyProofImpl(client, config, opts),
+    verifyAttestation: (opts: VerifyAttestationOptions) =>
+      verifyAttestationImpl(client, config, opts),
   })
 }
 
-export function verifyProof(
+export function verifyAttestation(
   client: PublicClient,
-  config: ProofVerifierConfig,
-  opts: VerifyProofOptions,
+  config: AttestationVerifierConfig,
+  opts: VerifyAttestationOptions,
 ): Promise<VerifyResult> {
-  return verifyProofImpl(client, config, opts)
+  return verifyAttestationImpl(client, config, opts)
 }

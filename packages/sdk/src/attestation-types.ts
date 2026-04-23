@@ -78,7 +78,7 @@ export interface VerifyClaimOptions {
   maxAge?: number
 }
 
-export interface VerifyProofOptions {
+export interface VerifyAttestationOptions {
   name: string
   platform: string
 }
