@@ -10,7 +10,7 @@ export type StorageTier = 'cdn' | 'ipfs'
 export interface UploadProofArgs {
   bytes: Uint8Array
   ensName: string
-  /** Record key under the ens-scoped blob namespace, e.g. 'social-proofs[com.x]'. */
+  /** Record key under the ens-scoped blob namespace, e.g. 'attestations[com.x][0x…]'. */
   key: string
   tier: StorageTier
   walletClient: WalletClient

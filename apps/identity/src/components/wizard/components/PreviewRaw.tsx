@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** Raw text-record view: every key that will be written on-chain, verbatim,
- *  including structural class/schema and the full claimHex for each proof. */
+ *  including structural class/schema and the full envelope hex for each proof. */
 export function PreviewRaw({ classValue, schemaUri }: Props) {
   const recordDiff = useWizardStore((s) => s.recordDiff)
   const proofs = useWizardStore((s) => s.proofs)
@@ -39,8 +39,10 @@ export function PreviewRaw({ classValue, schemaUri }: Props) {
       out.push({ key: r.key, status: 'removed', prevValue: r.prev })
     }
 
-    for (const { draft, claimHex } of proofs) {
-      out.push({ key: `social-proofs[${draft.claim.p}]`, status: 'added', newValue: claimHex })
+    for (const { draft, records } of proofs) {
+      out.push({ key: draft.claim.p, status: 'added', newValue: draft.claim.h })
+      out.push({ key: records.handleKey, status: 'added', newValue: records.handleHex })
+      out.push({ key: records.uidKey, status: 'added', newValue: records.uidHex })
     }
 
     return out

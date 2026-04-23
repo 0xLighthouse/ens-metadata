@@ -44,11 +44,11 @@ export function PreviewPretty({ keyLabels }: Props) {
       seen.add(r.key)
     }
 
-    for (const { draft } of proofs) {
+    for (const { draft, records } of proofs) {
       const platform = draft.claim.p
       const handle = draft.claim.h
       rows.push({
-        key: `social-proofs[${platform}]`,
+        key: records.handleKey,
         label: PLATFORM_LABELS[platform] ?? platform,
         value: `@${handle}`,
         tone: 'added',

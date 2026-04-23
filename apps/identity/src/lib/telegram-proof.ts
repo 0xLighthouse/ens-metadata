@@ -23,10 +23,11 @@ export interface DraftFullProof {
   claim: {
     p: string
     h: string
-    uid: string
     name: string
     addr: Address
   }
+  /** Raw platform uid — goes into the uid attestation, not the handle payload. */
+  uid: string
 }
 
 /**
@@ -52,9 +53,9 @@ export function buildTelegramProofFromPrivy(args: {
     claim: {
       p: TELEGRAM_PLATFORM,
       h: telegram.username,
-      uid: telegram.telegramUserId,
       name: ensName,
       addr: issuerAddress,
     },
+    uid: telegram.telegramUserId,
   }
 }

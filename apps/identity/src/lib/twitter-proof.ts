@@ -21,17 +21,18 @@ export interface PrivyTwitterAccount {
 }
 
 /**
- * Draft proof document. Fields match the v1 signed payload shape (minus
- * `iat` which is computed by the attester at signing time).
+ * Draft proof document. Mirrors the v2 signed-handle payload shape
+ * minus `t` (computed by the attester at signing time).
  */
 export interface DraftFullProof {
   claim: {
     p: string
     h: string
-    uid: string
     name: string
     addr: Address
   }
+  /** Raw platform uid — goes into the uid attestation, not the handle payload. */
+  uid: string
 }
 
 /**
@@ -56,9 +57,9 @@ export function buildTwitterProofFromPrivy(args: {
     claim: {
       p: TWITTER_PLATFORM,
       h: twitter.username,
-      uid: twitter.subject,
       name: ensName,
       addr: issuerAddress,
     },
+    uid: twitter.subject,
   }
 }

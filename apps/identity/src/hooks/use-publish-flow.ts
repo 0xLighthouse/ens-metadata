@@ -57,8 +57,12 @@ export function usePublishFlow({ classValue, schemaUri }: Args) {
       const recordsToWrite = diffToWriteMap(recordDiff)
       if (classValue) recordsToWrite.class = classValue
       if (schemaUri) recordsToWrite.schema = schemaUri
-      for (const { draft, claimHex } of proofs) {
-        recordsToWrite[`social-proofs[${draft.claim.p}]`] = claimHex
+      for (const { draft, records } of proofs) {
+        // Plain handle record: <platform> = "<handle>"
+        recordsToWrite[draft.claim.p] = draft.claim.h
+        // Handle attestation and uid attestation, each keyed by attester.
+        recordsToWrite[records.handleKey] = records.handleHex
+        recordsToWrite[records.uidKey] = records.uidHex
       }
 
       setPhase('writing')

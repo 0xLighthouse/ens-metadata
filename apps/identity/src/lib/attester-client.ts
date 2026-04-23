@@ -115,14 +115,19 @@ export interface AttestArgs {
 }
 
 export interface AttestationEntry {
-  /** 0x-prefixed hex of the fully-encoded v1 envelope — write directly to ENS. */
-  claimHex: string
   /** Platform namespace (e.g. "com.x", "org.telegram"). */
   platform: string
   /** Display handle. */
   handle: string
   /** Attester address. */
   attester: string
+  /** Pre-built text-record key/value pairs to write on-chain. */
+  records: {
+    handleKey: string
+    handleHex: string
+    uidKey: string
+    uidHex: string
+  }
 }
 
 export interface AttestResult {

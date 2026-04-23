@@ -145,7 +145,8 @@ export function useAttestationFlow({
                 issuerAddress: issuer as `0x${string}`,
                 ensName,
               }),
-              claimHex: entry.claimHex,
+              attester: entry.attester,
+              records: entry.records,
             }
           }
           if (entry.platform === TELEGRAM_PLATFORM && telegram) {
@@ -155,7 +156,8 @@ export function useAttestationFlow({
                 issuerAddress: issuer as `0x${string}`,
                 ensName,
               }),
-              claimHex: entry.claimHex,
+              attester: entry.attester,
+              records: entry.records,
             }
           }
           throw new Error(`Unexpected attestation platform: ${entry.platform}`)
