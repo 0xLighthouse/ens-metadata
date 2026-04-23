@@ -16,6 +16,7 @@ import {
   verifyUidClaim,
 } from '../attestation'
 import type { Envelope, HandlePayloadFields, UidPayloadFields } from '../attestation-types'
+import { handleAttestationRecordKey, uidAttestationRecordKey } from '../verify'
 
 // Fixed test keys — not secret, never used outside tests.
 const ATTESTER_PRIVATE_KEY =
@@ -382,5 +383,31 @@ describe('signUidClaim / verifyUidClaim', () => {
     const result = await verifyUidClaim(envelope, { ...base, owner: STRANGER_ADDR })
     expect(result.valid).toBe(false)
     expect(result.reason).toBe('bad-signature')
+  })
+})
+
+// ------------------------------------------------------------------
+// Record-key helpers
+// ------------------------------------------------------------------
+
+describe('handleAttestationRecordKey / uidAttestationRecordKey — ENS normalization', () => {
+  it('produces the expected shape for a plain ENS name', () => {
+    expect(handleAttestationRecordKey('com.x', 'atst.lighthousegov.eth')).toBe(
+      'attestations[com.x][atst.lighthousegov.eth]',
+    )
+    expect(uidAttestationRecordKey('com.x', 'atst.lighthousegov.eth')).toBe(
+      'uid[com.x][atst.lighthousegov.eth]',
+    )
+  })
+
+  it('normalizes mixed-case input to the canonical form', () => {
+    const upper = handleAttestationRecordKey('com.x', 'ATST.LighthouseGov.eth')
+    const lower = handleAttestationRecordKey('com.x', 'atst.lighthousegov.eth')
+    expect(upper).toBe(lower)
+  })
+
+  it('rejects obviously invalid ENS names via normalize()', () => {
+    // normalize() throws on names with disallowed characters.
+    expect(() => handleAttestationRecordKey('com.x', 'bad name.eth')).toThrow()
   })
 })

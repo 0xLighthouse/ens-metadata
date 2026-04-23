@@ -20,6 +20,7 @@ export {
   verifyUidAttestation,
   handleAttestationRecordKey,
   uidAttestationRecordKey,
+  DEFAULT_ATTESTER_ENS,
   type AttestationVerifierConfig,
 } from './verify'
 

@@ -9,9 +9,10 @@ import type { Address, Hex, WalletClient } from 'viem'
  * platform, handle or uid, timestamp) and check the signature against it.
  *
  * The attester identity is not part of the envelope either. It is expected
- * to be carried in the record key (`attestations[<p>][<0xattester>]` or
- * `uid[<p>][<0xattester>]`), so the verifier supplies the expected attester
- * alongside the envelope.
+ * to be carried in the record key as an ENS name
+ * (`attestations[<p>][<attester.eth>]` or `uid[<p>][<attester.eth>]`), which
+ * lets the attester rotate its signing key by updating the ENS name's
+ * resolution — older signatures made with the retired key stop verifying.
  */
 export interface Envelope {
   /** Envelope version (2). */
@@ -88,6 +89,10 @@ export interface SignClaimWalletClient {
  * produces a different recovered address, and we can't tell which field was
  * wrong. Callers can inspect `recovered` to distinguish "wrong signer" from
  * "wrong reconstruction".
+ *
+ * `attester-not-resolved` is separate because it's actionable: the attester
+ * ENS name has no current addr record, so no signing key is claimable and
+ * nothing under that name can be verified until the ENS is fixed.
  */
 export type VerifyFailureReason =
   | 'missing'
@@ -95,6 +100,7 @@ export type VerifyFailureReason =
   | 'bad-signature'
   | 'unsupported-version'
   | 'decode-error'
+  | 'attester-not-resolved'
 
 export interface VerifyClaimResult {
   valid: boolean
@@ -134,15 +140,20 @@ export interface VerifyUidClaimOptions extends BaseVerifyClaimOptions {
 export interface VerifyHandleAttestationOptions {
   name: string
   platform: string
-  /** Address of the attester whose record is being read + verified. */
-  attester: Address
+  /**
+   * ENS name of the attester whose record is being read + verified.
+   * Defaults to `DEFAULT_ATTESTER_ENS`. The SDK resolves this to an
+   * address at verify time — key rotation = resolution change = old
+   * signatures stop verifying.
+   */
+  attester?: string
 }
 
 export interface VerifyUidAttestationOptions {
   name: string
   platform: string
-  /** Address of the attester whose record is being read + verified. */
-  attester: Address
+  /** ENS name of the attester whose record is being read + verified. */
+  attester?: string
   /** Raw uid the caller already knows (from OAuth/platform metadata). */
   uid: string
 }
@@ -155,5 +166,8 @@ export interface VerifyResult {
   /** Present on successful uid verification. */
   uid?: string
   issuedAt?: number
-  attester?: Address
+  /** The attester ENS name the proof was read under. */
+  attester?: string
+  /** The address the attester ENS name resolved to at verify time. */
+  attesterAddress?: Address
 }

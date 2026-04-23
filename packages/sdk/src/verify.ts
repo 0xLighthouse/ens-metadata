@@ -1,7 +1,7 @@
 import { getOwner } from '@ensdomains/ensjs/public'
 import type { Address, Hex, PublicClient } from 'viem'
 import { hexToBytes, isAddress } from 'viem'
-import { getEnsText } from 'viem/actions'
+import { getEnsAddress, getEnsText } from 'viem/actions'
 import { normalize } from 'viem/ens'
 import { decodeEnvelope, verifyHandleClaim, verifyUidClaim } from './attestation'
 import type {
@@ -10,6 +10,14 @@ import type {
   VerifyResult,
   VerifyUidAttestationOptions,
 } from './attestation-types'
+
+/**
+ * Default attester ENS name. Callers who haven't set their own trusted
+ * attester get this one. The address it resolves to is the signing key
+ * expected during verification; rotating this name's addr record retires
+ * the old signing key and invalidates every signature under it.
+ */
+export const DEFAULT_ATTESTER_ENS = 'atst.lighthousegov.eth'
 
 /**
  * Configuration for the attestation verifier extension.
@@ -21,19 +29,19 @@ export interface AttestationVerifierConfig {
 
 /**
  * Build the parameterized text-record key for a handle attestation:
- * `attestations[<platform>][<0xattester>]`. The attester address is
- * lowercased for record-key canonicalization.
+ * `attestations[<platform>][<attester-ens>]`. The attester name is
+ * normalized via ENSIP-15 so writer and reader produce the same key.
  */
-export function handleAttestationRecordKey(platform: string, attester: Address): string {
-  return `attestations[${platform}][${attester.toLowerCase()}]`
+export function handleAttestationRecordKey(platform: string, attesterEns: string): string {
+  return `attestations[${platform}][${normalize(attesterEns)}]`
 }
 
 /**
  * Build the parameterized text-record key for a uid attestation:
- * `uid[<platform>][<0xattester>]`.
+ * `uid[<platform>][<attester-ens>]`.
  */
-export function uidAttestationRecordKey(platform: string, attester: Address): string {
-  return `uid[${platform}][${attester.toLowerCase()}]`
+export function uidAttestationRecordKey(platform: string, attesterEns: string): string {
+  return `uid[${platform}][${normalize(attesterEns)}]`
 }
 
 async function readOwner(client: PublicClient, name: string): Promise<Address | null> {
@@ -56,10 +64,18 @@ async function readEnvelopeHex(
   return raw as Hex
 }
 
+async function resolveAttester(
+  client: PublicClient,
+  attesterEns: string,
+): Promise<Address | null> {
+  const resolved = await getEnsAddress(client, { name: normalize(attesterEns) }).catch(() => null)
+  return resolved && isAddress(resolved) ? (resolved as Address) : null
+}
+
 /**
- * Read `attestations[<platform>][<attester>]` on the ENS name, decode the
- * v2 envelope, and verify the signature against the attester + current
- * owner + the handle text record (`<platform>`).
+ * Read `attestations[<platform>][<attester-ens>]` on the ENS name, decode
+ * the v2 envelope, and verify the signature against the attester ENS's
+ * current address + current owner + the handle text record (`<platform>`).
  */
 async function verifyHandleAttestationImpl(
   client: PublicClient,
@@ -67,28 +83,33 @@ async function verifyHandleAttestationImpl(
   opts: VerifyHandleAttestationOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
+  const attesterEns = opts.attester ?? DEFAULT_ATTESTER_ENS
 
-  const [envHex, owner, handle] = await Promise.all([
-    readEnvelopeHex(client, name, handleAttestationRecordKey(opts.platform, opts.attester)),
+  const [envHex, owner, handle, attesterAddress] = await Promise.all([
+    readEnvelopeHex(client, name, handleAttestationRecordKey(opts.platform, attesterEns)),
     readOwner(client, name),
     getEnsText(client, { name, key: opts.platform }).catch(() => null),
+    resolveAttester(client, attesterEns),
   ])
 
-  if (!envHex) return { valid: false, reason: 'missing' }
-  if (!owner) return { valid: false, reason: 'bad-signature' }
+  if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }
+  if (!attesterAddress) {
+    return { valid: false, reason: 'attester-not-resolved', attester: attesterEns }
+  }
+  if (!owner) return { valid: false, reason: 'bad-signature', attester: attesterEns, attesterAddress }
   if (!handle || typeof handle !== 'string' || handle.length === 0) {
-    return { valid: false, reason: 'missing' }
+    return { valid: false, reason: 'missing', attester: attesterEns, attesterAddress }
   }
 
   let envelope: Envelope
   try {
     envelope = decodeEnvelope(hexToBytes(envHex))
   } catch {
-    return { valid: false, reason: 'decode-error' }
+    return { valid: false, reason: 'decode-error', attester: attesterEns, attesterAddress }
   }
 
   const result = await verifyHandleClaim(envelope, {
-    trustedAttester: opts.attester,
+    trustedAttester: attesterAddress,
     owner,
     name,
     platform: opts.platform,
@@ -102,7 +123,8 @@ async function verifyHandleAttestationImpl(
       reason: result.reason,
       handle,
       issuedAt: envelope.issuedAt,
-      attester: opts.attester,
+      attester: attesterEns,
+      attesterAddress,
     }
   }
 
@@ -110,14 +132,15 @@ async function verifyHandleAttestationImpl(
     valid: true,
     handle,
     issuedAt: envelope.issuedAt,
-    attester: opts.attester,
+    attester: attesterEns,
+    attesterAddress,
   }
 }
 
 /**
- * Read `uid[<platform>][<attester>]` on the ENS name, decode the v2
- * envelope, and verify the signature against the attester + current
- * owner + the caller-supplied raw uid.
+ * Read `uid[<platform>][<attester-ens>]` on the ENS name, decode the v2
+ * envelope, and verify the signature against the attester ENS's current
+ * address + current owner + the caller-supplied raw uid.
  */
 async function verifyUidAttestationImpl(
   client: PublicClient,
@@ -125,24 +148,29 @@ async function verifyUidAttestationImpl(
   opts: VerifyUidAttestationOptions,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
+  const attesterEns = opts.attester ?? DEFAULT_ATTESTER_ENS
 
-  const [envHex, owner] = await Promise.all([
-    readEnvelopeHex(client, name, uidAttestationRecordKey(opts.platform, opts.attester)),
+  const [envHex, owner, attesterAddress] = await Promise.all([
+    readEnvelopeHex(client, name, uidAttestationRecordKey(opts.platform, attesterEns)),
     readOwner(client, name),
+    resolveAttester(client, attesterEns),
   ])
 
-  if (!envHex) return { valid: false, reason: 'missing' }
-  if (!owner) return { valid: false, reason: 'bad-signature' }
+  if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }
+  if (!attesterAddress) {
+    return { valid: false, reason: 'attester-not-resolved', attester: attesterEns }
+  }
+  if (!owner) return { valid: false, reason: 'bad-signature', attester: attesterEns, attesterAddress }
 
   let envelope: Envelope
   try {
     envelope = decodeEnvelope(hexToBytes(envHex))
   } catch {
-    return { valid: false, reason: 'decode-error' }
+    return { valid: false, reason: 'decode-error', attester: attesterEns, attesterAddress }
   }
 
   const result = await verifyUidClaim(envelope, {
-    trustedAttester: opts.attester,
+    trustedAttester: attesterAddress,
     owner,
     name,
     platform: opts.platform,
@@ -156,7 +184,8 @@ async function verifyUidAttestationImpl(
       reason: result.reason,
       uid: opts.uid,
       issuedAt: envelope.issuedAt,
-      attester: opts.attester,
+      attester: attesterEns,
+      attesterAddress,
     }
   }
 
@@ -164,7 +193,8 @@ async function verifyUidAttestationImpl(
     valid: true,
     uid: opts.uid,
     issuedAt: envelope.issuedAt,
-    attester: opts.attester,
+    attester: attesterEns,
+    attesterAddress,
   }
 }
 

@@ -39,15 +39,20 @@
 ; comes from the parameterized record key).
 ;
 ; Record keys on chain:
-;   attestations[<platform>][<0xattester>]  ; handle attestation envelope (hex)
-;   uid[<platform>][<0xattester>]           ; uid attestation envelope (hex)
-;   <platform>                              ; plain handle text record, e.g. com.x = "alice"
+;   attestations[<platform>][<attester.eth>]  ; handle attestation envelope (hex)
+;   uid[<platform>][<attester.eth>]           ; uid attestation envelope (hex)
+;   <platform>                                ; plain handle text record, e.g. com.x = "alice"
+;
+; <attester.eth> is an ENS name (ENSIP-15 normalized). Verifiers resolve
+; it to an address at verify time and compare that to the ecrecover
+; result. Rotating the attester's ENS addr record retires the prior
+; signing key and invalidates every signature made with it.
 ;
 ; Trust model: the signer is an **attester** — a backend service that
 ; observed both the wallet (via SIWE) and the platform login (OAuth,
-; Login Widget, etc.) within a single session. Verifiers allow-list the
-; attester address(es) they accept; the attester address is encoded in
-; the record key itself.
+; Login Widget, etc.) within a single session. Verifiers allow-list
+; attester ENS names; the attester address is derived by resolving that
+; ENS name at verify time.
 
 ; ---------------------------------------------------------------------------
 ; v2 Envelope (on-chain, tagged)
