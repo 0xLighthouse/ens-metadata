@@ -1,4 +1,4 @@
-; ENS Metadata — Identity Proof Schema (v1 Envelope)
+; ENS Metadata — Identity Proof Schema (v2 Envelope)
 ;
 ; CDDL (RFC 8610) for an on-chain attestation.
 ;
@@ -12,9 +12,13 @@
 ;                        First Come First Served range (>32767)
 ;   - Signing:           EIP-191 (Ethereum Signed Data Standard)
 ;
-; v1 separates an **unsigned outer envelope** (version, attester address, sig)
-; from a **signed inner payload**. Binary
-; values (addresses, uid signature) are encoded as raw bytes for compactness.
+; v2 is a compact envelope that does NOT carry the signed payload on chain.
+; Verifiers reconstruct the payload from context: the ENS name is the one
+; being read, the owner address is the current ENS owner, the platform and
+; attester address come from the parameterized record key, the handle comes
+; from the platform's plain text record, and the timestamp is the second
+; element of the envelope itself. The raw uid (for `uid` attestations)
+; must be known out-of-band by the verifier.
 ;
 ; Detection: first byte is 0xDA (CBOR major type 6 / tag, 4-byte value
 ; follows per RFC 8949 §3.4).
@@ -28,53 +32,50 @@
 ; which is required for signature verification.
 ;
 ; Signing: EIP-191 (`"\x19Ethereum Signed Message:\n32" || keccak256(payload)`).
-; The `payload` field is the canonical dag-cbor bytes of the inner map.
-; The verifier hashes payload directly (no re-encoding needed) and
-; calls ecrecover.
+; The `payload` is the canonical dag-cbor bytes of one of the inner maps.
+; The verifier re-encodes the payload from known values and hashes it
+; directly (no re-encoding needed if bytes are byte-identical) and calls
+; ecrecover, comparing the result to the expected attester address (which
+; comes from the parameterized record key).
 ;
-; UID construction: the `u` field in the signed payload is an obfuscated form
-; of the UID from the social media platform, which we are treating as sensitive
-; data. It is created by computing
-; `personalSign(keccak256("platform:rawUid"), attesterKey)` which results in a
-; 65-byte EIP-191 signature. If a consumer knows the user's UID and wants to
-; confirm the same was detected during the attestation, they can compute the
-; same hash and call ecrecover against the recovered attester address. If
-; validation passes, the UID is correct and unchanged from the time of
-; attestation.
+; Record keys on chain:
+;   attestations[<platform>][<0xattester>]  ; handle attestation envelope (hex)
+;   uid[<platform>][<0xattester>]           ; uid attestation envelope (hex)
+;   <platform>                              ; plain handle text record, e.g. com.x = "alice"
 ;
 ; Trust model: the signer is an **attester** — a backend service that
 ; observed both the wallet (via SIWE) and the platform login (OAuth,
-; Login Widget, etc.) within a single session. The attester address in
-; the outer envelope is cryptographically bound by the signature: the
-; canonical attester identity comes from ecrecover(sig, keccak256(payload)).
-; Verifiers reject any claim whose recovered attester is not in their
-; trusted set.
-;
+; Login Widget, etc.) within a single session. Verifiers allow-list the
+; attester address(es) they accept; the attester address is encoded in
+; the record key itself.
 
 ; ---------------------------------------------------------------------------
-; v1 Envelope (on-chain, tagged)
+; v2 Envelope (on-chain, tagged)
 ; ---------------------------------------------------------------------------
-v1-envelope = #6.1635021684(v1-envelope-array)
+v2-envelope = #6.1635021684(v2-envelope-array)
 
-v1-envelope-array = [
-  1,                          ; version — always 1 for this format
-  bstr,                       ; payload — canonical dag-cbor of v1-signed-payload
-  bstr .size 20,              ; attester address
-  bstr .size 65,              ; sig — EIP-191 over keccak256(payload)
+v2-envelope-array = [
+  2,                          ; version — always 2 for this format
+  uint,                       ; issuedAt — signed timestamp, unix seconds
+  bstr .size 65,              ; sig — EIP-191 over keccak256(dag-cbor(payload))
 ]
 
 ; ---------------------------------------------------------------------------
-; Signed inner payload (decoded from `payload` above)
+; Signed inner payload — NOT stored on chain; reconstructed by verifier
 ; ---------------------------------------------------------------------------
-; `h` is included in the signed data. If the user changes their social media
-; handle, the attestation is invalidated. `u` and `addr` are raw bytes, not
-; hex strings.
 
-v1-signed-payload = {
+v2-handle-payload = {
+  n:  tstr,                   ; name — ENS name the claim is bound to
+  a:  bstr .size 20,          ; addr — wallet observed by attester (SIWE), typically current ENS owner
   p:  tstr,                   ; platform namespace, e.g. "com.x"
   h:  tstr,                   ; handle at time of attestation
-  u:  bstr .size 65,          ; blinded uid — personalSign(keccak256("p:rawUid"), attesterKey)
-  n:  tstr,                   ; name — ENS name this claim is bound to
-  t:  uint,                   ; time — issued-at, unix seconds
-  a:  bstr .size 20,          ; addr — wallet observed by attester (SIWE)
+  t:  uint,                   ; timestamp, unix seconds (== envelope issuedAt)
+}
+
+v2-uid-payload = {
+  n:  tstr,                   ; name — ENS name the claim is bound to
+  a:  bstr .size 20,          ; addr — wallet observed by attester (SIWE), typically current ENS owner
+  p:  tstr,                   ; platform namespace, e.g. "com.x"
+  u:  tstr,                   ; raw uid from the platform (e.g. OAuth `sub`)
+  t:  uint,                   ; timestamp, unix seconds (== envelope issuedAt)
 }

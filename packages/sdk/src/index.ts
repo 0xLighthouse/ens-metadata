@@ -3,18 +3,23 @@ export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
 export { metadataWriter, MetadataWriteError } from './write'
 export {
-  encodePayload,
-  decodePayload,
+  encodeHandlePayload,
+  encodeUidPayload,
   encodeEnvelope,
   decodeEnvelope,
-  signClaim,
-  verifyClaim,
+  signHandleClaim,
+  signUidClaim,
+  verifyHandleClaim,
+  verifyUidClaim,
   CLAIM_VERSION,
   ENVELOPE_TAG,
 } from './attestation'
 export {
   attestationVerifier,
-  verifyAttestation,
+  verifyHandleAttestation,
+  verifyUidAttestation,
+  handleAttestationRecordKey,
+  uidAttestationRecordKey,
   type AttestationVerifierConfig,
 } from './verify'
 
@@ -33,12 +38,16 @@ export type {
 } from './types'
 
 export type {
-  PayloadFields,
   Envelope,
-  SignClaimInput,
-  VerifyClaimOptions,
+  HandlePayloadFields,
+  UidPayloadFields,
+  SignHandleClaimInput,
+  SignUidClaimInput,
+  VerifyHandleClaimOptions,
+  VerifyUidClaimOptions,
   VerifyClaimResult,
   VerifyFailureReason,
-  VerifyAttestationOptions,
+  VerifyHandleAttestationOptions,
+  VerifyUidAttestationOptions,
   VerifyResult,
 } from './attestation-types'

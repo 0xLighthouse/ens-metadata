@@ -1,26 +1,21 @@
-import { decode as dagCborDecode, encode as dagCborEncode } from '@ipld/dag-cbor'
+import { encode as dagCborEncode } from '@ipld/dag-cbor'
 import { Tagged, decode as cborgDecode, encode as cborgEncode } from 'cborg'
 import type { Address, Hex } from 'viem'
-import {
-  bytesToHex,
-  getAddress,
-  hexToBytes,
-  isAddress,
-  isHex,
-  keccak256,
-  recoverMessageAddress,
-} from 'viem'
+import { bytesToHex, hexToBytes, isAddress, keccak256, recoverMessageAddress } from 'viem'
 import type {
   Envelope,
-  PayloadFields,
-  SignClaimInput,
+  HandlePayloadFields,
   SignClaimWalletClient,
-  VerifyClaimOptions,
+  SignHandleClaimInput,
+  SignUidClaimInput,
+  UidPayloadFields,
   VerifyClaimResult,
+  VerifyHandleClaimOptions,
+  VerifyUidClaimOptions,
 } from './attestation-types'
 
 /** Current claim schema version. */
-export const CLAIM_VERSION = 1
+export const CLAIM_VERSION = 2
 
 /**
  * CBOR tag for envelopes: "atst" as big-endian uint32.
@@ -31,104 +26,91 @@ export const CLAIM_VERSION = 1
  */
 export const ENVELOPE_TAG = 1635021684
 
-const PAYLOAD_FIELD_NAMES = ['platform', 'handle', 'uid', 'name', 'issuedAt', 'addr'] as const
+// --- Payload assertion ---
 
-function assertPayloadFields(fields: Partial<PayloadFields>): asserts fields is PayloadFields {
-  for (const key of PAYLOAD_FIELD_NAMES) {
-    if (fields[key] === undefined || fields[key] === null) {
-      throw new Error(`claim: missing required payload field "${key}"`)
-    }
+function assertString(val: unknown, key: string): asserts val is string {
+  if (typeof val !== 'string' || val.length === 0) {
+    throw new Error(`claim: "${key}" must be a non-empty string`)
   }
-  for (const key of ['platform', 'handle', 'name'] as const) {
-    if (typeof fields[key] !== 'string' || fields[key].length === 0) {
-      throw new Error(`claim: "${key}" must be a non-empty string`)
-    }
-  }
-  if (
-    typeof fields.uid !== 'string' ||
-    !isHex(fields.uid) ||
-    hexToBytes(fields.uid).length !== 65
-  ) {
-    throw new Error('claim: "uid" must be a 65-byte hex string (blinded uid signature)')
-  }
-  if (
-    typeof fields.issuedAt !== 'number' ||
-    !Number.isInteger(fields.issuedAt) ||
-    fields.issuedAt < 0
-  ) {
+}
+
+function assertTimestamp(val: unknown): asserts val is number {
+  if (typeof val !== 'number' || !Number.isInteger(val) || val < 0) {
     throw new Error('claim: "issuedAt" must be a non-negative integer')
   }
-  if (typeof fields.addr !== 'string' || !isAddress(fields.addr)) {
+}
+
+function assertAddress(val: unknown): asserts val is Address {
+  if (typeof val !== 'string' || !isAddress(val)) {
     throw new Error('claim: "addr" must be a valid 0x-prefixed address')
   }
 }
 
-// --- Encode / Decode ---
+function assertHandleFields(
+  fields: Partial<HandlePayloadFields>,
+): asserts fields is HandlePayloadFields {
+  assertString(fields.platform, 'platform')
+  assertString(fields.handle, 'handle')
+  assertString(fields.name, 'name')
+  assertTimestamp(fields.issuedAt)
+  assertAddress(fields.addr)
+}
+
+function assertUidFields(fields: Partial<UidPayloadFields>): asserts fields is UidPayloadFields {
+  assertString(fields.platform, 'platform')
+  assertString(fields.uid, 'uid')
+  assertString(fields.name, 'name')
+  assertTimestamp(fields.issuedAt)
+  assertAddress(fields.addr)
+}
+
+// --- Payload encoding ---
 
 /**
- * Encode the inner signed payload as canonical dag-cbor bytes.
- * Maps readable TS field names to single-char CBOR keys and converts
- * binary values from hex strings to raw bytes.
+ * Encode a handle payload as canonical DAG-CBOR bytes.
+ * Map keys: n (name), a (addr), p (platform), h (handle), t (issuedAt).
  */
-export function encodePayload(fields: PayloadFields): Uint8Array {
-  assertPayloadFields(fields)
+export function encodeHandlePayload(fields: HandlePayloadFields): Uint8Array {
+  assertHandleFields(fields)
   return dagCborEncode({
+    n: fields.name,
+    a: hexToBytes(fields.addr),
     p: fields.platform,
     h: fields.handle,
-    u: hexToBytes(fields.uid),
-    n: fields.name,
     t: fields.issuedAt,
-    a: hexToBytes(fields.addr),
   })
 }
 
 /**
- * Decode inner payload bytes back to typed fields.
- * Maps single-char CBOR keys back to readable TS names and converts
- * raw bytes back to hex strings.
+ * Encode a uid payload as canonical DAG-CBOR bytes.
+ * Map keys: n (name), a (addr), p (platform), u (uid), t (issuedAt).
  */
-export function decodePayload(bytes: Uint8Array): PayloadFields {
-  const decoded = dagCborDecode(bytes) as Record<string, unknown>
-  const u = decoded.u
-  const a = decoded.a
-  if (!(u instanceof Uint8Array) || u.length !== 65) {
-    throw new Error('claim: payload "u" must be 65 bytes')
-  }
-  if (!(a instanceof Uint8Array) || a.length !== 20) {
-    throw new Error('claim: payload "a" (addr) must be 20 bytes')
-  }
-  const partial: Partial<PayloadFields> = {
-    platform: decoded.p as string,
-    handle: decoded.h as string,
-    uid: bytesToHex(u),
-    name: decoded.n as string,
-    issuedAt: decoded.t as number,
-    addr: getAddress(bytesToHex(a)),
-  }
-  assertPayloadFields(partial)
-  return partial
+export function encodeUidPayload(fields: UidPayloadFields): Uint8Array {
+  assertUidFields(fields)
+  return dagCborEncode({
+    n: fields.name,
+    a: hexToBytes(fields.addr),
+    p: fields.platform,
+    u: fields.uid,
+    t: fields.issuedAt,
+  })
 }
 
+// --- Envelope encoding ---
+
 /**
- * Encode a full v1 envelope as tagged CBOR bytes, ready to write to an
- * ENS text record as hex. On the wire the envelope is a 4-element array:
- * [version, payload, attester (20 bytes), sig (65 bytes)].
+ * Encode a v2 envelope as tagged CBOR bytes. On the wire it's a 3-element
+ * array: [version=2, issuedAt, sig(65)].
  */
 export function encodeEnvelope(envelope: Envelope): Uint8Array {
-  const arr = [
-    envelope.version,
-    envelope.payload,
-    hexToBytes(envelope.attester),
-    hexToBytes(envelope.sig),
-  ]
+  const arr = [envelope.version, envelope.issuedAt, hexToBytes(envelope.sig)]
   return cborgEncode(new Tagged(ENVELOPE_TAG, arr), { float64: true })
 }
 
 /**
- * Decode tagged CBOR bytes into a v1 Envelope. Expects the `atst` tag
- * (0xDA 0x61 0x74 0x73 0x74) followed by a 4-element array
- * [version, payload, attester, sig]. The tag prefix is enforced so future
- * envelope variants can't be silently accepted as v1.
+ * Decode tagged CBOR bytes into a v2 Envelope. Requires the `atst` tag
+ * prefix (0xDA 0x61 0x74 0x73 0x74) and version=2; otherwise throws so
+ * unrelated envelope variants can't silently verify.
  */
 export function decodeEnvelope(bytes: Uint8Array): Envelope {
   if (bytes.length < 5 || bytes[0] !== 0xda) {
@@ -138,130 +120,164 @@ export function decodeEnvelope(bytes: Uint8Array): Envelope {
     // biome-ignore lint/suspicious/noExplicitAny: cborg's TagDecodeControl type isn't exported
     tags: { [ENVELOPE_TAG]: (decode: any) => decode() },
   })
-  if (!Array.isArray(decoded) || decoded.length !== 4) {
-    throw new Error('claim: decoded envelope is not a 4-element array')
+  if (!Array.isArray(decoded) || decoded.length !== 3) {
+    throw new Error('claim: decoded envelope is not a 3-element array')
   }
 
-  const [version, payload, attesterBytes, sigBytes] = decoded
+  const [version, issuedAt, sigBytes] = decoded
 
   if (typeof version !== 'number' || version !== CLAIM_VERSION) {
     throw new Error(`claim: unsupported envelope version ${version}`)
   }
-  if (!(payload instanceof Uint8Array)) {
-    throw new Error('claim: envelope element 1 (payload) must be bytes')
-  }
-  if (!(attesterBytes instanceof Uint8Array) || attesterBytes.length !== 20) {
-    throw new Error('claim: envelope element 2 (attester) must be 20 bytes')
+  if (typeof issuedAt !== 'number' || !Number.isInteger(issuedAt) || issuedAt < 0) {
+    throw new Error('claim: envelope element 1 (issuedAt) must be a non-negative integer')
   }
   if (!(sigBytes instanceof Uint8Array) || sigBytes.length !== 65) {
-    throw new Error('claim: envelope element 3 (sig) must be 65 bytes')
+    throw new Error('claim: envelope element 2 (sig) must be 65 bytes')
   }
 
   return {
     version,
-    payload,
-    attester: getAddress(bytesToHex(attesterBytes)),
+    issuedAt,
     sig: bytesToHex(sigBytes),
   }
 }
 
-// --- Sign / Verify ---
+// --- Sign ---
 
-/**
- * Sign a claim as an attester, producing a v1 envelope. The inner payload
- * is encoded as canonical dag-cbor and signed with EIP-191.
- *
- * `issuedAt` is auto-computed (current unix time).
- * `attester` is auto-populated from the wallet's connected account.
- */
-export async function signClaim(
-  input: SignClaimInput,
-  attesterWallet: SignClaimWalletClient,
-): Promise<Envelope> {
-  const account = attesterWallet.account
-  if (!account) {
-    throw new Error('signClaim: attesterWallet has no connected account')
-  }
-  const attAddr = getAddress(account.address)
-
-  const payloadFields: PayloadFields = {
-    platform: input.platform,
-    handle: input.handle,
-    uid: input.uid,
-    name: input.name,
-    issuedAt: Math.floor(Date.now() / 1000),
-    addr: input.addr,
-  }
-
-  const payloadBytes = encodePayload(payloadFields)
-  const hash = keccak256(payloadBytes)
-  const sig = (await attesterWallet.signMessage({
-    account,
-    message: { raw: hash },
-  })) as Hex
-
-  return {
-    version: CLAIM_VERSION,
-    payload: payloadBytes,
-    attester: attAddr,
-    sig,
-  }
+async function signPayload(payload: Uint8Array, wallet: SignClaimWalletClient): Promise<Hex> {
+  const account = wallet.account
+  if (!account) throw new Error('signClaim: attesterWallet has no connected account')
+  const hash = keccak256(payload)
+  return (await wallet.signMessage({ account, message: { raw: hash } })) as Hex
 }
 
 /**
- * Verify a v1 envelope. Decodes the inner payload, checks optional
- * freshness (maxAge against issuedAt), signature integrity, trust, and
- * optional owner match.
+ * Sign a handle claim as an attester, producing a v2 envelope.
+ * `issuedAt` is auto-computed (current unix seconds).
  */
-export async function verifyClaim(
-  envelope: Envelope,
-  options: VerifyClaimOptions,
+export async function signHandleClaim(
+  input: SignHandleClaimInput,
+  attesterWallet: SignClaimWalletClient,
+): Promise<Envelope> {
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const payload = encodeHandlePayload({
+    platform: input.platform,
+    handle: input.handle,
+    name: input.name,
+    issuedAt,
+    addr: input.addr,
+  })
+  const sig = await signPayload(payload, attesterWallet)
+  return { version: CLAIM_VERSION, issuedAt, sig }
+}
+
+/**
+ * Sign a uid claim as an attester, producing a v2 envelope.
+ * `issuedAt` is auto-computed (current unix seconds).
+ */
+export async function signUidClaim(
+  input: SignUidClaimInput,
+  attesterWallet: SignClaimWalletClient,
+): Promise<Envelope> {
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const payload = encodeUidPayload({
+    platform: input.platform,
+    uid: input.uid,
+    name: input.name,
+    issuedAt,
+    addr: input.addr,
+  })
+  const sig = await signPayload(payload, attesterWallet)
+  return { version: CLAIM_VERSION, issuedAt, sig }
+}
+
+// --- Verify ---
+
+function checkMaxAge(issuedAt: number, maxAge: number | undefined): boolean {
+  if (maxAge === undefined) return true
+  const now = Math.floor(Date.now() / 1000)
+  return now - issuedAt <= maxAge
+}
+
+async function recoverAndCheck(
+  payload: Uint8Array,
+  sig: Hex,
+  expectedAttester: Address,
 ): Promise<VerifyClaimResult> {
-  let inner: PayloadFields
-  try {
-    inner = decodePayload(envelope.payload)
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('unsupported version')) {
-      return { valid: false, reason: 'unsupported-version' }
-    }
-    return { valid: false, reason: 'decode-error' }
-  }
-
-  if (!envelope.sig) {
-    return { valid: false, reason: 'bad-signature' }
-  }
-
-  if (options.maxAge !== undefined) {
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    if (nowSeconds - inner.issuedAt > options.maxAge) {
-      return { valid: false, reason: 'stale' }
-    }
-  }
-
   let recovered: Address
   try {
-    const hash = keccak256(envelope.payload)
-    recovered = await recoverMessageAddress({
-      message: { raw: hash },
-      signature: envelope.sig,
-    })
+    const hash = keccak256(payload)
+    recovered = await recoverMessageAddress({ message: { raw: hash }, signature: sig })
   } catch {
     return { valid: false, reason: 'bad-signature' }
   }
-
-  if (recovered.toLowerCase() !== envelope.attester.toLowerCase()) {
+  if (recovered.toLowerCase() !== expectedAttester.toLowerCase()) {
     return { valid: false, reason: 'bad-signature', recovered }
   }
-
-  const trustedLower = options.trustedAttesters.map((a) => a.toLowerCase())
-  if (!trustedLower.includes(envelope.attester.toLowerCase())) {
-    return { valid: false, reason: 'untrusted-attester', recovered }
-  }
-
-  if (options.expectedOwner) {
-    if (inner.addr.toLowerCase() !== options.expectedOwner.toLowerCase()) {
-      return { valid: false, reason: 'wrong-owner', recovered }
-    }
-  }
   return { valid: true, recovered }
+}
+
+/**
+ * Verify a v2 handle claim. The caller supplies everything needed to
+ * reconstruct the signed payload (name, platform, handle, owner). Any
+ * reconstruction mismatch (wrong owner, wrong handle, etc.) or wrong
+ * attester surfaces as `bad-signature` with `recovered` for debugging.
+ */
+export async function verifyHandleClaim(
+  envelope: Envelope,
+  options: VerifyHandleClaimOptions,
+): Promise<VerifyClaimResult> {
+  if (envelope.version !== CLAIM_VERSION) {
+    return { valid: false, reason: 'unsupported-version' }
+  }
+  if (!checkMaxAge(envelope.issuedAt, options.maxAge)) {
+    return { valid: false, reason: 'stale' }
+  }
+
+  let payload: Uint8Array
+  try {
+    payload = encodeHandlePayload({
+      platform: options.platform,
+      handle: options.handle,
+      name: options.name,
+      issuedAt: envelope.issuedAt,
+      addr: options.owner,
+    })
+  } catch {
+    return { valid: false, reason: 'decode-error' }
+  }
+
+  return recoverAndCheck(payload, envelope.sig, options.trustedAttester)
+}
+
+/**
+ * Verify a v2 uid claim. Same shape as verifyHandleClaim but reconstructs
+ * the payload using the raw uid; a wrong uid surfaces as `bad-signature`.
+ */
+export async function verifyUidClaim(
+  envelope: Envelope,
+  options: VerifyUidClaimOptions,
+): Promise<VerifyClaimResult> {
+  if (envelope.version !== CLAIM_VERSION) {
+    return { valid: false, reason: 'unsupported-version' }
+  }
+  if (!checkMaxAge(envelope.issuedAt, options.maxAge)) {
+    return { valid: false, reason: 'stale' }
+  }
+
+  let payload: Uint8Array
+  try {
+    payload = encodeUidPayload({
+      platform: options.platform,
+      uid: options.uid,
+      name: options.name,
+      issuedAt: envelope.issuedAt,
+      addr: options.owner,
+    })
+  } catch {
+    return { valid: false, reason: 'decode-error' }
+  }
+
+  return recoverAndCheck(payload, envelope.sig, options.trustedAttester)
 }
