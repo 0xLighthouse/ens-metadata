@@ -1,19 +1,19 @@
 ---
-title: Social Proofs
+title: Attestations
 weight: 5
 ---
 
 # Linking social accounts to an ENS name
 
-This guide explains how to attach a verifiable social-account proof to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X and Telegram; the same scheme extends to any platform with a server-verifiable login. Platform identifiers use reverse-DNS notation (`com.x` for X, `org.telegram` for Telegram) and are stored as parameterized ENS text records under the `social-proofs` key.
+This guide explains how to attach a verifiable social-account attestation to an ENS name, what gets stored on-chain, and how anyone can verify it without trusting a central directory. Supported platforms today are X and Telegram; the same scheme extends to any platform with a server-verifiable login. Platform identifiers use reverse-DNS notation (`com.x` for X, `org.telegram` for Telegram) and are stored as parameterized ENS text records under the `attestations` and `uid` keys.
 
 ## How it works
 
-A social proof is a signed attestation written to an ENS text record by the name's owner. Three pieces are involved:
+An attestation is a signed record written to an ENS text record by the name's owner. Three pieces are involved:
 
 1. **The attester** — a backend service that verifies that you own your wallet (via SIWE) and that you are able to log into your social media account (via OAuth / login widget), then signs the attestation with its key.
-2. **The attestation** — a CBOR-encoded structure containing the platform, handle, a blinded user ID, the ENS name, and a timestamp. The attester signs the inner payload; the name owner publishes the attestation on-chain.
-3. **The text record** — a parameterized key on the ENS name (for example `social-proofs[com.x]`), holding the attestation.
+2. **The attestation** — a CBOR-encoded envelope with an EIP-191 signature over a reconstructable DAG-CBOR payload (platform, handle *or* private uid, ENS name, owner address, timestamp). The attester signs; the name owner publishes on-chain.
+3. **The text record** — a parameterized key on the ENS name (for example `attestations[com.x][atst.lighthousegov.eth]`), holding the attestation envelope.
 
 Verification requires only the text record and two local `ecrecover` operations.
 
