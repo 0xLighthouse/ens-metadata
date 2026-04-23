@@ -17,11 +17,20 @@ This skill covers the four things you need: how to verify, how to read profile a
 
 Don't use this skill for general ENS name resolution (use viem's `getEnsAddress` / `getEnsName`), or for writing records on behalf of a user — the user always writes their own records via the wizard, you can only ask.
 
+## Two kinds of attestation
+
+Attestations come in two flavors, each stored in its own text record:
+
+- **Handle attestation** — binds a public handle (`@vitalik`) to the ENS name. Record key: `attestations[<platform>][<0xattester>]`.
+- **UID attestation** — binds a *private* platform uid (OAuth `sub`, Telegram numeric id) to the ENS name. Record key: `uid[<platform>][<0xattester>]`.
+
+You typically want the UID variant: it's the only one that cryptographically ties the name to the specific user id you already have. The handle record tells you "this handle was claimed"; the uid record tells you "this user is the same one you're talking to."
+
 ## Setup
 
 ```ts
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { verifyAttestation } from '@ensmetadata/sdk'
+import { verifyHandleAttestation, verifyUidAttestation } from '@ensmetadata/sdk'
 import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 
@@ -30,44 +39,33 @@ const client = createPublicClient({
   transport: http(process.env.RPC_URL),
 })
 
-// Allow-list of attester key addresses you accept. Each deployed attester
-// instance has a single signing key whose address is what gets stamped into
-// every signed envelope. Put the address(es) you trust here; refuse anything else.
-const trustedAttesters = ['0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf'] as const
+// The attester address you trust. Each deployed attester has a single signing
+// key whose address is what gets stamped into the record key; pass that here.
+const TRUSTED_ATTESTER = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf' as const
 ```
 
 Dependencies: `@ensmetadata/sdk`, `@ensdomains/ensjs`, `viem`, a mainnet RPC URL, and the trusted attester address(es).
 
-## Verify an attestation
+## Verify a uid attestation
 
 ```ts
-import { verifyAttestation } from '@ensmetadata/sdk'
-import { keccak256, recoverMessageAddress, toBytes } from 'viem'
+import { verifyUidAttestation } from '@ensmetadata/sdk'
 
 export async function checkTelegram(ensName: string, knownTelegramUid: string) {
-  const result = await verifyAttestation(
+  const result = await verifyUidAttestation(
     client,
-    { trustedAttesters, maxAge: 90 * 24 * 60 * 60 }, // optional staleness threshold
-    { name: ensName, platform: 'org.telegram' },
+    { maxAge: 90 * 24 * 60 * 60 }, // optional staleness threshold
+    {
+      name: ensName,
+      platform: 'org.telegram',
+      attester: TRUSTED_ATTESTER,
+      uid: knownTelegramUid,
+    },
   )
-  if (!result.valid) {
-    return { ok: false as const, reason: result.reason }
-  }
-
-  // The SDK verified the envelope signature, trust, ownership, and freshness.
-  // You still need to verify the uid binding yourself — see below.
-  const hash = keccak256(toBytes(`org.telegram:${knownTelegramUid}`))
-  const recovered = await recoverMessageAddress({
-    message: { raw: hash },
-    signature: result.uid as `0x${string}`,
-  })
-  if (recovered.toLowerCase() !== trustedAttesters[0].toLowerCase()) {
-    return { ok: false as const, reason: 'uid-mismatch' as const }
-  }
-
+  if (!result.valid) return { ok: false as const, reason: result.reason }
   return {
     ok: true as const,
-    handle: result.handle,
+    uid: result.uid,
     issuedAt: result.issuedAt, // unix seconds
   }
 }
@@ -75,36 +73,42 @@ export async function checkTelegram(ensName: string, knownTelegramUid: string) {
 
 Same shape for X — pass `platform: 'com.x'` and the X OAuth `sub` claim as the known uid.
 
-### What the SDK check does
-
-`verifyAttestation` reads the text record `social-proofs[<platform>]` on the name, decodes the envelope, and runs these checks:
-
-| Check | Fails with |
-| --- | --- |
-| The text record exists at all | `missing` |
-| Bytes decode as a valid v1 envelope + payload | `decode-error` |
-| `envelope.version` is supported | `unsupported-version` |
-| `ecrecover(keccak256(payload), sig) === envelope.attester` | `bad-signature` |
-| `envelope.attester` is in your trusted-attester set | `untrusted-attester` |
-| `payload.addr` equals the current ENS owner | `wrong-owner` |
-| `now - payload.issuedAt <= maxAge` (only if `maxAge` set) | `stale` |
-
-There is **no `expired` failure reason and no on-chain expiry field** — staleness is entirely client-side via your chosen `maxAge`. Omit `maxAge` to accept any age.
-
-### The uid binding is your job, not the SDK's
-
-The SDK tells you the envelope is valid and the attester endorsed *some* `platform:uid` pair. It doesn't know which raw uid was signed — that's intentional, because only the attester and the user originally knew it. You, the agent, know the raw uid from your chat platform, so you recompute the hash and `ecrecover` locally:
+## Verify a handle attestation
 
 ```ts
-const hash = keccak256(toBytes(`${platform}:${rawUid}`))
-const recovered = await recoverMessageAddress({
-  message: { raw: hash },
-  signature: result.uid as `0x${string}`,
-})
-// recovered should equal the attester address
+import { verifyHandleAttestation } from '@ensmetadata/sdk'
+
+const result = await verifyHandleAttestation(
+  client,
+  { maxAge: 90 * 24 * 60 * 60 },
+  { name: 'alice.eth', platform: 'com.x', attester: TRUSTED_ATTESTER },
+)
+// result.handle is the handle that was attested (also the current value of
+// the plain `com.x` text record — they must match for verification to pass).
 ```
 
-Without this step the binding is not confirmed — anyone could publish a valid envelope linking *some other* account and the SDK would still return `valid: true`.
+### What each call does under the hood
+
+Both `verifyHandleAttestation` and `verifyUidAttestation`:
+
+1. Read the envelope from the parameterized record (`attestations[<p>][<att>]` or `uid[<p>][<att>]`).
+2. Resolve the current ENS owner.
+3. Read auxiliary context: for a handle attestation, read the plain `<platform>` text record; for a uid attestation, the raw uid you passed.
+4. Reconstruct the canonical DAG-CBOR payload from those values plus the envelope timestamp.
+5. `keccak256(payload)`, `ecrecover` against the signature, compare to the trusted attester address.
+6. Apply freshness threshold if configured.
+
+### Failure reasons
+
+| Reason | What it means | What to do |
+| --- | --- | --- |
+| `missing` | No record under the parameterized key, or (for handle attestations) no `<platform>` text record. | Send the user a wizard link; poll. |
+| `decode-error` | Record bytes don't parse as a v2 envelope. | Treat as adversarial or corrupted. |
+| `unsupported-version` | Envelope version isn't v2. | Upgrade the SDK. |
+| `bad-signature` | Reconstructed payload doesn't match the signature — could be wrong owner (name transferred), wrong handle/uid supplied, or a different attester. | Check you passed the right attester address and the user hasn't transferred the name. |
+| `stale` | `now - issuedAt > maxAge`. | Only fires if you set `maxAge`. Ask the user to re-issue. |
+
+`result.recovered` (when present) holds the address ecrecover returned; if it's a valid-looking address but not your trusted attester, a different attester signed this or the payload reconstruction was wrong.
 
 ## Read profile attributes
 
@@ -126,10 +130,9 @@ const records = await getRecords(client, {
   name: 'alice.eth',
   texts: ['avatar', 'alias', 'description', 'email', 'class', 'schema'],
 })
-// records.texts is an array of { key, value } pairs
 ```
 
-These records are **self-asserted** — the user wrote them, no attester involved. Treat them as hints, not evidence. If you need cryptographic confidence about a value, don't use a text record — use an attestation.
+These records are **self-asserted** — the user wrote them, no attester involved. Treat them as hints, not evidence.
 
 ## Attestation format
 
@@ -137,43 +140,55 @@ Attestations are stored as hex-encoded CBOR in parameterized ENS text records:
 
 ```
 alice.eth
-  ├── social-proofs[com.x]          = "0xda61747374..."
-  └── social-proofs[org.telegram]   = "0xda61747374..."
+  ├── com.x                                                = "alice"               # plain handle
+  ├── attestations[com.x][0x7E5F…]                         = "0xda61747374…"       # handle attestation
+  ├── uid[com.x][0x7E5F…]                                  = "0xda61747374…"       # uid attestation
+  ├── org.telegram                                         = "alice"
+  ├── attestations[org.telegram][0x7E5F…]                  = "0xda61747374…"
+  └── uid[org.telegram][0x7E5F…]                           = "0xda61747374…"
 ```
 
-Each value starts with `0xDA` (CBOR tag header) followed by tag `1635021684` (`0x61747374`, ASCII for `atst`). You generally don't touch the bytes directly — `verifyAttestation` handles decoding — but knowing the shape helps when debugging.
+Each value starts with `0xDA` (CBOR tag header) followed by tag `1635021684` (`0x61747374`, ASCII for `atst`). The attester's address is in the record key, not the envelope.
 
-### Envelope
+### Envelope (v2)
 
 ```
 Tag(1635021684) [
-  1,             // envelope version
-  <bytes>,       // payload — DAG-CBOR bytes (described below)
-  <bytes 20>,    // attester address (unsigned hint; sig is the binding)
-  <bytes 65>,    // EIP-191 signature over keccak256(payload)
+  2,             // envelope version
+  <uint>,        // issuedAt, unix seconds (signed)
+  <bytes 65>,    // EIP-191 signature over keccak256(dag-cbor(payload))
 ]
 ```
 
-### Payload
+### Payload (DAG-CBOR, reconstructed; NOT stored on chain)
 
-The signed payload is DAG-CBOR encoded. Field names at the TypeScript layer → CBOR key:
+Handle payload:
 
-| Field | CBOR key | Description |
+| CBOR key | Field | Description |
 | --- | --- | --- |
-| `platform` | `p` | Reverse-DNS platform id — `com.x`, `org.telegram`. |
-| `handle` | `h` | Social handle at time of attestation. A handle change triggers re-attestation; the `handle-changed` judgment is yours to make (compare `result.handle` to the platform's current handle). |
-| `uid` | `u` | Attester-signed hash — `personalSign(keccak256("platform:rawUid"), attesterKey)`. A 65-byte EIP-191 signature, not the raw uid. |
-| `name` | `n` | ENS name the attestation is bound to. |
-| `issuedAt` | `t` | Unix seconds. |
-| `addr` | `a` | The wallet the attester observed during the SIWE session. Used for the ownership check. |
+| `n` | name | ENS name the attestation is bound to |
+| `a` | addr | 20-byte wallet address the attester observed (typically current ENS owner) |
+| `p` | platform | Reverse-DNS platform id — `com.x`, `org.telegram` |
+| `h` | handle | Handle at time of attestation (matches the `<platform>` text record) |
+| `t` | issuedAt | Unix seconds (matches the envelope's issuedAt) |
+
+UID payload:
+
+| CBOR key | Field | Description |
+| --- | --- | --- |
+| `n` | name | ENS name the attestation is bound to |
+| `a` | addr | 20-byte wallet address |
+| `p` | platform | Reverse-DNS platform id |
+| `u` | uid | Raw private user id (e.g. OAuth `sub`, Telegram numeric id) |
+| `t` | issuedAt | Unix seconds |
 
 ## Trust model — read this once
 
-There is exactly one cryptographic binding in the system: **the envelope signature**. That signature, produced by the attester with its private key, endorses the entire payload — platform, handle, uid, name, issued-at, and observed wallet. A valid envelope signature + an attester you trust means the attester saw a user who controlled `payload.addr` and could log into `payload.platform:rawUid`.
+There is exactly one cryptographic binding in the system: **the envelope signature over the reconstructed payload**. A valid signature from an attester you trust means the attester saw a user who controlled `payload.addr` at `payload.t` and could log into `payload.platform` as `payload.h` or `payload.u`.
 
-Your verifier job is: (1) let the SDK check envelope integrity, trust, ownership, and freshness; (2) confirm the uid you know matches the signed uid via `ecrecover(keccak256("platform:rawUid"), result.uid) === attesterAddress`. Pure local computation — no attester call, no network dependency.
+The attester's address lives in the record key. If you're verifying an attestation signed by an attester you don't trust, don't read it in the first place — pick records under `attestations[<p>][<your-trusted-attester>]`.
 
-The signer is the **attester service**, not the wallet. The wallet's only role is publishing the signed envelope to the resolver and being the ENS name owner. Verifiers allow-list the attester address(es) they accept.
+The wallet's only roles are (1) publishing the signed envelope and (2) being the ENS name owner. It does not sign the attestation.
 
 ## Requesting setup
 
@@ -200,32 +215,7 @@ https://identity.ensmetadata.app/?name=alice.eth&class=Person&schema=ipfs://QmSH
 https://identity.ensmetadata.app/?name=alice.eth&platforms=org.telegram&class=Person&schema=ipfs://QmSHkLh…&attrs=alias,avatar
 ```
 
-After sending the link, **poll** `verifyAttestation` (or `getEnsText` for non-attestation records) until the records land. The wizard takes a few minutes — attester signs, user publishes — so ~30s poll intervals are fine. There's no callback or webhook back to you; the agent owns its own state machine.
-
-## Failure modes
-
-SDK-reported reasons (from `result.reason`):
-
-| Reason | What it means | What to do |
-| --- | --- | --- |
-| `missing` | No `social-proofs[<platform>]` text record on this name. | Send the user a wizard link; poll. |
-| `decode-error` | The record bytes don't decode as a v1 envelope + payload. | Treat as adversarial or corrupted. |
-| `unsupported-version` | `envelope.version` is a version this SDK doesn't know. | Upgrade the SDK. |
-| `bad-signature` | `ecrecover(keccak256(payload), sig) !== envelope.attester`. | Bytes are corrupt or tampered. Treat as adversarial. |
-| `untrusted-attester` | Signature is valid, but `envelope.attester` isn't in your trusted set. | Check your allow-list config first; may also mean the attestation was issued by an attester you don't accept. |
-| `wrong-owner` | `payload.addr` no longer matches the current ENS owner. | Name has transferred. The new owner needs to re-issue. |
-| `stale` | `now - payload.issuedAt > maxAge`. | Only possible if you set `maxAge`. Send the user a wizard link to re-issue. |
-
-Agent-generated (not from `result.reason` — you compute these):
-
-| Reason | What it means | What to do |
-| --- | --- | --- |
-| `uid-mismatch` | SDK said the envelope is valid, but `recoverMessageAddress` on `result.uid` doesn't match the attester address — a **different** uid was signed. | A different account is bound to this name. Refuse the binding. |
-| `handle-changed` | `result.handle` doesn't match the platform's current handle for this uid. | Display hint only — the binding is still valid, the display string is stale. |
-
-## Why polling is fine
-
-The read path costs one ENS resolver call — sub-second on a decent RPC. Polling at 30s intervals while a setup request is outstanding is cheap. Don't wire up webhooks — there's no infrastructure for it on the attester side, and agent state is simpler when it owns the loop.
+After sending the link, **poll** `verifyUidAttestation` or `verifyHandleAttestation` (or `getEnsText` for non-attestation records) until the records land. The wizard takes a few minutes — attester signs, user publishes — so ~30s poll intervals are fine.
 
 ## What this skill does NOT cover
 

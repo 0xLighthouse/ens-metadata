@@ -45,7 +45,7 @@ To verify a proof that has been published to an ENS name, first collect the foll
 3. The ENS name of the attester, and the attestation record itself.
 4. Look up which address the attester's ENS name resolves to. This is the signer's address.
 
-{/* 
+{/*
 //// Pass in these details to the SDK
 
 ### SDK verification
@@ -85,7 +85,7 @@ Attestations are encoded using CBOR format, identified by tag `1635021684` (`0x6
 
 ```sh
 Tag(1635021684) [
-  1,                                // envelope version
+  2,                                // envelope version
   <integer>,                        // timestamp
   <bytes 65>,                       // signature — EIP-191 over keccak256(payload)
 ]
@@ -104,8 +104,6 @@ The payload for the signature is encoded using [DAG-CBOR](https://www.npmjs.com/
 | Issued at | `t` | The timestamp from the attestation. |
 
 Generate the DAG-CBOR encoded form of the above fields, and hash it with keccak256 to regenerate the payload that was signed by the attester. You can now verify against the signature included in the attestation.
-
-
 
 ## Blind UID proofs
 
