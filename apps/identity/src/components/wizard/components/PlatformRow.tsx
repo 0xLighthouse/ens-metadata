@@ -32,8 +32,10 @@ export function PlatformRow({
   const label = platform === 'com.x' ? 'X.com' : 'Telegram'
   const linked = platform === 'com.x' ? !!twitter : !!telegram
   const handle = platform === 'com.x' ? (twitter?.username ?? null) : (telegram?.username ?? null)
-  const avatarUrl =
-    platform === 'com.x' ? (twitter?.profilePictureUrl ?? null) : (telegram?.photoUrl ?? null)
+  // Telegram's photoUrl points at t.me/i/userpic/…, which is session-gated and
+  // can't be loaded by third-party clients. Privy passes it through unchanged
+  // and offers no proxy, so we always fall back to the letter initial there.
+  const avatarUrl = platform === 'com.x' ? (twitter?.profilePictureUrl ?? null) : null
   const helperText =
     platform === 'com.x'
       ? 'Log in to X and approve access. Only your X handle will be made public. No other data will be stored or shared.'
