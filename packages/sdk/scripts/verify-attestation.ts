@@ -3,10 +3,10 @@
  * Dev script — look up and verify a handle attestation on an ENS name via the SDK.
  *
  * Usage:
- *   pnpm --filter @ensmetadata/sdk verify-attestation <ens-name> [platform] [attester-ens]
+ *   pnpm --filter @ensmetadata/sdk verify-attestation <ens-name> <platform> [attester-ens]
  *
  * Examples:
- *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth
+ *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth com.x
  *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth org.telegram
  *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth com.x atst.example.eth
  *
@@ -52,10 +52,10 @@ function kv(key: string, value: string | number | undefined): void {
 }
 
 function usage(): never {
-  console.error(`Usage: verify-attestation <ens-name> [platform] [attester-ens]
+  console.error(`Usage: verify-attestation <ens-name> <platform> [attester-ens]
 
 Examples:
-  verify-attestation lighthousegov.eth
+  verify-attestation lighthousegov.eth com.x
   verify-attestation lighthousegov.eth org.telegram
   verify-attestation lighthousegov.eth com.x atst.example.eth`)
   process.exit(1)
@@ -63,11 +63,11 @@ Examples:
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
-  if (args.length === 0 || args[0].startsWith('--')) usage()
+  if (args.length < 2 || args[0].startsWith('--')) usage()
 
   const name = args[0]
   const positional = args.slice(1).filter((a) => !a.startsWith('--'))
-  const platform = positional[0] ?? 'com.x'
+  const platform = positional[0]
   const attester = positional[1] ?? DEFAULT_ATTESTER_ENS
 
   header('Setup')
@@ -81,11 +81,19 @@ async function main(): Promise<void> {
   const rpcUrl =
     process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? 'https://eth.llamarpc.com'
   const rpcSource = process.env.RPC_URL
-    ? ''
+    ? '(from RPC_URL)'
     : process.env.NEXT_PUBLIC_RPC_URL
-      ? c('dim', '  (from NEXT_PUBLIC_RPC_URL)')
-      : c('dim', '  (default)')
-  console.log(`  ${c('gray', 'RPC URL       ')} ${rpcUrl}${rpcSource}`)
+      ? '(from NEXT_PUBLIC_RPC_URL)'
+      : '(default)'
+  // Only the host — RPC URLs often carry API keys in query strings or path
+  // segments, which shouldn't land in stdout or CI logs.
+  let rpcHost: string
+  try {
+    rpcHost = new URL(rpcUrl).host
+  } catch {
+    rpcHost = '<unparsable>'
+  }
+  console.log(`  ${c('gray', 'RPC URL       ')} ${rpcHost} ${c('dim', rpcSource)}`)
 
   header('Creating public client')
   const client = createPublicClient({
