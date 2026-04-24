@@ -9,8 +9,10 @@
  *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth
  *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth atst.lighthousegov.eth com.x
  *
- * Env:
- *   RPC_URL            — optional mainnet RPC endpoint (falls back to a public one)
+ * Env (first defined wins):
+ *   RPC_URL                — explicit script-level override
+ *   NEXT_PUBLIC_RPC_URL    — project-wide mainnet RPC (same var the identity app uses)
+ *   (fallback)             — eth.llamarpc.com, slow and flaky, avoid if you can
  */
 
 import { addEnsContracts } from '@ensdomains/ensjs'
@@ -71,10 +73,17 @@ async function main(): Promise<void> {
   console.log(`  ${c('gray', 'Platform      ')} ${platform}`)
   console.log(`  ${c('gray', 'Attester ENS  ')} ${attester}`)
   console.log(`  ${c('gray', 'Chain         ')} mainnet`)
-  const rpcUrl = process.env.RPC_URL ?? 'https://eth.llamarpc.com'
-  console.log(
-    `  ${c('gray', 'RPC URL       ')} ${rpcUrl}${process.env.RPC_URL ? '' : c('dim', '  (default)')}`,
-  )
+  // Precedence: RPC_URL (explicit script override) > NEXT_PUBLIC_RPC_URL
+  // (project-wide mainnet RPC, same var the identity app reads) > llamarpc
+  // fallback (works, but often slow enough to look hung).
+  const rpcUrl =
+    process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? 'https://eth.llamarpc.com'
+  const rpcSource = process.env.RPC_URL
+    ? ''
+    : process.env.NEXT_PUBLIC_RPC_URL
+      ? c('dim', '  (from NEXT_PUBLIC_RPC_URL)')
+      : c('dim', '  (default)')
+  console.log(`  ${c('gray', 'RPC URL       ')} ${rpcUrl}${rpcSource}`)
 
   header('Creating public client')
   const client = createPublicClient({
