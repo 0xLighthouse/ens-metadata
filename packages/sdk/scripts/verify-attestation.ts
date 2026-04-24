@@ -3,11 +3,12 @@
  * Dev script — look up and verify a handle attestation on an ENS name via the SDK.
  *
  * Usage:
- *   pnpm --filter @ensmetadata/sdk verify-attestation <ens-name> [attester-ens] [platform]
+ *   pnpm --filter @ensmetadata/sdk verify-attestation <ens-name> [platform] [attester-ens]
  *
  * Examples:
  *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth
- *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth atst.lighthousegov.eth com.x
+ *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth org.telegram
+ *   pnpm --filter @ensmetadata/sdk verify-attestation lighthousegov.eth com.x atst.example.eth
  *
  * Env (first defined wins):
  *   RPC_URL                — explicit script-level override
@@ -51,11 +52,12 @@ function kv(key: string, value: string | number | undefined): void {
 }
 
 function usage(): never {
-  console.error(`Usage: verify-attestation <ens-name> [attester-ens] [platform]
+  console.error(`Usage: verify-attestation <ens-name> [platform] [attester-ens]
 
 Examples:
   verify-attestation lighthousegov.eth
-  verify-attestation lighthousegov.eth atst.lighthousegov.eth com.x`)
+  verify-attestation lighthousegov.eth org.telegram
+  verify-attestation lighthousegov.eth com.x atst.example.eth`)
   process.exit(1)
 }
 
@@ -65,8 +67,8 @@ async function main(): Promise<void> {
 
   const name = args[0]
   const positional = args.slice(1).filter((a) => !a.startsWith('--'))
-  const attester = positional[0] ?? DEFAULT_ATTESTER_ENS
-  const platform = positional[1] ?? 'com.x'
+  const platform = positional[0] ?? 'com.x'
+  const attester = positional[1] ?? DEFAULT_ATTESTER_ENS
 
   header('Setup')
   console.log(`  ${c('gray', 'ENS name      ')} ${c('cyan', name)}`)
