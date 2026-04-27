@@ -8,7 +8,7 @@ import { z } from 'zod'
 
 const McpServiceSchema = z.object({
   name: z.literal('MCP'),
-  endpoint: z.string().url().describe('MCP server URL'),
+  endpoint: z.url().describe('MCP server URL'),
   version: z.string().describe('MCP protocol version date (e.g. 2025-11-25)'),
   mcpTools: z.array(z.string()).optional().describe('Tool names exposed by this MCP server'),
   capabilities: z.array(z.string()).optional().describe('MCP capability identifiers'),
@@ -16,16 +16,13 @@ const McpServiceSchema = z.object({
 
 const A2AServiceSchema = z.object({
   name: z.literal('A2A'),
-  endpoint: z
-    .string()
-    .url()
-    .describe('URL to the agent card JSON (e.g. /.well-known/agent-card.json)'),
+  endpoint: z.url().describe('URL to the agent card JSON (e.g. /.well-known/agent-card.json)'),
   version: z.string().describe('A2A protocol version (e.g. 0.3.0)'),
 })
 
 const OasfServiceSchema = z.object({
   name: z.literal('OASF'),
-  endpoint: z.string().url().describe('OASF schema endpoint URL'),
+  endpoint: z.url().describe('OASF schema endpoint URL'),
   version: z.string().describe('OASF version (e.g. 0.8.0)'),
   skills: z
     .array(z.string())
@@ -41,12 +38,12 @@ const AgentWalletServiceSchema = z.object({
 
 const WebServiceSchema = z.object({
   name: z.literal('web'),
-  endpoint: z.string().url().describe('Human-facing web UI URL'),
+  endpoint: z.url().describe('Human-facing web UI URL'),
 })
 
 const EmailServiceSchema = z.object({
   name: z.literal('email'),
-  endpoint: z.string().email().describe('Support email address'),
+  endpoint: z.email().describe('Support email address'),
 })
 
 const EnsServiceSchema = z.object({
@@ -78,17 +75,15 @@ const KNOWN_SERVICE_NAMES = [
   'ENS',
   'DID',
 ] as const
-const UnknownServiceSchema = z
-  .object({
-    name: z
-      .string()
-      .refine((n) => !(KNOWN_SERVICE_NAMES as readonly string[]).includes(n), {
-        message: 'Use the typed schema for known service names',
-      })
-      .describe('Custom service type name'),
-    endpoint: z.string().describe('Service endpoint'),
-  })
-  .passthrough()
+const UnknownServiceSchema = z.looseObject({
+  name: z
+    .string()
+    .refine((n) => !(KNOWN_SERVICE_NAMES as readonly string[]).includes(n), {
+      message: 'Use the typed schema for known service names',
+    })
+    .describe('Custom service type name'),
+  endpoint: z.string().describe('Service endpoint'),
+})
 
 // ─── Main schema ─────────────────────────────────────────────────────────────
 
@@ -105,15 +100,14 @@ export const SCHEMA_8004_V2 = z.object({
     .describe('Natural language explanation of what the agent does and its capabilities'),
 
   image: z
-    .string()
     .url()
     .optional()
     .describe('Avatar or logo URI — PNG, SVG, WebP, or JPG; 512×512px minimum recommended'),
 
   services: z
     .array(
-      z
-        .discriminatedUnion('name', [
+      z.union([
+        z.discriminatedUnion('name', [
           McpServiceSchema,
           A2AServiceSchema,
           OasfServiceSchema,
@@ -122,8 +116,9 @@ export const SCHEMA_8004_V2 = z.object({
           EmailServiceSchema,
           EnsServiceSchema,
           DidServiceSchema,
-        ])
-        .or(UnknownServiceSchema),
+        ]),
+        UnknownServiceSchema,
+      ]),
     )
     .describe(
       'Communication endpoints — MCP, A2A, OASF, agentWallet, web, email, ENS, DID, or any custom type',

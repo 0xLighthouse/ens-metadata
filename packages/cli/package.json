@@ -26,18 +26,15 @@
   "dependencies": {
     "@ensmetadata/sdk": "workspace:*",
     "@ensdomains/ensjs": "^4.0.2",
-    "ink": "^6.8.0",
-    "pastel": "^3.0.0",
-    "react": "^19.2.4",
+    "incur": "^0.4.4",
     "viem": "2.23.15",
-    "zod": "^3.25.76"
+    "zod": "^4.3.6"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
-    "@types/react": "^19.2.14",
     "@ensmetadata/schemas": "workspace:*",
     "@ensmetadata/shared": "workspace:*",
     "tsconfig": "workspace:*",
