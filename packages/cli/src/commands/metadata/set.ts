@@ -2,16 +2,30 @@ import { readFileSync } from 'node:fs'
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import { getPublishedRegistry } from '@ensmetadata/schemas/published'
 import { metadataWriter, validateMetadataSchema } from '@ensmetadata/sdk'
-import { http, createPublicClient, createWalletClient } from 'viem'
+import { createPublicClient, createWalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
+import {
+  buildFallbackTransport,
+  globalEnv,
+  globalOptions,
+  resolveRpcUrl,
+  validateName,
+} from '../../lib/context.js'
 import {
   estimateEnsTextRecordsCost,
   formatCost,
   validateEnsTextRecordsCost,
 } from '../../lib/ens-write.js'
-import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../lib/rpc.js'
+
+const setOptions = globalOptions.extend({
+  privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
+  broadcast: z
+    .boolean()
+    .default(false)
+    .describe('Broadcast the transaction on-chain (default: dry run)'),
+})
 
 export const setCommand = {
   description: 'Set ENS metadata text records from a payload file',
@@ -19,23 +33,18 @@ export const setCommand = {
     name: z.string().describe('ENS name (e.g. myagent.eth)'),
     payload: z.string().describe('Path to payload.json'),
   }),
-  options: z.object({
-    privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
-    broadcast: z
-      .boolean()
-      .default(false)
-      .describe('Broadcast the transaction on-chain (default: dry run)'),
-    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
-  }),
+  options: setOptions,
+  env: globalEnv,
   async run(c: {
     args: { name: string; payload: string }
-    options: { privateKey: string; broadcast: boolean; rpc?: string }
+    options: z.infer<typeof setOptions>
+    env: z.infer<typeof globalEnv>
   }) {
-    const { name: ensName, payload: payloadFile } = c.args
+    const ensName = validateName(c.args.name)
     const { privateKey, broadcast } = c.options
-    const rpcUrl = resolveRpcUrl(mainnet.id, c.options)
+    const rpcUrl = resolveRpcUrl(mainnet.id, c.options, c.env as Record<string, string | undefined>)
 
-    const raw: unknown = JSON.parse(readFileSync(payloadFile, 'utf8'))
+    const raw: unknown = JSON.parse(readFileSync(c.args.payload, 'utf8'))
     const validated = validateMetadataSchema(raw, SCHEMA_MAP.Agent)
     if (!validated.success) {
       throw new Error(
@@ -85,8 +94,9 @@ export const setCommand = {
     const { addEnsContracts } = await import('@ensdomains/ensjs')
     const account = privateKeyToAccount(privateKey as `0x${string}`)
     const chain = addEnsContracts(mainnet)
-    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
-    const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
+    const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
+    const publicClient = createPublicClient({ chain, transport })
+    const walletClient = createWalletClient({ account, chain, transport })
 
     const writer = metadataWriter({ publicClient })(walletClient)
     const result = await writer.setMetadata({ name: ensName, records: payload })

@@ -1,9 +1,7 @@
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import { metadataReader } from '@ensmetadata/sdk'
-import { http, createPublicClient } from 'viem'
-import { mainnet } from 'viem/chains'
 import { z } from 'zod'
-import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../lib/rpc.js'
+import { clientFromContext, globalEnv, globalOptions, validateName } from '../../lib/context.js'
 import { queryDomain } from '../../lib/subgraph.js'
 
 export const viewCommand = {
@@ -11,16 +9,16 @@ export const viewCommand = {
   args: z.object({
     name: z.string().describe('ENS name (e.g. myagent.eth)'),
   }),
-  options: z.object({
-    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
-  }),
-  async run(c: { args: { name: string }; options: { rpc?: string } }) {
-    const ensName = c.args.name
-    const rpcUrl = resolveRpcUrl(mainnet.id, c.options)
-    const client = createPublicClient({
-      chain: mainnet,
-      transport: http(rpcUrl, { batch: { batchSize: 128 } }),
-    }).extend(metadataReader())
+  options: globalOptions,
+  env: globalEnv,
+  async run(c: {
+    args: { name: string }
+    options: z.infer<typeof globalOptions>
+    env: z.infer<typeof globalEnv>
+  }) {
+    const ensName = validateName(c.args.name)
+    const { client } = clientFromContext(c, 'mainnet')
+    const reader = client.extend(metadataReader())
 
     const domain = await queryDomain(ensName)
     if (domain && !domain.resolver) {
@@ -39,7 +37,7 @@ export const viewCommand = {
       }
     }
 
-    const metadata = await client.getMetadata({
+    const metadata = await reader.getMetadata({
       name: ensName,
       ...(textKeys ? { keys: textKeys } : {}),
     })

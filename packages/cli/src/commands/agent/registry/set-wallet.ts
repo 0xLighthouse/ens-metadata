@@ -1,17 +1,15 @@
-import {
-  http,
-  createPublicClient,
-  createWalletClient,
-  encodeFunctionData,
-  formatEther,
-  verifyTypedData,
-} from 'viem'
+import { createWalletClient, encodeFunctionData, formatEther, verifyTypedData } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { z } from 'zod'
 import IdentityRegistryABI from '../../../lib/abis/IdentityRegistry.json' with { type: 'json' }
+import {
+  buildFallbackTransport,
+  chainAwareOptions,
+  clientFromContext,
+  globalEnv,
+  resolveRpcUrl,
+} from '../../../lib/context.js'
 import { estimateCost, formatCost, validateCost } from '../../../lib/estimate-cost.js'
-import { SUPPORTED_CHAINS, resolveChain } from '../../../lib/registry.js'
-import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../../lib/rpc.js'
 
 const EIP712_TYPES = {
   AgentWalletSet: [
@@ -22,53 +20,37 @@ const EIP712_TYPES = {
   ],
 } as const
 
+const setWalletOptions = chainAwareOptions.extend({
+  privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
+  broadcast: z
+    .boolean()
+    .default(false)
+    .describe('Broadcast the transaction on-chain (default: dry run)'),
+  deadline: z.string().optional().describe('Deadline unix timestamp (auto-generated if omitted)'),
+  signature: z
+    .string()
+    .optional()
+    .describe('EIP-712 signature from the wallet (auto-signed if omitted)'),
+})
+
 export const setWalletCommand = {
   description: 'Link a verified wallet to an agent via EIP-712 signature',
   args: z.object({
     agentId: z.string().describe('Agent token ID'),
     walletAddress: z.string().describe('Wallet address (0x...)'),
   }),
-  options: z.object({
-    chainName: z
-      .enum(SUPPORTED_CHAINS)
-      .default('mainnet')
-      .describe('Chain name (e.g. mainnet, base, arbitrum, optimism)'),
-    privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
-    broadcast: z
-      .boolean()
-      .default(false)
-      .describe('Broadcast the transaction on-chain (default: dry run)'),
-    deadline: z.string().optional().describe('Deadline unix timestamp (auto-generated if omitted)'),
-    signature: z
-      .string()
-      .optional()
-      .describe('EIP-712 signature from the wallet (auto-signed if omitted)'),
-    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
-  }),
+  options: setWalletOptions,
+  env: globalEnv,
   async run(c: {
     args: { agentId: string; walletAddress: string }
-    options: {
-      chainName: string
-      privateKey: string
-      broadcast: boolean
-      deadline?: string
-      signature?: string
-      rpc?: string
-    }
+    options: z.infer<typeof setWalletOptions>
+    env: z.infer<typeof globalEnv>
   }) {
-    const {
-      chainName,
-      privateKey,
-      broadcast,
-      deadline: deadlineOpt,
-      signature: signatureOpt,
-    } = c.options
+    const { privateKey, broadcast, deadline: deadlineOpt, signature: signatureOpt } = c.options
     const { agentId, walletAddress } = c.args
 
-    const { chain, registryAddress } = resolveChain(chainName)
-    const rpcUrl = resolveRpcUrl(chain.id, c.options)
+    const { client: publicClient, chain, registryAddress } = clientFromContext(c)
     const account = privateKeyToAccount(privateKey as `0x${string}`)
-    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
     const tokenId = BigInt(agentId)
     const chainId = await publicClient.getChainId()
 
@@ -81,6 +63,9 @@ export const setWalletCommand = {
 
     let finalDeadline: bigint
     let finalSignature: `0x${string}`
+
+    const rpcUrl = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
+    const transport = buildFallbackTransport(chain.id, rpcUrl, chain.rpcUrls.default.http)
 
     if (signatureOpt && deadlineOpt) {
       finalDeadline = BigInt(deadlineOpt)
@@ -107,7 +92,7 @@ export const setWalletCommand = {
       const block = await publicClient.getBlock()
       finalDeadline = block.timestamp + 240n
 
-      const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
+      const walletClient = createWalletClient({ account, chain, transport })
       finalSignature = await walletClient.signTypedData({
         account,
         domain,
@@ -151,7 +136,7 @@ export const setWalletCommand = {
 
       return {
         dryRun: true,
-        chain: chainName,
+        chain: c.options.chain,
         registry: registryAddress,
         function: 'setAgentWallet',
         agentId: tokenId.toString(),
@@ -159,6 +144,9 @@ export const setWalletCommand = {
         deadline: finalDeadline.toString(),
         signer: account.address,
         signature: signatureOpt ? 'provided (verified)' : 'auto-signed',
+        to: registryAddress,
+        data,
+        value: '0',
         ...(estimatedCost ? { estimatedCost } : {}),
         ...(balance ? { balance } : {}),
         ...(signatureOpt
@@ -180,7 +168,7 @@ export const setWalletCommand = {
       }
     }
 
-    const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
+    const walletClient = createWalletClient({ account, chain, transport })
     const txData = encodeFunctionData({
       abi: IdentityRegistryABI,
       functionName: 'setAgentWallet',
@@ -205,7 +193,7 @@ export const setWalletCommand = {
 
     return {
       broadcast: true,
-      chain: chainName,
+      chain: c.options.chain,
       registry: registryAddress,
       function: 'setAgentWallet',
       agentId: tokenId.toString(),
