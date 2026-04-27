@@ -10,111 +10,96 @@ export type RegistryCallParams = {
   broadcast: boolean
   functionName: string
   contractArgs: readonly unknown[]
-  /** Lines shown between header and cost in dry-run output */
-  dryRunDetails: string[]
-  /** e.g. "✅ Agent registered on base-sepolia" */
-  successMessage: string
-  /** Additional lines after success message (e.g. "   Agent URI: ...") */
-  successDetails?: string[]
-  /** Prefix for error messages, e.g. "Registration" → "Registration failed: ..." */
-  errorPrefix: string
+  /** Extra fields surfaced in the result object alongside chain/registry/signer */
+  extraDetails?: Record<string, unknown>
 }
 
-export type RegistryCallResult = {
-  status: 'done' | 'error'
-  message: string
-}
+export type RegistryDryRunResult = {
+  dryRun: true
+  chain: string
+  registry: `0x${string}`
+  function: string
+  signer: `0x${string}`
+  estimatedCost?: string
+  balance?: string
+  hint: string
+} & Record<string, unknown>
+
+export type RegistryBroadcastResult = {
+  broadcast: true
+  chain: string
+  registry: `0x${string}`
+  function: string
+  txHash: `0x${string}`
+  explorerUrl: string | null
+} & Record<string, unknown>
 
 /**
- * Shared executor for registry contract calls. Handles both dry-run and broadcast paths:
- * - Dry-run: encodes function data, estimates cost + balance, formats display
- * - Broadcast: validateCost, simulateContract, writeContract, explorer URL
+ * Shared executor for IdentityRegistry contract calls. Handles both dry-run and
+ * broadcast paths and returns a structured result object suitable for incur output.
  */
 export async function executeRegistryCall(
   params: RegistryCallParams,
-  onWorking?: (message: string) => void,
-): Promise<RegistryCallResult> {
-  const {
-    chainName,
-    privateKey,
-    broadcast,
-    functionName,
-    contractArgs,
-    dryRunDetails,
-    successMessage,
-    successDetails,
-    errorPrefix,
-  } = params
+): Promise<RegistryDryRunResult | RegistryBroadcastResult> {
+  const { chainName, privateKey, broadcast, functionName, contractArgs, extraDetails } = params
   const { chain, registryAddress } = resolveChain(chainName)
   const account = privateKeyToAccount(privateKey as `0x${string}`)
-
   const data = encodeFunctionData({
     abi: IdentityRegistryABI,
     functionName,
     args: [...contractArgs],
   })
 
-  if (!broadcast) {
-    const publicClient = createPublicClient({ chain, transport: http() })
+  const publicClient = createPublicClient({ chain, transport: http() })
 
-    let costLine = '  Est. Cost: unable to estimate'
-    let balanceLine = ''
+  if (!broadcast) {
+    let estimatedCost: string | undefined
+    let balance: string | undefined
     try {
-      const [est, balance] = await Promise.all([
+      const [est, bal] = await Promise.all([
         estimateCost(publicClient, { account: account.address, to: registryAddress, data }),
         publicClient.getBalance({ address: account.address }),
       ])
-      costLine = `  Est. Cost: ${formatCost(est)}`
-      balanceLine = `  Balance:   ${Number.parseFloat(formatEther(balance)).toFixed(6)} ETH`
-    } catch {}
+      estimatedCost = formatCost(est)
+      balance = `${Number.parseFloat(formatEther(bal)).toFixed(6)} ETH`
+    } catch {
+      // best-effort
+    }
 
     return {
-      status: 'done',
-      message: [
-        `Dry run — would call ${functionName} on ${chainName}:`,
-        '',
-        `  Registry:  ${registryAddress}`,
-        ...dryRunDetails,
-        `  Signer:    ${account.address}`,
-        balanceLine,
-        costLine,
-        '',
-        'Run with --broadcast to submit on-chain.',
-      ].join('\n'),
+      dryRun: true,
+      chain: chainName,
+      registry: registryAddress,
+      function: functionName,
+      signer: account.address,
+      ...(estimatedCost ? { estimatedCost } : {}),
+      ...(balance ? { balance } : {}),
+      ...(extraDetails ?? {}),
+      hint: 'Run with --broadcast to submit on-chain.',
     }
   }
 
-  onWorking?.(`Broadcasting ${functionName} on ${chainName}…`)
+  const walletClient = createWalletClient({ account, chain, transport: http() })
+  await validateCost(publicClient, { account: account.address, to: registryAddress, data })
 
-  try {
-    const publicClient = createPublicClient({ chain, transport: http() })
-    const walletClient = createWalletClient({ account, chain, transport: http() })
+  const { request } = await publicClient.simulateContract({
+    account,
+    address: registryAddress,
+    abi: IdentityRegistryABI,
+    functionName,
+    args: [...contractArgs],
+  })
 
-    await validateCost(publicClient, { account: account.address, to: registryAddress, data })
+  const txHash = await walletClient.writeContract(request)
+  const explorerUrl = chain.blockExplorers?.default?.url ?? null
 
-    const { request } = await publicClient.simulateContract({
-      account,
-      address: registryAddress,
-      abi: IdentityRegistryABI,
-      functionName,
-      args: [...contractArgs],
-    })
-
-    const txHash = await walletClient.writeContract(request)
-
-    const explorerUrl = chain.blockExplorers?.default?.url
-    return {
-      status: 'done',
-      message: [
-        successMessage,
-        ...(successDetails ?? []),
-        `   Tx Hash:  ${explorerUrl ? `${explorerUrl}/tx/${txHash}` : txHash}`,
-      ].join('\n'),
-    }
-  } catch (err) {
-    return {
-      status: 'error',
-      message: `${errorPrefix} failed: ${(err as Error).message}`,
-    }
+  return {
+    broadcast: true,
+    chain: chainName,
+    registry: registryAddress,
+    function: functionName,
+    txHash,
+    explorerUrl: explorerUrl ? `${explorerUrl}/tx/${txHash}` : null,
+    ...(extraDetails ?? {}),
   }
 }

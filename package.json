@@ -33,13 +33,9 @@
     },
     "peerDependencyRules": {
       "allowedVersions": {
-        "pastel>react": "19",
         "vocs>react": "18",
         "vocs>react-dom": "18"
       }
-    },
-    "patchedDependencies": {
-      "pastel@3.0.0": "patches/pastel@3.0.0.patch"
     }
   }
 }

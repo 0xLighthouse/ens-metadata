@@ -1,10 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Text } from 'ink'
-import React from 'react'
-
-export const description = 'Print the SKILL.md guide for this CLI'
+import { z } from 'zod'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -20,11 +17,13 @@ function getSkillMdPath(): string {
   throw new Error('SKILL.md not found in package')
 }
 
-export default function Skill() {
-  try {
+export const skillCommand = {
+  description: 'Print the SKILL.md guide for this CLI',
+  args: z.object({}),
+  options: z.object({}),
+  run() {
     const content = readFileSync(getSkillMdPath(), 'utf8')
-    return <Text>{content}</Text>
-  } catch (err) {
-    return <Text color="red">❌ {(err as Error).message}</Text>
-  }
+    process.stdout.write(content)
+    return { ok: true }
+  },
 }
