@@ -1,7 +1,8 @@
 import type { Hex } from 'viem'
-import { http, createPublicClient, encodeFunctionData, formatEther } from 'viem'
+import { createPublicClient, encodeFunctionData, formatEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
+import { buildFallbackTransport } from './context.js'
 import { type CostEstimate, estimateCost, formatCost, validateCost } from './estimate-cost.js'
 
 export type TextRecord = { key: string; value: string }
@@ -10,7 +11,8 @@ async function ensSetup(privateKey: string, rpcUrl?: string) {
   const { addEnsContracts } = await import('@ensdomains/ensjs')
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const chain = addEnsContracts(mainnet)
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
+  const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
+  const publicClient = createPublicClient({ chain, transport })
   return { account, chain, publicClient }
 }
 

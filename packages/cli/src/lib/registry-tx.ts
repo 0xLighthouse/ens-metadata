@@ -1,17 +1,19 @@
-import { http, createPublicClient, createWalletClient, encodeFunctionData, formatEther } from 'viem'
+import { createWalletClient, encodeFunctionData, formatEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import IdentityRegistryABI from './abis/IdentityRegistry.json' with { type: 'json' }
+import {
+  type Context,
+  buildFallbackTransport,
+  clientFromContext,
+  resolveRpcUrl,
+} from './context.js'
 import { estimateCost, formatCost, validateCost } from './estimate-cost.js'
-import { resolveChain } from './registry.js'
 
 export type RegistryCallParams = {
-  chainName: string
   privateKey: string
   broadcast: boolean
   functionName: string
   contractArgs: readonly unknown[]
-  /** Optional RPC URL override (e.g. from --rpc flag or env) */
-  rpcUrl?: string
   /** Extra fields surfaced in the result object alongside chain/registry/signer */
   extraDetails?: Record<string, unknown>
 }
@@ -22,6 +24,9 @@ export type RegistryDryRunResult = {
   registry: `0x${string}`
   function: string
   signer: `0x${string}`
+  to: `0x${string}`
+  data: `0x${string}`
+  value: '0'
   estimatedCost?: string
   balance?: string
   hint: string
@@ -37,23 +42,22 @@ export type RegistryBroadcastResult = {
 } & Record<string, unknown>
 
 /**
- * Shared executor for IdentityRegistry contract calls. Handles both dry-run and
- * broadcast paths and returns a structured result object suitable for incur output.
+ * Shared executor for IdentityRegistry contract calls. Reads chain + RPC from
+ * the incur context. Dry-run output includes pipeable `{to, data, value}`
+ * alongside the human-readable summary.
  */
 export async function executeRegistryCall(
+  c: Context,
   params: RegistryCallParams,
 ): Promise<RegistryDryRunResult | RegistryBroadcastResult> {
-  const { chainName, privateKey, broadcast, functionName, contractArgs, rpcUrl, extraDetails } =
-    params
-  const { chain, registryAddress } = resolveChain(chainName)
+  const { privateKey, broadcast, functionName, contractArgs, extraDetails } = params
+  const { client: publicClient, chain, registryAddress } = clientFromContext(c)
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const data = encodeFunctionData({
     abi: IdentityRegistryABI,
     functionName,
     args: [...contractArgs],
   })
-
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
 
   if (!broadcast) {
     let estimatedCost: string | undefined
@@ -71,10 +75,13 @@ export async function executeRegistryCall(
 
     return {
       dryRun: true,
-      chain: chainName,
+      chain: c.options.chain ?? 'mainnet',
       registry: registryAddress,
       function: functionName,
       signer: account.address,
+      to: registryAddress,
+      data,
+      value: '0',
       ...(estimatedCost ? { estimatedCost } : {}),
       ...(balance ? { balance } : {}),
       ...(extraDetails ?? {}),
@@ -82,7 +89,9 @@ export async function executeRegistryCall(
     }
   }
 
-  const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
+  const rpcUrl = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport(chain.id, rpcUrl, chain.rpcUrls.default.http)
+  const walletClient = createWalletClient({ account, chain, transport })
   await validateCost(publicClient, { account: account.address, to: registryAddress, data })
 
   const { request } = await publicClient.simulateContract({
@@ -98,7 +107,7 @@ export async function executeRegistryCall(
 
   return {
     broadcast: true,
-    chain: chainName,
+    chain: c.options.chain ?? 'mainnet',
     registry: registryAddress,
     function: functionName,
     txHash,
