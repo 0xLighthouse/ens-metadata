@@ -50,10 +50,16 @@ export function extractSchemaFields(texts: Record<string, string | null>): GetSc
 }
 
 declare function setTimeout(callback: () => void, ms: number): unknown
+declare function clearTimeout(handle: unknown): void
 
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
-  return Promise.race([promise, timer]) as Promise<T | null>
+  let timerId: unknown
+  const timer = new Promise<null>((resolve) => {
+    timerId = setTimeout(() => resolve(null), ms)
+  })
+  return Promise.race([promise, timer]).finally(() => clearTimeout(timerId)) as Promise<
+    T | null
+  >
 }
 
 export async function fetchTextRecords(
