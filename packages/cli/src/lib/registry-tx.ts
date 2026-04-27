@@ -10,6 +10,8 @@ export type RegistryCallParams = {
   broadcast: boolean
   functionName: string
   contractArgs: readonly unknown[]
+  /** Optional RPC URL override (e.g. from --rpc flag or env) */
+  rpcUrl?: string
   /** Extra fields surfaced in the result object alongside chain/registry/signer */
   extraDetails?: Record<string, unknown>
 }
@@ -41,7 +43,8 @@ export type RegistryBroadcastResult = {
 export async function executeRegistryCall(
   params: RegistryCallParams,
 ): Promise<RegistryDryRunResult | RegistryBroadcastResult> {
-  const { chainName, privateKey, broadcast, functionName, contractArgs, extraDetails } = params
+  const { chainName, privateKey, broadcast, functionName, contractArgs, rpcUrl, extraDetails } =
+    params
   const { chain, registryAddress } = resolveChain(chainName)
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const data = encodeFunctionData({
@@ -50,7 +53,7 @@ export async function executeRegistryCall(
     args: [...contractArgs],
   })
 
-  const publicClient = createPublicClient({ chain, transport: http() })
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
 
   if (!broadcast) {
     let estimatedCost: string | undefined
@@ -79,7 +82,7 @@ export async function executeRegistryCall(
     }
   }
 
-  const walletClient = createWalletClient({ account, chain, transport: http() })
+  const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
   await validateCost(publicClient, { account: account.address, to: registryAddress, data })
 
   const { request } = await publicClient.simulateContract({

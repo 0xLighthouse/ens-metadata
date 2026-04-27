@@ -3,6 +3,7 @@ import { metadataReader } from '@ensmetadata/sdk'
 import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
+import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../lib/rpc.js'
 import { queryDomain } from '../../lib/subgraph.js'
 
 export const viewCommand = {
@@ -10,12 +11,15 @@ export const viewCommand = {
   args: z.object({
     name: z.string().describe('ENS name (e.g. myagent.eth)'),
   }),
-  options: z.object({}),
-  async run(c: { args: { name: string } }) {
+  options: z.object({
+    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
+  }),
+  async run(c: { args: { name: string }; options: { rpc?: string } }) {
     const ensName = c.args.name
+    const rpcUrl = resolveRpcUrl(mainnet.id, c.options)
     const client = createPublicClient({
       chain: mainnet,
-      transport: http(undefined, { batch: { batchSize: 128 } }),
+      transport: http(rpcUrl, { batch: { batchSize: 128 } }),
     }).extend(metadataReader())
 
     const domain = await queryDomain(ensName)
