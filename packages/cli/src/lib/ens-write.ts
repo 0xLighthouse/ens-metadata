@@ -6,11 +6,11 @@ import { type CostEstimate, estimateCost, formatCost, validateCost } from './est
 
 export type TextRecord = { key: string; value: string }
 
-async function ensSetup(privateKey: string) {
+async function ensSetup(privateKey: string, rpcUrl?: string) {
   const { addEnsContracts } = await import('@ensdomains/ensjs')
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const chain = addEnsContracts(mainnet)
-  const publicClient = createPublicClient({ chain, transport: http() })
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
   return { account, chain, publicClient }
 }
 
@@ -24,8 +24,13 @@ async function resolveEns(publicClient: any, ensName: string) {
   return resolverAddress
 }
 
-async function encodeEnsTextRecords(ensName: string, texts: TextRecord[], privateKey: string) {
-  const { account, publicClient } = await ensSetup(privateKey)
+async function encodeEnsTextRecords(
+  ensName: string,
+  texts: TextRecord[],
+  privateKey: string,
+  rpcUrl?: string,
+) {
+  const { account, publicClient } = await ensSetup(privateKey, rpcUrl)
   const { namehash, generateRecordCallArray } = await import('@ensdomains/ensjs/utils')
   const resolverAddress = await resolveEns(publicClient, ensName)
   const node = namehash(ensName)
@@ -59,11 +64,13 @@ export async function estimateEnsTextRecordsCost(
   ensName: string,
   texts: TextRecord[],
   privateKey: string,
+  rpcUrl?: string,
 ): Promise<CostEstimate & { balance: string }> {
   const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
     ensName,
     texts,
     privateKey,
+    rpcUrl,
   )
   const [est, balance] = await Promise.all([
     estimateCost(publicClient, { account: account.address, to: resolverAddress, data }),
@@ -78,11 +85,13 @@ export async function validateEnsTextRecordsCost(
   ensName: string,
   texts: TextRecord[],
   privateKey: string,
+  rpcUrl?: string,
 ): Promise<CostEstimate> {
   const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
     ensName,
     texts,
     privateKey,
+    rpcUrl,
   )
   return validateCost(publicClient, { account: account.address, to: resolverAddress, data })
 }

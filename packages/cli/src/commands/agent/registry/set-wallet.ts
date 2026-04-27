@@ -11,6 +11,7 @@ import { z } from 'zod'
 import IdentityRegistryABI from '../../../lib/abis/IdentityRegistry.json' with { type: 'json' }
 import { estimateCost, formatCost, validateCost } from '../../../lib/estimate-cost.js'
 import { SUPPORTED_CHAINS, resolveChain } from '../../../lib/registry.js'
+import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../../lib/rpc.js'
 
 const EIP712_TYPES = {
   AgentWalletSet: [
@@ -42,6 +43,7 @@ export const setWalletCommand = {
       .string()
       .optional()
       .describe('EIP-712 signature from the wallet (auto-signed if omitted)'),
+    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
   }),
   async run(c: {
     args: { agentId: string; walletAddress: string }
@@ -51,6 +53,7 @@ export const setWalletCommand = {
       broadcast: boolean
       deadline?: string
       signature?: string
+      rpc?: string
     }
   }) {
     const {
@@ -63,8 +66,9 @@ export const setWalletCommand = {
     const { agentId, walletAddress } = c.args
 
     const { chain, registryAddress } = resolveChain(chainName)
+    const rpcUrl = resolveRpcUrl(chain.id, c.options)
     const account = privateKeyToAccount(privateKey as `0x${string}`)
-    const publicClient = createPublicClient({ chain, transport: http() })
+    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
     const tokenId = BigInt(agentId)
     const chainId = await publicClient.getChainId()
 
@@ -103,7 +107,7 @@ export const setWalletCommand = {
       const block = await publicClient.getBlock()
       finalDeadline = block.timestamp + 240n
 
-      const walletClient = createWalletClient({ account, chain, transport: http() })
+      const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
       finalSignature = await walletClient.signTypedData({
         account,
         domain,
@@ -176,7 +180,7 @@ export const setWalletCommand = {
       }
     }
 
-    const walletClient = createWalletClient({ account, chain, transport: http() })
+    const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
     const txData = encodeFunctionData({
       abi: IdentityRegistryABI,
       functionName: 'setAgentWallet',

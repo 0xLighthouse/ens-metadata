@@ -11,6 +11,7 @@ import {
   formatCost,
   validateEnsTextRecordsCost,
 } from '../../lib/ens-write.js'
+import { RPC_OPTION_DESCRIPTION, resolveRpcUrl } from '../../lib/rpc.js'
 
 export const setCommand = {
   description: 'Set ENS metadata text records from a payload file',
@@ -24,13 +25,15 @@ export const setCommand = {
       .boolean()
       .default(false)
       .describe('Broadcast the transaction on-chain (default: dry run)'),
+    rpc: z.string().optional().describe(RPC_OPTION_DESCRIPTION),
   }),
   async run(c: {
     args: { name: string; payload: string }
-    options: { privateKey: string; broadcast: boolean }
+    options: { privateKey: string; broadcast: boolean; rpc?: string }
   }) {
     const { name: ensName, payload: payloadFile } = c.args
     const { privateKey, broadcast } = c.options
+    const rpcUrl = resolveRpcUrl(mainnet.id, c.options)
 
     const raw: unknown = JSON.parse(readFileSync(payloadFile, 'utf8'))
     const validated = validateMetadataSchema(raw, SCHEMA_MAP.Agent)
@@ -59,7 +62,7 @@ export const setCommand = {
     if (!broadcast) {
       let estimate: Awaited<ReturnType<typeof estimateEnsTextRecordsCost>> | null = null
       try {
-        estimate = await estimateEnsTextRecordsCost(ensName, texts, privateKey)
+        estimate = await estimateEnsTextRecordsCost(ensName, texts, privateKey, rpcUrl)
       } catch {
         // estimate is best-effort
       }
@@ -77,13 +80,13 @@ export const setCommand = {
       }
     }
 
-    await validateEnsTextRecordsCost(ensName, texts, privateKey)
+    await validateEnsTextRecordsCost(ensName, texts, privateKey, rpcUrl)
 
     const { addEnsContracts } = await import('@ensdomains/ensjs')
     const account = privateKeyToAccount(privateKey as `0x${string}`)
     const chain = addEnsContracts(mainnet)
-    const publicClient = createPublicClient({ chain, transport: http() })
-    const walletClient = createWalletClient({ account, chain, transport: http() })
+    const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
+    const walletClient = createWalletClient({ account, chain, transport: http(rpcUrl) })
 
     const writer = metadataWriter({ publicClient })(walletClient)
     const result = await writer.setMetadata({ name: ensName, records: payload })
