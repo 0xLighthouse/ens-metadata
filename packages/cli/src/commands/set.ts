@@ -12,12 +12,12 @@ import {
   globalOptions,
   resolveRpcUrl,
   validateName,
-} from '../../lib/context.js'
+} from '../lib/context.js'
 import {
   estimateEnsTextRecordsCost,
   formatCost,
   validateEnsTextRecordsCost,
-} from '../../lib/ens-write.js'
+} from '../lib/ens-write.js'
 
 const setOptions = globalOptions.extend({
   privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),

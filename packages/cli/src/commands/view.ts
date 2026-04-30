@@ -1,8 +1,8 @@
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import { metadataReader } from '@ensmetadata/sdk'
 import { z } from 'zod'
-import { clientFromContext, globalEnv, globalOptions, validateName } from '../../lib/context.js'
-import { queryDomain } from '../../lib/subgraph.js'
+import { clientFromContext, globalEnv, globalOptions, validateName } from '../lib/context.js'
+import { queryDomain } from '../lib/subgraph.js'
 
 export const viewCommand = {
   description: 'View ENS node metadata',
