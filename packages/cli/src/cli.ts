@@ -11,8 +11,16 @@ import { unsetWalletCommand as agentRegistryUnsetWallet } from './commands/agent
 import { setCommand as metadataSet } from './commands/metadata/set.js'
 import { templateCommand as metadataTemplate } from './commands/metadata/template.js'
 import { validateCommand as metadataValidate } from './commands/metadata/validate.js'
+import { verifyHandleCommand as metadataVerifyHandle } from './commands/metadata/verify/handle.js'
+import { verifyUidCommand as metadataVerifyUid } from './commands/metadata/verify/uid.js'
 import { viewCommand as metadataView } from './commands/metadata/view.js'
 import { skillCommand } from './commands/skill.js'
+
+const metadataVerifyGroup = Cli.create('verify', {
+  description: 'Verify social-handle and uid attestations on ENS names',
+})
+  .command('handle', metadataVerifyHandle)
+  .command('uid', metadataVerifyUid)
 
 const metadataGroup = Cli.create('metadata', {
   description: 'View and write ERC-8004 metadata records on ENS names',
@@ -21,6 +29,7 @@ const metadataGroup = Cli.create('metadata', {
   .command('set', metadataSet)
   .command('validate', metadataValidate)
   .command('template', metadataTemplate)
+  .command(metadataVerifyGroup)
 
 const agentRegistrationFileGroup = Cli.create('registration-file', {
   description: 'Build, validate, and publish ERC-8004 v2.0 agent registration files',
