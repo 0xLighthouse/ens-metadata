@@ -96,7 +96,9 @@ async function verifyHandleAttestationImpl(
   if (!attesterAddress) {
     return { valid: false, reason: 'attester-not-resolved', attester: attesterEns }
   }
-  if (!owner) return { valid: false, reason: 'bad-signature', attester: attesterEns, attesterAddress }
+  if (!owner) {
+    return { valid: false, reason: 'owner-not-resolved', attester: attesterEns, attesterAddress }
+  }
   if (!handle || typeof handle !== 'string' || handle.length === 0) {
     return { valid: false, reason: 'missing', attester: attesterEns, attesterAddress }
   }
@@ -160,7 +162,9 @@ async function verifyUidAttestationImpl(
   if (!attesterAddress) {
     return { valid: false, reason: 'attester-not-resolved', attester: attesterEns }
   }
-  if (!owner) return { valid: false, reason: 'bad-signature', attester: attesterEns, attesterAddress }
+  if (!owner) {
+    return { valid: false, reason: 'owner-not-resolved', attester: attesterEns, attesterAddress }
+  }
 
   let envelope: Envelope
   try {

@@ -110,6 +110,7 @@ Both `verifyHandleAttestation` and `verifyUidAttestation`:
 | `decode-error` | Record bytes don't parse as a v2 envelope. | Treat as adversarial or corrupted. |
 | `unsupported-version` | Envelope version isn't v2. | Upgrade the SDK. |
 | `attester-not-resolved` | The attester ENS name has no current `addr` record — nothing under that name is verifiable until the ENS is fixed. | Inspect your `attester` option; if it's correct, the attester's operator has not pointed the name at a signing key. |
+| `owner-not-resolved` | The subject ENS name has no owner — unregistered, expired, or an RPC failure. | Confirm the name is still registered; retry on RPC errors. |
 | `bad-signature` | Reconstructed payload doesn't match the signature — could be wrong owner (name transferred), wrong handle/uid supplied, a rotated key, or a different attester entirely. | Check you passed the right attester name; confirm the user hasn't transferred the name. |
 | `stale` | `now - issuedAt > maxAge`. | Only fires if you set `maxAge`. Ask the user to re-issue. |
 
