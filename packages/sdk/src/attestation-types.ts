@@ -93,6 +93,10 @@ export interface SignClaimWalletClient {
  * `attester-not-resolved` is separate because it's actionable: the attester
  * ENS name has no current addr record, so no signing key is claimable and
  * nothing under that name can be verified until the ENS is fixed.
+ *
+ * `owner-not-resolved` is the analogous case for the subject name: the ENS
+ * name being verified has no owner (unregistered, expired, or RPC failure),
+ * so we can't reconstruct the signed payload.
  */
 export type VerifyFailureReason =
   | 'missing'
@@ -101,6 +105,7 @@ export type VerifyFailureReason =
   | 'unsupported-version'
   | 'decode-error'
   | 'attester-not-resolved'
+  | 'owner-not-resolved'
 
 export interface VerifyClaimResult {
   valid: boolean
