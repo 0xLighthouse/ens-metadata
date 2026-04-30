@@ -27,7 +27,7 @@
     "@ensmetadata/sdk": "workspace:*",
     "@ensdomains/ensjs": "^4.0.2",
     "incur": "^0.4.4",
-    "viem": "2.23.15",
+    "viem": "2.47.6",
     "zod": "^4.3.6"
   },
   "publishConfig": {
