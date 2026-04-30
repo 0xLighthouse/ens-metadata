@@ -8,28 +8,24 @@ import { registerCommand as agentRegistryRegister } from './commands/agent/regis
 import { setUriCommand as agentRegistrySetUri } from './commands/agent/registry/set-uri.js'
 import { setWalletCommand as agentRegistrySetWallet } from './commands/agent/registry/set-wallet.js'
 import { unsetWalletCommand as agentRegistryUnsetWallet } from './commands/agent/registry/unset-wallet.js'
-import { setCommand as metadataSet } from './commands/metadata/set.js'
-import { templateCommand as metadataTemplate } from './commands/metadata/template.js'
-import { validateCommand as metadataValidate } from './commands/metadata/validate.js'
-import { verifyHandleCommand as metadataVerifyHandle } from './commands/metadata/verify/handle.js'
-import { verifyUidCommand as metadataVerifyUid } from './commands/metadata/verify/uid.js'
-import { viewCommand as metadataView } from './commands/metadata/view.js'
+import { verifyHandleCommand as attestationVerifyHandle } from './commands/attestation/verify/handle.js'
+import { verifyUidCommand as attestationVerifyUid } from './commands/attestation/verify/uid.js'
+import { setCommand } from './commands/set.js'
 import { skillCommand } from './commands/skill.js'
+import { templateCommand } from './commands/template.js'
+import { validateCommand } from './commands/validate.js'
+import { viewCommand } from './commands/view.js'
 
-const metadataVerifyGroup = Cli.create('verify', {
-  description: 'Verify social-handle and uid attestations on ENS names',
+const attestationVerifyGroup = Cli.create('verify', {
+  description: 'Verify social-handle and uid attestations added to ENS names',
 })
-  .command('handle', metadataVerifyHandle)
-  .command('uid', metadataVerifyUid)
+  .command('handle', attestationVerifyHandle)
+  .command('uid', attestationVerifyUid)
 
-const metadataGroup = Cli.create('metadata', {
-  description: 'View and write ERC-8004 metadata records on ENS names',
+const attestationGroup = Cli.create('attestation', {
+  description: 'Attestations added to ENS names',
 })
-  .command('view', metadataView)
-  .command('set', metadataSet)
-  .command('validate', metadataValidate)
-  .command('template', metadataTemplate)
-  .command(metadataVerifyGroup)
+  .command(attestationVerifyGroup)
 
 const agentRegistrationFileGroup = Cli.create('registration-file', {
   description: 'Build, validate, and publish ERC-8004 v2.0 agent registration files',
@@ -48,15 +44,19 @@ const agentRegistryGroup = Cli.create('registry', {
   .command('unset-wallet', agentRegistryUnsetWallet)
 
 const agentGroup = Cli.create('agent', {
-  description: 'Agent lifecycle — registration files and on-chain identity',
+  description: 'Agent registration files and on-chain identity',
 })
   .command(agentRegistrationFileGroup)
   .command(agentRegistryGroup)
 
 const cli = Cli.create('ens-metadata', {
-  description: 'CLI for managing AI agent metadata on ENS using ERC-8004',
+  description: 'CLI for managing metadata for ENS names',
 })
-  .command(metadataGroup)
+  .command('view', viewCommand)
+  .command('set', setCommand)
+  .command('validate', validateCommand)
+  .command('template', templateCommand)
+  .command(attestationGroup)
   .command(agentGroup)
   .command('skill', skillCommand)
 
