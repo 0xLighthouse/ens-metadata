@@ -13,7 +13,7 @@ Ask the user for their agent's ENS name before proceeding.
 
 > Referred to as `<AGENT_ENS_NAME>` throughout.
 
-Ensure the agent's address is the **manager** of the subname. Run `ens-metadata metadata view <AGENT_ENS_NAME>` to check. If the agent is not the manager, ask the user to transfer the manager role to the agent's public address before proceeding.
+Ensure the agent's address is the **manager** of the subname. Run `ens-metadata view <AGENT_ENS_NAME>` to check. If the agent is not the manager, ask the user to transfer the manager role to the agent's public address before proceeding.
 
 ## Guardrails
 
@@ -43,10 +43,10 @@ Registration Progress:
 mkdir -p ~/.ens-metadata
 
 # generate template, then edit with your details
-ens-metadata registration-file template > ~/.ens-metadata/registration.json
+ens-metadata agent registration-file template > ~/.ens-metadata/registration.json
 
 # validate
-ens-metadata registration-file validate ~/.ens-metadata/registration.json
+ens-metadata agent registration-file validate ~/.ens-metadata/registration.json
 ```
 
 ### Step 2: Publish registration file to IPFS
@@ -54,7 +54,7 @@ ens-metadata registration-file validate ~/.ens-metadata/registration.json
 Requires environment variables: `PINATA_JWT`, `PINATA_API_KEY`, `PINATA_API_SECRET`
 
 ```sh
-ens-metadata registration-file publish ~/.ens-metadata/registration.json
+ens-metadata agent registration-file publish ~/.ens-metadata/registration.json
 # Returns => {"cid":"<CID>","uri":"ipfs://<CID>"}
 ```
 
@@ -64,35 +64,35 @@ Publishes to the canonical registries at <https://github.com/erc-8004/erc-8004-c
 
 ```sh
 # Register agent identity (returns agent-id)
-ens-metadata registry identity register --chain-name <chain> <agent-uri> --private-key <0x...> [--broadcast]
+ens-metadata agent registry register --chain <chain> <agent-uri> --private-key <0x...> [--broadcast]
 
 # Query agent by token ID
-ens-metadata registry identity query --chain-name <chain> <agent-id>
+ens-metadata agent registry query --chain <chain> <agent-id>
 
 # Update agent URI
-ens-metadata registry identity set-uri --chain-name <chain> <agent-id> <new-uri> --private-key <0x...> [--broadcast]
+ens-metadata agent registry set-uri --chain <chain> <agent-id> <new-uri> --private-key <0x...> [--broadcast]
 
 # Link a verified wallet (auto-signs if signer controls the wallet)
-ens-metadata registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --private-key <0x...> [--broadcast]
+ens-metadata agent registry set-wallet --chain <chain> <agent-id> <wallet> --private-key <0x...> [--broadcast]
 
 # Link a wallet controlled by a different key (provide EIP-712 signature)
-ens-metadata registry identity set-wallet --chain-name <chain> <agent-id> <wallet> --deadline <ts> --signature <0x...> --private-key <0x...> [--broadcast]
+ens-metadata agent registry set-wallet --chain <chain> <agent-id> <wallet> --deadline <ts> --signature <0x...> --private-key <0x...> [--broadcast]
 
 # Clear wallet link
-ens-metadata registry identity unset-wallet --chain-name <chain> <agent-id> --private-key <0x...> [--broadcast]
+ens-metadata agent registry unset-wallet --chain <chain> <agent-id> --private-key <0x...> [--broadcast]
 ```
 
 ### Step 4: Prepare and set ENS metadata
 
 ```sh
 # Generate metadata payload template
-ens-metadata metadata template > ~/.ens-metadata/payload.json
+ens-metadata template > ~/.ens-metadata/payload.json
 
 # Validate payload
-ens-metadata metadata validate ~/.ens-metadata/payload.json
+ens-metadata validate ~/.ens-metadata/payload.json
 
 # Set metadata on ENS (dry run first, then --broadcast)
-ens-metadata metadata set <AGENT_ENS_NAME> ~/.ens-metadata/payload.json --private-key 0x<KEY> [--broadcast]
+ens-metadata set <AGENT_ENS_NAME> ~/.ens-metadata/payload.json --private-key 0x<KEY> [--broadcast]
 ```
 
 Update metadata when agent skills, identity, or capabilities change. Remember to also update your `<agent-uri>`.
