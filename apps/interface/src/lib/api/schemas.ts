@@ -41,18 +41,3 @@ export async function fetchSchemas(): Promise<Schema[]> {
   return schemas
 }
 
-/**
- * Fetch a specific schema by ID
- */
-export async function fetchSchemaById(id: string): Promise<Schema | null> {
-  const schemas = await fetchSchemas()
-  return schemas.find((s) => s.id === id) || null
-}
-
-/**
- * Fetch the latest version of a schema by name
- */
-export async function fetchLatestSchemaByName(name: string): Promise<Schema | null> {
-  const schemas = await fetchSchemas()
-  return schemas.find((s) => s.class === name) || null
-}

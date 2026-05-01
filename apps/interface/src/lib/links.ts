@@ -50,7 +50,7 @@ export function resolveLink(node: TreeNode, chainId = 1): ResolvedLink {
 /**
  * Generate a Safe UI link
  */
-export function safeLink(address: string, chainId = 1): string {
+function safeLink(address: string, chainId = 1): string {
   // Safe supports multiple chains with different prefixes
   const chainPrefix = getChainPrefix(chainId)
   return `https://app.safe.global/${chainPrefix}:${address}`
@@ -59,7 +59,7 @@ export function safeLink(address: string, chainId = 1): string {
 /**
  * Generate a block explorer link based on chain ID
  */
-export function explorerLink(address: string, chainId = 1): string {
+function explorerLink(address: string, chainId = 1): string {
   const explorerBase = getExplorerBase(chainId)
   return `${explorerBase}/address/${address}`
 }
@@ -67,7 +67,7 @@ export function explorerLink(address: string, chainId = 1): string {
 /**
  * Generate an ENS app link
  */
-export function ensLink(name: string): string {
+function ensLink(name: string): string {
   return `https://app.ens.domains/${name}`
 }
 
