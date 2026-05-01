@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware'
 
 import { ErrorCode } from '@/lib/api/utils/ErrorCode'
 import { formatApiError } from '@/lib/api/utils/formatApiError'
-import type { InitializeStoreProps } from '@/lib/contexts/types'
 
 interface AppRouteHistory {
   currentPath?: string
@@ -49,7 +48,6 @@ interface UiState {
   showAppErrorModal: boolean
 
   // Actions
-  hydrate: (data: InitializeStoreProps) => void
   setRouteHistory: (state: AppRouteHistory) => void
   setAppDialog: (dialog: AppDialog) => void
   setAppError: (error: AppErrorDialog) => void
@@ -78,13 +76,6 @@ export const useUiStore = create<UiState>()(
       showAppErrorModal: false,
 
       // Actions
-      hydrate: (data: InitializeStoreProps) => {
-        set({
-          lang: data.ui.lang ?? 'en-US',
-          isMobile: data.ui.isMobile ?? false,
-        })
-      },
-
       setRouteHistory: (state: AppRouteHistory) => {
         set({ routeHistory: state })
       },
