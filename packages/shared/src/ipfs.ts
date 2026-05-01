@@ -1,9 +1,10 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
 function publishToIpfs(cmd: string, filePath: string): string {
-  const output = execSync(`${cmd} ${filePath}`, { encoding: 'utf8' }).trim()
+  const [bin, ...args] = cmd.split(/\s+/)
+  const output = execFileSync(bin, [...args, filePath], { encoding: 'utf8' }).trim()
   const lines = output.split(/\r?\n/).filter(Boolean)
   const last = lines[lines.length - 1] ?? ''
   const parts = last.split(/\s+/)

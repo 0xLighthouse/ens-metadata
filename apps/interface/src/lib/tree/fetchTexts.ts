@@ -11,7 +11,6 @@ const client = createPublicClient({
 })
 
 export async function fetchTexts(ensName: string, keys: string[]) {
-  console.log('fetchTexts()', ensName, keys)
   const calls = keys.map((key) =>
     client.getEnsText({
       name: ensName,
