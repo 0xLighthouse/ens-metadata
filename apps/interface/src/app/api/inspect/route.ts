@@ -1,3 +1,4 @@
+// TODO: Add server-side auth (Privy JWT verification) and rate limiting
 import { NextRequest, NextResponse } from 'next/server'
 import { http, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
                 try {
                   ensAvatar = await client.getEnsAvatar({ name: ensName })
                 } catch (err) {
-                  console.log(`Failed to fetch avatar for ${ensName}:`, err)
+                  console.warn(`Failed to fetch avatar for ${ensName}`)
                 }
               }
               return {
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
                 ensAvatar,
               }
             } catch (err) {
-              console.log(`Failed to resolve ENS for ${ownerAddress}:`, err)
+              console.warn(`Failed to resolve ENS for ${ownerAddress}`)
               return {
                 address: ownerAddress,
                 ensName: null,
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         // Not a Safe or method call failed
-        console.log('Not a Safe multisig or detection failed:', error)
+        console.warn('Safe multisig detection failed')
         result.detectedType = 'Unknown Contract'
         result.metadata = {
           note: 'Unable to detect as Safe multisig',
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error inspecting node:', error)
     return NextResponse.json(
-      { error: 'Failed to inspect node', details: (error as Error).message },
+      { error: 'Failed to inspect node' },
       { status: 500 },
     )
   }

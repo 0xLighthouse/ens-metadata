@@ -1,3 +1,4 @@
+// TODO: Add server-side auth (Privy JWT verification) and rate limiting
 import { DuneClient } from '@duneanalytics/client-sdk'
 import { NextResponse } from 'next/server'
 

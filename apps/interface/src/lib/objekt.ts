@@ -1,5 +1,6 @@
 import type { WalletClient } from 'viem'
 import { sha256 } from 'viem'
+import { normalize } from 'viem/ens'
 
 const OBJEKT_ENS_API = 'https://ens.objekt.sh'
 
@@ -111,7 +112,7 @@ export async function uploadAvatar({
 
   const tierParam = storageTier !== 'cdn' ? `?storage=${storageTier}` : ''
   // TODO: make upload type dynamic based on the field key (avatar, header, etc.)
-  const url = `${OBJEKT_ENS_API}/${ensName}/avatar${tierParam}`
+  const url = `${OBJEKT_ENS_API}/${encodeURIComponent(normalize(ensName))}/avatar${tierParam}`
 
   // For paid tiers, wrap fetch with x402 payment handler
   const doFetch =
