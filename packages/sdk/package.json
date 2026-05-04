@@ -20,16 +20,16 @@
     "prepublishOnly": "pnpm build && pnpm test && pnpm lint"
   },
   "dependencies": {
-    "@ensdomains/ensjs": "^4.0.2",
+    "@ensdomains/ensjs": "^4.2.2",
     "@ipld/dag-cbor": "^9.2.6",
-    "cborg": "^5.1.0",
+    "cborg": "^5.1.1",
     "viem": "2.47.6"
   },
   "devDependencies": {
     "@ensmetadata/schemas": "workspace:*",
     "tsup": "^8.5.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5",
-    "vitest": "^3.2.1"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
