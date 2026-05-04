@@ -1,9 +1,23 @@
 import { z } from 'zod'
+import { SUPPORTED_CHAINS, resolveChain } from '../../../lib/registry.js'
+
+const templateOptions = z.object({
+  chain: z
+    .enum(SUPPORTED_CHAINS)
+    .default('mainnet')
+    .describe(
+      'Chain the agent will be registered on. Determines the agentRegistry CAIP-10 address.',
+    ),
+})
 
 /**
- * Derived from <https://best-practices.8004scan.io/docs/01-agent-metadata-standard.html>
+ * Derived from <https://best-practices.8004scan.io/docs/01-agent-metadata-standard.html>.
+ * The `agentRegistry` CAIP-10 string is computed from the canonical IdentityRegistry
+ * address for the selected chain (see `src/lib/registry.ts`), so the template stays in
+ * sync with what `agent registry register --chain <name>` will actually use.
  */
-function buildTemplate() {
+function buildTemplate(chainName: string) {
+  const { chain, registryAddress } = resolveChain(chainName)
   return {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: 'My Agent',
@@ -24,13 +38,13 @@ function buildTemplate() {
       },
       {
         name: 'agentWallet',
-        endpoint: 'eip155:1:0x0000000000000000000000000000000000000000',
+        endpoint: `eip155:${chain.id}:0x0000000000000000000000000000000000000000`,
       },
     ],
     registrations: [
       {
         agentId: 0,
-        agentRegistry: 'eip155:1:0x8004a6090Cd10A7288092483047B097295Fb8847',
+        agentRegistry: `eip155:${chain.id}:${registryAddress}`,
       },
     ],
     supportedTrust: ['reputation'],
@@ -43,8 +57,8 @@ function buildTemplate() {
 export const templateCommand = {
   description: 'Generate empty ERC-8004 v2.0 registration file template',
   args: z.object({}),
-  options: z.object({}),
-  run() {
-    return buildTemplate()
+  options: templateOptions,
+  run(c: { options: z.infer<typeof templateOptions> }) {
+    return buildTemplate(c.options.chain)
   },
 }
