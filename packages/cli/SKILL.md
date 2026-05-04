@@ -85,8 +85,8 @@ ens-metadata agent registry unset-wallet --chain <chain> <agent-id> --private-ke
 ### Step 4: Prepare and set ENS metadata
 
 ```sh
-# Generate metadata payload template
-ens-metadata template > ~/.ens-metadata/payload.json
+# Generate metadata payload template (e.g. agent, person, org, wallet, ...)
+ens-metadata template agent > ~/.ens-metadata/payload.json
 
 # Validate payload
 ens-metadata validate ~/.ens-metadata/payload.json
