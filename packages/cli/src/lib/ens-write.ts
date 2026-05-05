@@ -1,19 +1,17 @@
-import type { Hex } from 'viem'
+import type { Address, Hex } from 'viem'
 import { createPublicClient, encodeFunctionData, formatEther } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { buildFallbackTransport } from './context.js'
 import { type CostEstimate, estimateCost, formatCost, validateCost } from './estimate-cost.js'
 
 export type TextRecord = { key: string; value: string }
 
-async function ensSetup(privateKey: string, rpcUrl?: string) {
+async function ensSetup(rpcUrl?: string) {
   const { addEnsContracts } = await import('@ensdomains/ensjs')
-  const account = privateKeyToAccount(privateKey as `0x${string}`)
   const chain = addEnsContracts(mainnet)
   const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
   const publicClient = createPublicClient({ chain, transport })
-  return { account, chain, publicClient }
+  return { chain, publicClient }
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
@@ -26,13 +24,8 @@ async function resolveEns(publicClient: any, ensName: string) {
   return resolverAddress
 }
 
-async function encodeEnsTextRecords(
-  ensName: string,
-  texts: TextRecord[],
-  privateKey: string,
-  rpcUrl?: string,
-) {
-  const { account, publicClient } = await ensSetup(privateKey, rpcUrl)
+async function encodeEnsTextRecords(ensName: string, texts: TextRecord[], rpcUrl?: string) {
+  const { publicClient } = await ensSetup(rpcUrl)
   const { namehash, generateRecordCallArray } = await import('@ensdomains/ensjs/utils')
   const resolverAddress = await resolveEns(publicClient, ensName)
   const node = namehash(ensName)
@@ -59,24 +52,23 @@ async function encodeEnsTextRecords(
           args: [calls as Hex[]],
         })
 
-  return { account, publicClient, resolverAddress, data }
+  return { publicClient, resolverAddress, data }
 }
 
 export async function estimateEnsTextRecordsCost(
   ensName: string,
   texts: TextRecord[],
-  privateKey: string,
+  signerAddress: Address,
   rpcUrl?: string,
 ): Promise<CostEstimate & { balance: string }> {
-  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
+  const { publicClient, resolverAddress, data } = await encodeEnsTextRecords(
     ensName,
     texts,
-    privateKey,
     rpcUrl,
   )
   const [est, balance] = await Promise.all([
-    estimateCost(publicClient, { account: account.address, to: resolverAddress, data }),
-    publicClient.getBalance({ address: account.address }),
+    estimateCost(publicClient, { account: signerAddress, to: resolverAddress, data }),
+    publicClient.getBalance({ address: signerAddress }),
   ])
   return { ...est, balance: `${Number.parseFloat(formatEther(balance)).toFixed(6)} ETH` }
 }
@@ -86,14 +78,9 @@ export { formatCost }
 export async function validateEnsTextRecordsCost(
   ensName: string,
   texts: TextRecord[],
-  privateKey: string,
+  signerAddress: Address,
   rpcUrl?: string,
 ): Promise<CostEstimate> {
-  const { account, publicClient, resolverAddress, data } = await encodeEnsTextRecords(
-    ensName,
-    texts,
-    privateKey,
-    rpcUrl,
-  )
-  return validateCost(publicClient, { account: account.address, to: resolverAddress, data })
+  const { publicClient, resolverAddress, data } = await encodeEnsTextRecords(ensName, texts, rpcUrl)
+  return validateCost(publicClient, { account: signerAddress, to: resolverAddress, data })
 }
