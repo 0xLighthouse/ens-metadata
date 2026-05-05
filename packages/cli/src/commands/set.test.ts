@@ -3,7 +3,18 @@ import registryRaw from '@ensmetadata/schemas/registry' with { type: 'json' }
 import type { Schema } from '@ensmetadata/schemas/types'
 import type { PublicClient } from 'viem'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { filterPayloadEntries, resolveSchemaForPayload } from './set.js'
+import {
+  filterPayloadEntries,
+  readEnsManager,
+  resolveSchemaForPayload,
+  setCommand,
+} from './set.js'
+
+const queryDomainStrictMock = vi.fn()
+vi.mock('../lib/subgraph.js', () => ({
+  queryDomainStrict: (name: string) => queryDomainStrictMock(name),
+  queryDomain: (name: string) => queryDomainStrictMock(name),
+}))
 
 const AGENT_SCHEMA = SCHEMA_MAP.Agent
 const registry = registryRaw as {
@@ -214,5 +225,62 @@ describe('resolveSchemaForPayload', () => {
     if (!result.success) {
       expect(result.errors.some((e) => e.key === 'notARealKey')).toBe(true)
     }
+  })
+})
+
+describe('readEnsManager (via ENSNode)', () => {
+  const ZERO = '0x0000000000000000000000000000000000000000'
+
+  beforeEach(() => {
+    queryDomainStrictMock.mockReset()
+  })
+
+  it('returns ownerId for unwrapped names', async () => {
+    queryDomainStrictMock.mockResolvedValue({
+      ownerId: '0x1111111111111111111111111111111111111111',
+      wrappedOwnerId: ZERO,
+    })
+    const owner = await readEnsManager('myagent.eth')
+    expect(owner).toBe('0x1111111111111111111111111111111111111111')
+  })
+
+  it('prefers wrappedOwnerId when set (wrapped names)', async () => {
+    queryDomainStrictMock.mockResolvedValue({
+      ownerId: '0x000000000000000000000000d4416b13d2b3a9abae7acd5d6c2bbdbe25686401', // NameWrapper-ish
+      wrappedOwnerId: '0x2222222222222222222222222222222222222222',
+    })
+    const owner = await readEnsManager('myagent.eth')
+    expect(owner).toBe('0x2222222222222222222222222222222222222222')
+  })
+
+  it('hard-fails when ENSNode is unreachable', async () => {
+    queryDomainStrictMock.mockRejectedValue(new Error('ENSNode request failed: ECONNREFUSED'))
+    await expect(readEnsManager('myagent.eth')).rejects.toThrow(/ENSNode request failed/)
+  })
+
+  it('hard-fails when ENSNode has no record of the name', async () => {
+    queryDomainStrictMock.mockResolvedValue(null)
+    await expect(readEnsManager('doesnotexist.eth')).rejects.toThrow(
+      /ENSNode has no record of/,
+    )
+  })
+
+  it('hard-fails when both owner fields are zero/missing', async () => {
+    queryDomainStrictMock.mockResolvedValue({ ownerId: ZERO, wrappedOwnerId: ZERO })
+    await expect(readEnsManager('myagent.eth')).rejects.toThrow(
+      /Could not determine the manager/,
+    )
+  })
+})
+
+describe('setCommand.run — broadcast guard', () => {
+  it('throws when --broadcast is set without --private-key', async () => {
+    await expect(
+      setCommand.run({
+        args: { name: 'myagent.eth', payload: '/tmp/never-read.json' },
+        options: { broadcast: true, includeEmpty: false },
+        env: {},
+      }),
+    ).rejects.toThrow(/--private-key is required when --broadcast is set/)
   })
 })

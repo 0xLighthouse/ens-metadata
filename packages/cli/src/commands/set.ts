@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { metadataWriter, validateMetadataSchema } from '@ensmetadata/sdk'
 import type { Schema } from '@ensmetadata/schemas/types'
-import { type PublicClient, createPublicClient, createWalletClient } from 'viem'
+import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
@@ -18,9 +18,15 @@ import {
   validateEnsTextRecordsCost,
 } from '../lib/ens-write.js'
 import { fetchSchemaByUri } from '../lib/schema-fetch.js'
+import { queryDomainStrict } from '../lib/subgraph.js'
 
 const setOptions = globalOptions.extend({
-  privateKey: z.string().describe('Private key for signing (hex, prefixed with 0x)'),
+  privateKey: z
+    .string()
+    .optional()
+    .describe(
+      'Private key for signing (hex, prefixed with 0x). Required for --broadcast; optional for dry-run (the ENS manager is used as the from-address when omitted).',
+    ),
   broadcast: z
     .boolean()
     .default(false)
@@ -92,6 +98,38 @@ async function readEnsSchemaUri(client: PublicClient, ensName: string): Promise<
   return value
 }
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+/**
+ * Look up the address authorised to set records on `ensName` via ENSNode (the
+ * project's standard indexed-data source). Used as the `from` address for
+ * dry-run gas estimation when no `--private-key` is supplied.
+ *
+ * Resolution: prefer `wrappedOwnerId` when set (wrapped names hold the
+ * NameWrapper as the registry owner), otherwise fall back to `ownerId`.
+ */
+export async function readEnsManager(ensName: string): Promise<Address> {
+  const domain = await queryDomainStrict(ensName)
+  if (!domain) {
+    throw new Error(
+      `ENSNode has no record of ${ensName}. Pass --private-key to provide a from-address explicitly.`,
+    )
+  }
+
+  const candidate =
+    domain.wrappedOwnerId && domain.wrappedOwnerId !== ZERO_ADDRESS
+      ? domain.wrappedOwnerId
+      : domain.ownerId
+
+  if (!candidate || candidate === ZERO_ADDRESS) {
+    throw new Error(
+      `Could not determine the manager of ${ensName} from ENSNode. Pass --private-key to provide a from-address explicitly.`,
+    )
+  }
+
+  return candidate as Address
+}
+
 /**
  * Resolve the schema to validate against following the documented cascade:
  *  - If the payload includes `schema`, fetch it (hard-fail on any error).
@@ -151,6 +189,10 @@ export const setCommand = {
     const rpcUrl = resolveRpcUrl(mainnet.id, c.options, c.env as Record<string, string | undefined>)
     const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
 
+    if (broadcast && !privateKey) {
+      throw new Error('--private-key is required when --broadcast is set.')
+    }
+
     const raw: unknown = JSON.parse(readFileSync(c.args.payload, 'utf8'))
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
       throw new Error('Payload must be a JSON object.')
@@ -193,10 +235,20 @@ export const setCommand = {
       validated: resolved.schema !== null,
     }
 
+    /**
+     * Resolve the from-address used for gas estimation:
+     *   - private key supplied → derive from it
+     *   - otherwise            → look up the ENS manager
+     */
+    const signerAddress: Address = privateKey
+      ? privateKeyToAccount(privateKey as `0x${string}`).address
+      : await readEnsManager(ensName)
+    const signerSource: 'privateKey' | 'ensManager' = privateKey ? 'privateKey' : 'ensManager'
+
     if (!broadcast) {
       let estimate: Awaited<ReturnType<typeof estimateEnsTextRecordsCost>> | null = null
       try {
-        estimate = await estimateEnsTextRecordsCost(ensName, texts, privateKey, rpcUrl)
+        estimate = await estimateEnsTextRecordsCost(ensName, texts, signerAddress, rpcUrl)
       } catch {
         // estimate is best-effort
       }
@@ -204,6 +256,7 @@ export const setCommand = {
         dryRun: true,
         name: ensName,
         schema: schemaInfo,
+        signer: { address: signerAddress, source: signerSource },
         records: texts,
         ...(estimate
           ? {
@@ -211,11 +264,15 @@ export const setCommand = {
               balance: estimate.balance,
             }
           : {}),
-        hint: 'Run with --broadcast to submit on-chain.',
+        hint:
+          signerSource === 'ensManager'
+            ? 'Run with --private-key 0x<KEY> --broadcast to submit on-chain.'
+            : 'Run with --broadcast to submit on-chain.',
       }
     }
 
-    await validateEnsTextRecordsCost(ensName, texts, privateKey, rpcUrl)
+    // privateKey is guaranteed non-null here by the early check above.
+    await validateEnsTextRecordsCost(ensName, texts, signerAddress, rpcUrl)
 
     const account = privateKeyToAccount(privateKey as `0x${string}`)
     const { addEnsContracts } = await import('@ensdomains/ensjs')
