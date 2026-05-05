@@ -95,6 +95,16 @@ ens-metadata validate ~/.ens-metadata/payload.json
 ens-metadata set <AGENT_ENS_NAME> ~/.ens-metadata/payload.json --private-key 0x<KEY> [--broadcast]
 ```
 
+`set` only writes the keys present in the payload. Empty-string values are skipped by default so a partially-filled template won't clobber existing ENS records — pass `--include-empty` to deliberately clear records.
+
+Validation cascade:
+
+1. If the payload contains a `schema` field, that schema is fetched (locally if its CID is bundled with the CLI, otherwise via IPFS gateway) and the payload is validated against it.
+2. Otherwise the `schema` text record is read off the ENS name. If the read fails (RPC error) or returns a URI that cannot be fetched, `set` hard-fails. If the read succeeds and no record is set, `set` proceeds without validation.
+3. If neither source supplies a schema, the payload is written without validation.
+
+Override the IPFS gateway with `--ipfs-gateway https://my-gateway.example` or the `IPFS_GATEWAY` env var (default: `https://ipfs.io`).
+
 Update metadata when agent skills, identity, or capabilities change. Remember to also update your `<agent-uri>`.
 
 ## References
