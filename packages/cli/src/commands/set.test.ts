@@ -1,11 +1,14 @@
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import registryRaw from '@ensmetadata/schemas/registry' with { type: 'json' }
 import type { Schema } from '@ensmetadata/schemas/types'
+import { computeDelta } from '@ensmetadata/sdk'
 import type { PublicClient } from 'viem'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildPayloadDiff,
   filterPayloadEntries,
   readEnsManager,
+  readExistingTextRecords,
   resolveSchemaForPayload,
   setCommand,
 } from './set.js'
@@ -185,6 +188,36 @@ describe('resolveSchemaForPayload', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('uses pre-fetched ensSchemaUri without making an RPC call', async () => {
+    const getEnsText = vi.fn(async () => null)
+    const client = makeClient(getEnsText)
+    const result = await resolveSchemaForPayload({
+      payload: {},
+      ensName,
+      publicClient: client,
+      ensSchemaUri: `ipfs://${AGENT_LATEST_CID}`,
+    })
+    expect(result.source).toBe('ens')
+    expect(result.uri).toBe(`ipfs://${AGENT_LATEST_CID}`)
+    expect(result.schema?.title).toBe('Agent')
+    // Critical: the RPC was bypassed because the caller pre-fetched the value.
+    expect(getEnsText).not.toHaveBeenCalled()
+  })
+
+  it('treats pre-fetched empty ensSchemaUri as no record (no RPC, no validation)', async () => {
+    const getEnsText = vi.fn(async () => 'should-not-be-called')
+    const client = makeClient(getEnsText)
+    const result = await resolveSchemaForPayload({
+      payload: {},
+      ensName,
+      publicClient: client,
+      ensSchemaUri: null,
+    })
+    expect(result.source).toBe('none')
+    expect(result.schema).toBeNull()
+    expect(getEnsText).not.toHaveBeenCalled()
+  })
+
   it('rejects non-ipfs schema URIs', async () => {
     const client = makeClient(async () => null)
     await expect(
@@ -282,5 +315,95 @@ describe('setCommand.run — broadcast guard', () => {
         env: {},
       }),
     ).rejects.toThrow(/--private-key is required when --broadcast is set/)
+  })
+})
+
+describe('readExistingTextRecords', () => {
+  it('reads each requested key in parallel and returns a map', async () => {
+    const seen: { key: string }[] = []
+    const client = makeClient(async ({ key }) => {
+      seen.push({ key })
+      if (key === 'description') return 'hello'
+      if (key === 'avatar') return 'ipfs://avatar'
+      return null
+    })
+    const out = await readExistingTextRecords(client, 'myagent.eth', [
+      'description',
+      'avatar',
+      'url',
+    ])
+    expect(out).toEqual({ description: 'hello', avatar: 'ipfs://avatar', url: null })
+    expect(seen.map((s) => s.key).sort()).toEqual(['avatar', 'description', 'url'])
+  })
+
+  it('normalises empty strings to null', async () => {
+    const client = makeClient(async ({ key }) => (key === 'description' ? '' : null))
+    const out = await readExistingTextRecords(client, 'myagent.eth', ['description'])
+    expect(out).toEqual({ description: null })
+  })
+
+  it('propagates RPC errors instead of silently dropping them', async () => {
+    const client = makeClient(async () => {
+      throw new Error('RPC 500 boom')
+    })
+    await expect(
+      readExistingTextRecords(client, 'myagent.eth', ['description']),
+    ).rejects.toThrow(/RPC 500 boom/)
+  })
+})
+
+describe('buildPayloadDiff', () => {
+  it('separates added vs updated vs unchanged using the delta', () => {
+    const existing = {
+      description: 'old description',
+      avatar: null,
+      class: 'Agent',
+    }
+    const desired = {
+      description: 'new description',
+      avatar: 'ipfs://new-avatar',
+      class: 'Agent',
+    }
+    const delta = computeDelta(existing, desired)
+    const diff = buildPayloadDiff(existing, desired, delta)
+    expect(diff.added).toEqual([{ key: 'avatar', value: 'ipfs://new-avatar' }])
+    expect(diff.updated).toEqual([
+      { key: 'description', from: 'old description', to: 'new description' },
+    ])
+    expect(diff.deleted).toEqual([])
+    expect(diff.unchanged).toEqual([{ key: 'class', value: 'Agent' }])
+  })
+
+  it('reports deleted keys when desired sends an empty string for an existing value', () => {
+    const existing = { description: 'will be cleared', class: 'Agent' }
+    const desired = { description: '', class: 'Agent' }
+    const delta = computeDelta(existing, desired)
+    const diff = buildPayloadDiff(existing, desired, delta)
+    expect(diff.deleted).toEqual([{ key: 'description', from: 'will be cleared' }])
+    expect(diff.unchanged).toEqual([{ key: 'class', value: 'Agent' }])
+    expect(diff.added).toEqual([])
+    expect(diff.updated).toEqual([])
+  })
+
+  it('treats existing-empty + desired-empty as a no-op (not added, not deleted)', () => {
+    const existing = { description: null }
+    const desired = { description: '' }
+    const delta = computeDelta(existing, desired)
+    const diff = buildPayloadDiff(existing, desired, delta)
+    expect(diff.added).toEqual([])
+    expect(diff.deleted).toEqual([])
+    expect(diff.updated).toEqual([])
+    // Empty desired with no original is intentionally suppressed from
+    // 'unchanged' so it isn't shown to the user as a phantom record.
+    expect(diff.unchanged).toEqual([])
+  })
+
+  it('returns an empty diff when desired is empty', () => {
+    expect(buildPayloadDiff({ class: 'Agent' }, {}, { changes: {}, deleted: [] })).toEqual({
+      added: [],
+      updated: [],
+      deleted: [],
+      unchanged: [],
+    })
   })
 })
