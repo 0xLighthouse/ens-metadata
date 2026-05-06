@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { metadataWriter, validateMetadataSchema } from '@ensmetadata/sdk'
+import { computeDelta, metadataWriter, validateMetadataSchema } from '@ensmetadata/sdk'
+import type { MetadataDelta } from '@ensmetadata/sdk'
 import type { Schema } from '@ensmetadata/schemas/types'
 import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -98,6 +99,64 @@ async function readEnsSchemaUri(client: PublicClient, ensName: string): Promise<
   return value
 }
 
+/**
+ * Batch-read ENS text records for `keys` in parallel. Returns `null` for keys
+ * that are unset or hold an empty string. RPC errors propagate (we want to
+ * hard-fail rather than silently treat a transport blip as "no record").
+ */
+export async function readExistingTextRecords(
+  client: PublicClient,
+  ensName: string,
+  keys: string[],
+): Promise<Record<string, string | null>> {
+  const results = await Promise.all(
+    keys.map(async (key) => {
+      // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText
+      const value = await (client as any).getEnsText({ name: ensName, key })
+      return [key, typeof value === 'string' && value.length > 0 ? value : null] as const
+    }),
+  )
+  return Object.fromEntries(results)
+}
+
+export interface PayloadDiff {
+  added: { key: string; value: string }[]
+  updated: { key: string; from: string; to: string }[]
+  deleted: { key: string; from: string }[]
+  unchanged: { key: string; value: string }[]
+}
+
+/**
+ * Bucket the desired payload against existing ENS values using the delta from
+ * `computeDelta`. Used both to drive the dry-run output and to give the
+ * broadcast path a "nothing to do" early-exit.
+ */
+export function buildPayloadDiff(
+  existing: Record<string, string | null>,
+  desired: Record<string, string>,
+  delta: MetadataDelta,
+): PayloadDiff {
+  const diff: PayloadDiff = { added: [], updated: [], deleted: [], unchanged: [] }
+  const deletedSet = new Set(delta.deleted)
+
+  for (const [key, value] of Object.entries(desired)) {
+    const orig = existing[key] ?? null
+    if (Object.prototype.hasOwnProperty.call(delta.changes, key)) {
+      if (orig === null || orig === '') {
+        diff.added.push({ key, value })
+      } else {
+        diff.updated.push({ key, from: orig, to: value })
+      }
+    } else if (deletedSet.has(key)) {
+      diff.deleted.push({ key, from: orig ?? '' })
+    } else if (value !== '') {
+      diff.unchanged.push({ key, value })
+    }
+  }
+
+  return diff
+}
+
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 /**
@@ -137,12 +196,18 @@ export async function readEnsManager(ensName: string): Promise<Address> {
  *    fails (RPC error, timeout) → hard-fail. If the read succeeds and no
  *    record is set → no validation. If a URI comes back → fetch it
  *    (hard-fail on any error).
+ *
+ * `ensSchemaUri`, when provided, replaces the per-call ENS read — the caller
+ * has already fetched the `schema` record (e.g. as part of a delta batch) and
+ * a `null`/empty string means "no record set" exactly as it does after a
+ * direct read.
  */
 export async function resolveSchemaForPayload(args: {
   payload: Record<string, unknown>
   ensName: string
   publicClient: PublicClient
   ipfsGateway?: string
+  ensSchemaUri?: string | null
 }): Promise<ResolvedSchema> {
   const payloadSchema =
     typeof args.payload.schema === 'string' && args.payload.schema.length > 0
@@ -155,12 +220,16 @@ export async function resolveSchemaForPayload(args: {
   }
 
   let ensUri: string | null
-  try {
-    ensUri = await readEnsSchemaUri(args.publicClient, args.ensName)
-  } catch (err) {
-    throw new Error(
-      `Failed to read 'schema' text record from ENS for ${args.ensName}: ${err instanceof Error ? err.message : String(err)}`,
-    )
+  if (args.ensSchemaUri !== undefined) {
+    ensUri = args.ensSchemaUri && args.ensSchemaUri.length > 0 ? args.ensSchemaUri : null
+  } else {
+    try {
+      ensUri = await readEnsSchemaUri(args.publicClient, args.ensName)
+    } catch (err) {
+      throw new Error(
+        `Failed to read 'schema' text record from ENS for ${args.ensName}: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
   }
 
   if (!ensUri) {
@@ -203,11 +272,29 @@ export const setCommand = {
 
     const publicClient = await buildPublicClient(rpcUrl)
 
+    /**
+     * Batch-read existing values for every payload key plus `schema` (always
+     * needed for schema resolution). Doing this once here lets us
+     *   1. compute a delta and skip records that already match on-chain, and
+     *   2. reuse the `schema` value inside `resolveSchemaForPayload` instead
+     *      of issuing a second `getEnsText('schema')` call.
+     */
+    const keysToRead = Array.from(new Set([...Object.keys(filtered), 'schema']))
+    let existing: Record<string, string | null>
+    try {
+      existing = await readExistingTextRecords(publicClient, ensName, keysToRead)
+    } catch (err) {
+      throw new Error(
+        `Failed to read existing text records from ENS for ${ensName}: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+
     const resolved = await resolveSchemaForPayload({
       payload: rawRecord,
       ensName,
       publicClient,
       ipfsGateway,
+      ensSchemaUri: existing.schema ?? null,
     })
 
     if (resolved.schema) {
@@ -221,18 +308,33 @@ export const setCommand = {
       }
     }
 
-    const texts = Object.entries(filtered).map(([key, value]) => ({ key, value }))
+    const delta = computeDelta(existing, filtered)
+    const diff = buildPayloadDiff(existing, filtered, delta)
 
-    if (texts.length === 0) {
-      throw new Error(
-        'No records to write. The payload contained no non-empty entries (use --include-empty to send empty strings).',
-      )
-    }
+    const texts = [
+      ...Object.entries(delta.changes).map(([key, value]) => ({ key, value })),
+      ...delta.deleted.map((key) => ({ key, value: '' })),
+    ]
 
     const schemaInfo = {
       source: resolved.source,
       uri: resolved.uri,
       validated: resolved.schema !== null,
+    }
+
+    if (texts.length === 0) {
+      const hint =
+        Object.keys(filtered).length === 0
+          ? 'The payload contained no non-empty entries (use --include-empty to send empty strings).'
+          : 'All values in the payload already match the existing ENS records.'
+      return {
+        dryRun: !broadcast,
+        name: ensName,
+        schema: schemaInfo,
+        noOp: true,
+        diff,
+        hint,
+      }
     }
 
     /**
@@ -258,6 +360,7 @@ export const setCommand = {
         schema: schemaInfo,
         signer: { address: signerAddress, source: signerSource },
         records: texts,
+        diff,
         ...(estimate
           ? {
               estimatedCost: formatCost(estimate),
@@ -280,9 +383,12 @@ export const setCommand = {
     const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
     const walletClient = createWalletClient({ account, chain, transport })
 
-    const records = Object.fromEntries(texts.map((t) => [t.key, t.value]))
     const writer = metadataWriter({ publicClient })(walletClient)
-    const result = await writer.setMetadata({ name: ensName, records })
+    const result = await writer.setMetadata({
+      name: ensName,
+      records: delta.changes,
+      deleted: delta.deleted,
+    })
 
     return {
       broadcast: true,
@@ -290,6 +396,7 @@ export const setCommand = {
       schema: schemaInfo,
       txHash: result.txHash,
       explorerUrl: `https://etherscan.io/tx/${result.txHash}`,
+      diff,
     }
   },
 }
