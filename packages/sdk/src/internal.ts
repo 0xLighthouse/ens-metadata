@@ -14,6 +14,13 @@ export const baseRegistryAbi = [
     inputs: [{ name: 'node', type: 'bytes32' }],
     outputs: [{ name: '', type: 'address' }],
   },
+  {
+    name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
 ] as const
 
 export const resolverTextAbi = [
@@ -50,6 +57,30 @@ export function isBasename(name: string): boolean {
   const n = normalize(name)
   if (n === 'base.eth') return false
   return n.endsWith('.base.eth')
+}
+
+/**
+ * Read `owner(node)` for `name` on the Base L2 registry. Returns `null` when
+ * the registry returns the zero address or the read fails. Works at any
+ * subname depth without the registrar/wrapper distinction.
+ */
+export async function getBaseRegistryOwner(
+  client: PublicClient,
+  name: string,
+): Promise<`0x${string}` | null> {
+  const node = namehash(normalize(name))
+  try {
+    const address = (await client.readContract({
+      address: BASE_REGISTRY,
+      abi: baseRegistryAbi,
+      functionName: 'owner',
+      args: [node],
+    })) as `0x${string}`
+    if (!address || address === '0x0000000000000000000000000000000000000000') return null
+    return address
+  } catch {
+    return null
+  }
 }
 
 /**

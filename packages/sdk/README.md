@@ -209,30 +209,43 @@ await writer.applyDelta({
 })
 ```
 
-### Writing to Basenames
+### Basenames (`*.base.eth`)
 
-`*.base.eth` names live on Base L2 (chain 8453). The SDK detects them automatically: pass an extra `basePublicClient` so the writer can read the L2 resolver from the Base registry, and connect the wallet to Base before signing.
+`*.base.eth` names live on Base L2 (chain 8453). The SDK auto-detects them by suffix and routes reads, writes, and attestation verification through Base directly — no CCIP-Read involved. Mainnet names are unchanged.
+
+Pass a Base public client to each factory you use. Without one the SDK lazily creates a client against the default Base RPC; production callers should supply their own for reliability.
 
 ```ts
 import { createPublicClient, http } from 'viem'
 import { base, mainnet } from 'viem/chains'
-import { metadataWriter } from '@ensmetadata/sdk'
+import { attestationVerifier, metadataReader, metadataWriter } from '@ensmetadata/sdk'
 
 const publicClient = createPublicClient({ chain: mainnet, transport: http() })
 const basePublicClient = createPublicClient({ chain: base, transport: http() })
 
-// walletClient must be connected to Base (chain 8453) before calling.
-const writer = metadataWriter({ publicClient, basePublicClient })(walletClient)
+// Reads — direct L2 calls; the mainnet client is unused for Basenames.
+const reader = metadataReader({ basePublicClient })(publicClient)
+const metadata = await reader.getMetadata({ name: 'alice.base.eth' })
 
+// Writes — walletClient must be connected to Base (chain 8453) before calling.
+const writer = metadataWriter({ publicClient, basePublicClient })(walletClient)
 await writer.setMetadata({
   name: 'alice.base.eth',
   records: { description: 'On Base' },
 })
+
+// Attestation verification — owner read goes to the Base registry; the
+// attester ENS itself is still resolved on mainnet.
+const verifier = attestationVerifier({ basePublicClient })(publicClient)
+const result = await verifier.verifyHandleAttestation({
+  name: 'alice.base.eth',
+  platform: 'com.x',
+})
 ```
 
-Detection is by suffix: any name ending in `.base.eth` (other than `base.eth` itself) is routed through the L2 path. Mainnet names are unchanged.
-
 If the wallet is on the wrong chain the SDK throws `MetadataWriteError` with `code === 'wrong-chain'`. Drive `wallet_switchEthereumChain` from your UI before retrying.
+
+The 2LD `base.eth` itself is treated as a mainnet name (it is owned on L1 by Coinbase). Custom attester ENS names ending in `.base.eth` are not yet supported — the default attester is a mainnet ENS.
 
 ### Validation
 

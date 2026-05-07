@@ -10,6 +10,13 @@ import type {
   VerifyResult,
   VerifyUidAttestationOptions,
 } from './attestation-types'
+import {
+  fetchTextRecordsDirect,
+  getBaseRegistryOwner,
+  getBaseResolverAddress,
+  getOrCreateBasePublicClient,
+  isBasename,
+} from './internal'
 
 /**
  * Default attester ENS name. Callers who haven't set their own trusted
@@ -25,6 +32,11 @@ export const DEFAULT_ATTESTER_ENS = 'atst.lighthousegov.eth'
 export interface AttestationVerifierConfig {
   /** Max age in seconds. If `now - issuedAt > maxAge`, the claim is stale. */
   maxAge?: number
+  /**
+   * Optional Base public client. Required for verifying `*.base.eth` names;
+   * when omitted the SDK lazily creates one against the default Base RPC.
+   */
+  basePublicClient?: PublicClient
 }
 
 /**
@@ -44,7 +56,16 @@ export function uidAttestationRecordKey(platform: string, attesterEns: string): 
   return `uid[${platform}][${normalize(attesterEns)}]`
 }
 
-async function readOwner(client: PublicClient, name: string): Promise<Address | null> {
+async function readOwner(
+  client: PublicClient,
+  basePublicClient: PublicClient | undefined,
+  name: string,
+): Promise<Address | null> {
+  if (isBasename(name)) {
+    const baseClient = getOrCreateBasePublicClient(basePublicClient)
+    const owner = await getBaseRegistryOwner(baseClient, name)
+    return (owner ?? null) as Address | null
+  }
   try {
     const owner = await getOwner(client as never, { name })
     if (owner?.owner && isAddress(owner.owner)) return owner.owner as Address
@@ -54,14 +75,52 @@ async function readOwner(client: PublicClient, name: string): Promise<Address | 
   return null
 }
 
+async function readBaseTextsForVerify(
+  basePublicClient: PublicClient | undefined,
+  name: string,
+  keys: string[],
+): Promise<Record<string, string | null>> {
+  const baseClient = getOrCreateBasePublicClient(basePublicClient)
+  let resolverAddress: `0x${string}` | null = null
+  try {
+    resolverAddress = await getBaseResolverAddress(baseClient, name)
+  } catch {
+    resolverAddress = null
+  }
+  if (!resolverAddress) {
+    return Object.fromEntries(keys.map((k) => [k, null]))
+  }
+  return fetchTextRecordsDirect(baseClient, resolverAddress, name, keys)
+}
+
 async function readEnvelopeHex(
   client: PublicClient,
+  basePublicClient: PublicClient | undefined,
   name: string,
   key: string,
 ): Promise<Hex | null> {
+  if (isBasename(name)) {
+    const records = await readBaseTextsForVerify(basePublicClient, name, [key])
+    const value = records[key]
+    return value && value.length > 0 ? (value as Hex) : null
+  }
   const raw = await getEnsText(client, { name, key }).catch(() => null)
   if (!raw || typeof raw !== 'string' || raw.length === 0) return null
   return raw as Hex
+}
+
+async function readPlatformHandle(
+  client: PublicClient,
+  basePublicClient: PublicClient | undefined,
+  name: string,
+  platform: string,
+): Promise<string | null> {
+  if (isBasename(name)) {
+    const records = await readBaseTextsForVerify(basePublicClient, name, [platform])
+    return records[platform] ?? null
+  }
+  const raw = await getEnsText(client, { name, key: platform }).catch(() => null)
+  return typeof raw === 'string' && raw.length > 0 ? raw : null
 }
 
 async function resolveAttester(client: PublicClient, attesterEns: string): Promise<Address | null> {
@@ -78,14 +137,20 @@ async function verifyHandleAttestationImpl(
   client: PublicClient,
   config: AttestationVerifierConfig,
   opts: VerifyHandleAttestationOptions,
+  basePublicClient?: PublicClient,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
   const attesterEns = opts.attester ?? DEFAULT_ATTESTER_ENS
 
   const [envHex, owner, handle, attesterAddress] = await Promise.all([
-    readEnvelopeHex(client, name, handleAttestationRecordKey(opts.platform, attesterEns)),
-    readOwner(client, name),
-    getEnsText(client, { name, key: opts.platform }).catch(() => null),
+    readEnvelopeHex(
+      client,
+      basePublicClient,
+      name,
+      handleAttestationRecordKey(opts.platform, attesterEns),
+    ),
+    readOwner(client, basePublicClient, name),
+    readPlatformHandle(client, basePublicClient, name, opts.platform),
     resolveAttester(client, attesterEns),
   ])
 
@@ -145,13 +210,19 @@ async function verifyUidAttestationImpl(
   client: PublicClient,
   config: AttestationVerifierConfig,
   opts: VerifyUidAttestationOptions,
+  basePublicClient?: PublicClient,
 ): Promise<VerifyResult> {
   const name = normalize(opts.name)
   const attesterEns = opts.attester ?? DEFAULT_ATTESTER_ENS
 
   const [envHex, owner, attesterAddress] = await Promise.all([
-    readEnvelopeHex(client, name, uidAttestationRecordKey(opts.platform, attesterEns)),
-    readOwner(client, name),
+    readEnvelopeHex(
+      client,
+      basePublicClient,
+      name,
+      uidAttestationRecordKey(opts.platform, attesterEns),
+    ),
+    readOwner(client, basePublicClient, name),
     resolveAttester(client, attesterEns),
   ])
 
@@ -202,9 +273,9 @@ async function verifyUidAttestationImpl(
 export function attestationVerifier(config: AttestationVerifierConfig = {}) {
   return (client: PublicClient) => ({
     verifyHandleAttestation: (opts: VerifyHandleAttestationOptions) =>
-      verifyHandleAttestationImpl(client, config, opts),
+      verifyHandleAttestationImpl(client, config, opts, config.basePublicClient),
     verifyUidAttestation: (opts: VerifyUidAttestationOptions) =>
-      verifyUidAttestationImpl(client, config, opts),
+      verifyUidAttestationImpl(client, config, opts, config.basePublicClient),
   })
 }
 
@@ -213,7 +284,7 @@ export function verifyHandleAttestation(
   config: AttestationVerifierConfig,
   opts: VerifyHandleAttestationOptions,
 ): Promise<VerifyResult> {
-  return verifyHandleAttestationImpl(client, config, opts)
+  return verifyHandleAttestationImpl(client, config, opts, config.basePublicClient)
 }
 
 export function verifyUidAttestation(
@@ -221,5 +292,5 @@ export function verifyUidAttestation(
   config: AttestationVerifierConfig,
   opts: VerifyUidAttestationOptions,
 ): Promise<VerifyResult> {
-  return verifyUidAttestationImpl(client, config, opts)
+  return verifyUidAttestationImpl(client, config, opts, config.basePublicClient)
 }
