@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs'
-import { computeDelta, metadataWriter, validateMetadataSchema } from '@ensmetadata/sdk'
+import {
+  computeDelta,
+  metadataWriter,
+  readTextRecordsStrict,
+  validateMetadataSchema,
+} from '@ensmetadata/sdk'
 import type { MetadataDelta } from '@ensmetadata/sdk'
 import type { Schema } from '@ensmetadata/schemas/types'
 import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
@@ -87,36 +92,9 @@ async function buildPublicClient(rpcUrl?: string): Promise<PublicClient> {
   return createPublicClient({ chain, transport }) as PublicClient
 }
 
-/**
- * Read the `schema` text record directly off ENS without the SDK's
- * error-swallowing wrapper. We need to distinguish "RPC failure" (hard-fail)
- * from "no record set" (skip validation).
- */
 async function readEnsSchemaUri(client: PublicClient, ensName: string): Promise<string | null> {
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText
-  const value = await (client as any).getEnsText({ name: ensName, key: 'schema' })
-  if (typeof value !== 'string' || value.length === 0) return null
-  return value
-}
-
-/**
- * Batch-read ENS text records for `keys` in parallel. Returns `null` for keys
- * that are unset or hold an empty string. RPC errors propagate (we want to
- * hard-fail rather than silently treat a transport blip as "no record").
- */
-export async function readExistingTextRecords(
-  client: PublicClient,
-  ensName: string,
-  keys: string[],
-): Promise<Record<string, string | null>> {
-  const results = await Promise.all(
-    keys.map(async (key) => {
-      // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText
-      const value = await (client as any).getEnsText({ name: ensName, key })
-      return [key, typeof value === 'string' && value.length > 0 ? value : null] as const
-    }),
-  )
-  return Object.fromEntries(results)
+  const records = await readTextRecordsStrict({ client, name: ensName, keys: ['schema'] })
+  return records.schema ?? null
 }
 
 export interface PayloadDiff {
@@ -282,7 +260,11 @@ export const setCommand = {
     const keysToRead = Array.from(new Set([...Object.keys(filtered), 'schema']))
     let existing: Record<string, string | null>
     try {
-      existing = await readExistingTextRecords(publicClient, ensName, keysToRead)
+      existing = await readTextRecordsStrict({
+        client: publicClient,
+        name: ensName,
+        keys: keysToRead,
+      })
     } catch (err) {
       throw new Error(
         `Failed to read existing text records from ENS for ${ensName}: ${err instanceof Error ? err.message : String(err)}`,

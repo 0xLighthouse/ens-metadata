@@ -1,4 +1,5 @@
-import type { Address, Hex } from 'viem'
+import { getResolverAddressStrict } from '@ensmetadata/sdk'
+import type { Address, Hex, PublicClient } from 'viem'
 import { createPublicClient, encodeFunctionData, formatEther } from 'viem'
 import { mainnet } from 'viem/chains'
 import { buildFallbackTransport } from './context.js'
@@ -14,14 +15,8 @@ async function ensSetup(rpcUrl?: string) {
   return { chain, publicClient }
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
-async function resolveEns(publicClient: any, ensName: string) {
-  const { getResolver } = await import('@ensdomains/ensjs/public')
-  const resolverAddress = await getResolver(publicClient, { name: ensName })
-  if (!resolverAddress) {
-    throw new Error(`No resolver found for ${ensName}. Set a resolver first.`)
-  }
-  return resolverAddress
+async function resolveEns(publicClient: PublicClient, ensName: string) {
+  return getResolverAddressStrict({ client: publicClient, name: ensName })
 }
 
 async function encodeEnsTextRecords(ensName: string, texts: TextRecord[], rpcUrl?: string) {

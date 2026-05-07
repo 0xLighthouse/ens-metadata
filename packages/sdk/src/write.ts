@@ -1,5 +1,6 @@
 import type { PublicClient, WalletClient } from 'viem'
 import { normalize } from 'viem/ens'
+import { getResolverAddressStrict } from './read-helpers'
 import type {
   ApplyDeltaOptions,
   MetadataDelta,
@@ -41,11 +42,14 @@ function deltaToRecords(delta: MetadataDelta): {
 }
 
 async function resolveResolver(publicClient: PublicClient, name: string): Promise<`0x${string}`> {
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
-  const resolver = await (publicClient as any).getEnsResolver({ name })
-  if (!resolver) throw new MetadataWriteError(`No resolver found for ${name}`, [])
-  const address = typeof resolver === 'string' ? resolver : resolver.address
-  return address as `0x${string}`
+  try {
+    return await getResolverAddressStrict({ client: publicClient, name })
+  } catch (err) {
+    throw new MetadataWriteError(
+      err instanceof Error ? err.message : `No resolver found for ${name}`,
+      [],
+    )
+  }
 }
 
 async function setMetadataImpl(
