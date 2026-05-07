@@ -78,3 +78,47 @@ export interface SetMetadataResult {
   texts: { key: string; value: string }[]
   coins: { coin: string; value: string }[]
 }
+
+// --- prepare/estimate types ---
+
+export interface PrepareSetMetadataOptions {
+  name: string
+  /** Desired record values keyed by ENS text key. Empty string / null marks the key for deletion. */
+  desired: Record<string, string | null | undefined>
+  /**
+   * Pre-read existing values. If omitted the SDK reads the union of
+   * `Object.keys(desired)` strictly from ENS.
+   */
+  existing?: Record<string, string | null>
+  /** Validation runs before the delta is computed, against `desired`. */
+  schema?: Schema
+  /** Forwarded to computeDelta. */
+  ignoreKeys?: Set<string>
+  resolverAddress?: `0x${string}`
+}
+
+export interface PrepareResult {
+  name: string
+  resolverAddress: `0x${string}`
+  existing: Record<string, string | null>
+  delta: MetadataDelta
+  /** Multicall calldata ready for sendTransaction. Empty string when delta is a no-op. */
+  calldata: `0x${string}` | null
+  /** Always equals the resolver address. */
+  to: `0x${string}`
+  /** Validation outcome — `null` when no schema was supplied. */
+  validation: MetadataValidationResult | null
+}
+
+export interface EstimateSetMetadataOptions extends PrepareSetMetadataOptions {
+  account: `0x${string}`
+}
+
+export interface EstimateResult {
+  prepared: PrepareResult
+  gas: bigint
+  maxFeePerGas: bigint
+  costWei: bigint
+  /** Signer balance for caller-side affordability checks. */
+  balance: bigint
+}

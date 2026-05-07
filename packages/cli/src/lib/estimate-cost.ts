@@ -1,3 +1,4 @@
+import type { EstimateResult } from '@ensmetadata/sdk'
 import { type EstimateGasParameters, type PublicClient, formatEther } from 'viem'
 
 const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
@@ -6,7 +7,7 @@ const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereu
 let priceCache: { usd: number; ts: number } | null = null
 const CACHE_TTL_MS = 60_000
 
-async function getEthUsdPrice(): Promise<number> {
+export async function getEthUsdPrice(): Promise<number> {
   if (priceCache && Date.now() - priceCache.ts < CACHE_TTL_MS) {
     return priceCache.usd
   }
@@ -20,6 +21,8 @@ async function getEthUsdPrice(): Promise<number> {
   return usd
 }
 
+// ─── Legacy CostEstimate API (used by ERC-8004 commands) ────────────────────
+
 export type CostEstimate = {
   gas: bigint
   maxFeePerGas: bigint
@@ -30,12 +33,9 @@ export type CostEstimate = {
 }
 
 /**
- * Estimate the cost of a transaction in ETH and USD.
- *
- * Pass the same transaction parameters you'd send to `writeContract` or
- * `sendTransaction`. The function estimates gas, fetches fee data and the
- * current ETH/USD price, then returns everything you need to present a
- * confirmation prompt.
+ * Estimate the cost of an arbitrary transaction. Used by ERC-8004 callers
+ * that build their own calldata. The new `set` command path consumes an
+ * SDK `EstimateResult` directly via `formatEstimate`.
  */
 export async function estimateCost(
   client: PublicClient,
@@ -61,19 +61,9 @@ export async function estimateCost(
   }
 }
 
-/** One-liner for display: "$0.42 (0.00025 ETH)" */
-export function formatCost(est: CostEstimate): string {
-  // Trim trailing zeros for a cleaner ETH display
-  const eth = Number.parseFloat(est.costEth).toPrecision(4)
-  return `$${est.costUsd} (${eth} ETH)`
-}
-
 const MAX_COST_USD = 2
 
-/**
- * Pre-flight guard: estimates cost and hard-errors if gas exceeds $2 USD
- * or the signer's balance cannot cover the transaction.
- */
+/** Pre-flight guard for a CostEstimate (legacy ERC-8004 path). */
 export async function validateCost(
   client: PublicClient,
   tx: EstimateGasParameters & { account: `0x${string}` },
@@ -99,4 +89,67 @@ export async function validateCost(
   }
 
   return est
+}
+
+// ─── SDK EstimateResult adapters (used by the `set` command) ────────────────
+
+export interface FormattedEstimate {
+  costEth: string
+  costUsd: string
+  ethUsdPrice: number
+  balance: string
+}
+
+/**
+ * Format an SDK `EstimateResult` for human display. Pulls the live ETH/USD
+ * price (cached). Returns zero values when the estimate is a no-op.
+ */
+export async function formatEstimate(est: EstimateResult): Promise<FormattedEstimate> {
+  const balance = `${Number.parseFloat(formatEther(est.balance)).toFixed(6)} ETH`
+  if (est.costWei === 0n) {
+    return { costEth: '0', costUsd: '0.00', ethUsdPrice: 0, balance }
+  }
+
+  const ethUsdPrice = await getEthUsdPrice()
+  const costEth = formatEther(est.costWei)
+  const costEthNum = Number(costEth)
+
+  return {
+    costEth,
+    costUsd: (costEthNum * ethUsdPrice).toFixed(2),
+    ethUsdPrice,
+    balance,
+  }
+}
+
+/** One-liner for display: "$0.42 (0.00025 ETH)". Works for both legacy
+ * CostEstimate and SDK-derived FormattedEstimate shapes. */
+export function formatCost(input: { costEth: string; costUsd: string }): string {
+  if (input.costEth === '0') return '$0.00 (0 ETH)'
+  const eth = Number.parseFloat(input.costEth).toPrecision(4)
+  return `$${input.costUsd} (${eth} ETH)`
+}
+
+/**
+ * Pre-flight guard for an SDK `EstimateResult`. Hard-errors if estimated
+ * cost exceeds $2 USD or the signer's balance cannot cover the transaction.
+ */
+export async function enforceCostPolicy(est: EstimateResult): Promise<FormattedEstimate> {
+  const formatted = await formatEstimate(est)
+  const costUsd = Number.parseFloat(formatted.costUsd)
+
+  if (costUsd > MAX_COST_USD) {
+    throw new Error(
+      `Estimated gas cost ${formatCost(formatted)} exceeds the $${MAX_COST_USD} safety limit. Aborting.`,
+    )
+  }
+
+  if (est.balance < est.costWei) {
+    const balEth = Number.parseFloat(formatEther(est.balance)).toFixed(6)
+    throw new Error(
+      `Insufficient balance: ${balEth} ETH available but transaction costs ~${formatCost(formatted)}. Aborting.`,
+    )
+  }
+
+  return formatted
 }
