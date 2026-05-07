@@ -64,10 +64,7 @@ async function readEnvelopeHex(
   return raw as Hex
 }
 
-async function resolveAttester(
-  client: PublicClient,
-  attesterEns: string,
-): Promise<Address | null> {
+async function resolveAttester(client: PublicClient, attesterEns: string): Promise<Address | null> {
   const resolved = await getEnsAddress(client, { name: normalize(attesterEns) }).catch(() => null)
   return resolved && isAddress(resolved) ? (resolved as Address) : null
 }

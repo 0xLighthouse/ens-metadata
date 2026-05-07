@@ -1,6 +1,19 @@
-import type { PublicClient } from 'viem'
+import { type PublicClient, namehash } from 'viem'
 import { normalize } from 'viem/ens'
 import { buildTextOptions, fetchTextRecords, normalizeResolverAddress } from './internal'
+
+const RESOLVER_TEXT_ABI = [
+  {
+    name: 'text',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'key', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'string' }],
+  },
+] as const
 
 export interface ReadTextRecordsOptions {
   client: PublicClient
@@ -112,4 +125,40 @@ export async function getResolverAddressStrict(
     throw new Error(`No resolver found for ${normalizedName}`)
   }
   return address as `0x${string}`
+}
+
+export interface ReadTextRecordsFromResolverOptions {
+  client: PublicClient
+  resolverAddress: `0x${string}`
+  name: string
+  keys: string[]
+}
+
+/**
+ * Read text records by calling `text(bytes32 node, string key)` directly on a
+ * resolver contract. Bypasses ENS universal-resolver and CCIP-Read flows, so
+ * the caller chooses the chain via the supplied `client`.
+ *
+ * Per-key errors surface as `null`. Empty strings are normalised to `null`.
+ */
+export async function readTextRecordsFromResolver(
+  opts: ReadTextRecordsFromResolverOptions,
+): Promise<Record<string, string | null>> {
+  const node = namehash(normalize(opts.name))
+  const entries = await Promise.all(
+    opts.keys.map(async (key) => {
+      try {
+        const value = (await opts.client.readContract({
+          address: opts.resolverAddress,
+          abi: RESOLVER_TEXT_ABI,
+          functionName: 'text',
+          args: [node, key],
+        })) as string
+        return [key, typeof value === 'string' && value.length > 0 ? value : null] as const
+      } catch {
+        return [key, null] as const
+      }
+    }),
+  )
+  return Object.fromEntries(entries)
 }

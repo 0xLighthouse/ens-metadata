@@ -2,12 +2,20 @@ export { metadataReader } from './read'
 export {
   readTextRecords,
   readTextRecordsStrict,
+  readTextRecordsFromResolver,
   getResolverAddress,
   getResolverAddressStrict,
   type ReadTextRecordsOptions,
+  type ReadTextRecordsFromResolverOptions,
   type GetResolverAddressOptions,
 } from './read-helpers'
-export { extractSchemaFields } from './internal'
+export {
+  extractSchemaFields,
+  isBasename,
+  getBaseResolverAddress,
+  BASE_CHAIN_ID,
+  BASE_REGISTRY,
+} from './internal'
 export {
   parseSchemaUri,
   fetchSchemaByUri,
