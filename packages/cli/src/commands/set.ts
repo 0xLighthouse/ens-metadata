@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs'
 import {
-  computeDelta,
+  metadataEstimator,
   metadataWriter,
   readTextRecordsStrict,
   resolveSchemaForName,
-  validateMetadataSchema,
 } from '@ensmetadata/sdk'
-import type { MetadataDelta, ResolvedSchema } from '@ensmetadata/sdk'
+import type { EstimateResult, MetadataDelta, ResolvedSchema } from '@ensmetadata/sdk'
 import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
@@ -19,11 +18,7 @@ import {
   resolveRpcUrl,
   validateName,
 } from '../lib/context.js'
-import {
-  estimateEnsTextRecordsCost,
-  formatCost,
-  validateEnsTextRecordsCost,
-} from '../lib/ens-write.js'
+import { enforceCostPolicy, formatCost, formatEstimate } from '../lib/estimate-cost.js'
 import { queryDomainStrict } from '../lib/subgraph.js'
 
 const setOptions = globalOptions.extend({
@@ -218,20 +213,46 @@ export const setCommand = {
       localResolver: bundledSchemaResolver,
     })
 
-    if (resolved.schema) {
-      const result = validateMetadataSchema(filtered, resolved.schema)
-      if (!result.success) {
+    /**
+     * Resolve the from-address used for gas estimation and broadcast:
+     *   - private key supplied → derive from it
+     *   - otherwise            → look up the ENS manager via ENSNode
+     */
+    const signerAddress: Address = privateKey
+      ? privateKeyToAccount(privateKey as `0x${string}`).address
+      : await readEnsManager(ensName)
+    const signerSource: 'privateKey' | 'ensManager' = privateKey ? 'privateKey' : 'ensManager'
+
+    /**
+     * `estimateSetMetadata` produces a `PrepareResult` with the same delta we
+     * need for diff display, plus calldata + gas estimate in one call. Reusing
+     * the pre-fetched `existing` map avoids a second round trip to ENS.
+     */
+    const estimator = metadataEstimator({ publicClient })
+    let estimate: EstimateResult
+    try {
+      estimate = await estimator.estimateSetMetadata({
+        name: ensName,
+        desired: filtered,
+        existing,
+        account: signerAddress,
+        ...(resolved.schema ? { schema: resolved.schema } : {}),
+      })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'MetadataWriteError') {
         throw new Error(
-          `Invalid payload (validated against schema from ${resolved.source}${resolved.uri ? `: ${resolved.uri}` : ''}):\n${result.errors
+          `Invalid payload (validated against schema from ${resolved.source}${resolved.uri ? `: ${resolved.uri}` : ''}):\n${(
+            err as Error & { errors: { key: string; message: string }[] }
+          ).errors
             .map((e) => `[${e.key}] ${e.message}`)
             .join('\n')}`,
         )
       }
+      throw err
     }
 
-    const delta = computeDelta(existing, filtered)
+    const delta: MetadataDelta = estimate.prepared.delta
     const diff = buildPayloadDiff(existing, filtered, delta)
-
     const texts = [
       ...Object.entries(delta.changes).map(([key, value]) => ({ key, value })),
       ...delta.deleted.map((key) => ({ key, value: '' })),
@@ -258,20 +279,10 @@ export const setCommand = {
       }
     }
 
-    /**
-     * Resolve the from-address used for gas estimation:
-     *   - private key supplied → derive from it
-     *   - otherwise            → look up the ENS manager
-     */
-    const signerAddress: Address = privateKey
-      ? privateKeyToAccount(privateKey as `0x${string}`).address
-      : await readEnsManager(ensName)
-    const signerSource: 'privateKey' | 'ensManager' = privateKey ? 'privateKey' : 'ensManager'
-
     if (!broadcast) {
-      let estimate: Awaited<ReturnType<typeof estimateEnsTextRecordsCost>> | null = null
+      let formatted: Awaited<ReturnType<typeof formatEstimate>> | null = null
       try {
-        estimate = await estimateEnsTextRecordsCost(ensName, texts, signerAddress, rpcUrl)
+        formatted = await formatEstimate(estimate)
       } catch {
         // estimate is best-effort
       }
@@ -282,10 +293,10 @@ export const setCommand = {
         signer: { address: signerAddress, source: signerSource },
         records: texts,
         diff,
-        ...(estimate
+        ...(formatted
           ? {
-              estimatedCost: formatCost(estimate),
-              balance: estimate.balance,
+              estimatedCost: formatCost(formatted),
+              balance: formatted.balance,
             }
           : {}),
         hint:
@@ -296,7 +307,7 @@ export const setCommand = {
     }
 
     // privateKey is guaranteed non-null here by the early check above.
-    await validateEnsTextRecordsCost(ensName, texts, signerAddress, rpcUrl)
+    await enforceCostPolicy(estimate)
 
     const account = privateKeyToAccount(privateKey as `0x${string}`)
     const { addEnsContracts } = await import('@ensdomains/ensjs')

@@ -22,7 +22,7 @@ export {
 } from './schema-resolve'
 export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
-export { metadataWriter, MetadataWriteError } from './write'
+export { metadataWriter, metadataEstimator, MetadataWriteError } from './write'
 export {
   encodeHandlePayload,
   encodeUidPayload,
@@ -57,6 +57,10 @@ export type {
   SetMetadataOptions,
   ApplyDeltaOptions,
   SetMetadataResult,
+  PrepareSetMetadataOptions,
+  PrepareResult,
+  EstimateSetMetadataOptions,
+  EstimateResult,
 } from './types'
 
 export type {
