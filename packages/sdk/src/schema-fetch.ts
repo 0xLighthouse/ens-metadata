@@ -19,26 +19,31 @@ export interface SchemaFetcherOptions {
   /** Network timeout (ms). Default 15000. */
   timeoutMs?: number
   /**
-   * Optional fast-path resolver. If supplied and returns a Schema for the
-   * CID, the gateway fetch is skipped. Used by callers (e.g. the CLI) to
-   * consult a bundled local registry before going over the network.
+   * Optional fast-path resolver. Receives the post-`ipfs://` location string
+   * (a bare CID, or `CID/sub/path` for directory-style URIs) and may return
+   * a Schema to skip the gateway fetch. Resolvers backed by a CID-keyed
+   * registry should return `null` for any location containing a `/`.
    */
-  localResolver?: (cid: string) => Promise<Schema | null> | Schema | null
+  localResolver?: (location: string) => Promise<Schema | null> | Schema | null
 }
 
 /**
- * Parse an `ipfs://<cid>` URI into its CID. Throws on any other scheme.
+ * Parse an `ipfs://<cid>[/path]` URI into its location string — the CID, or
+ * the CID followed by a sub-path for directory-style URIs. Throws on any
+ * other scheme.
  */
-export function parseSchemaUri(uri: string): { cid: string } {
+export function parseSchemaUri(uri: string): { location: string } {
   const trimmed = uri.trim()
   if (!trimmed.startsWith('ipfs://')) {
-    throw new Error(`Unsupported schema URI: "${uri}". Only ipfs://<cid> URIs are supported.`)
+    throw new Error(
+      `Unsupported schema URI: "${uri}". Only ipfs://<cid>[/path] URIs are supported.`,
+    )
   }
-  const cid = trimmed.slice('ipfs://'.length).replace(/^\/+/, '').split('/')[0]
-  if (!cid) {
+  const location = trimmed.slice('ipfs://'.length).replace(/^\/+/, '')
+  if (!location) {
     throw new Error(`Invalid IPFS URI: "${uri}". Missing CID.`)
   }
-  return { cid }
+  return { location }
 }
 
 function isPlausibleSchema(value: unknown): value is Schema {
@@ -49,9 +54,13 @@ function isPlausibleSchema(value: unknown): value is Schema {
   return true
 }
 
-async function fetchFromGateway(cid: string, gateway: string, timeoutMs: number): Promise<Schema> {
+async function fetchFromGateway(
+  location: string,
+  gateway: string,
+  timeoutMs: number,
+): Promise<Schema> {
   const origin = gateway.replace(/\/+$/, '')
-  const url = `${origin}/ipfs/${cid}`
+  const url = `${origin}/ipfs/${location}`
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -91,21 +100,21 @@ async function fetchFromGateway(cid: string, gateway: string, timeoutMs: number)
 }
 
 /**
- * Resolve an `ipfs://<cid>` URI to a `Schema`. Tries the optional
+ * Resolve an `ipfs://<cid>[/path]` URI to a `Schema`. Tries the optional
  * `localResolver` first, then falls back to the configured IPFS gateway.
  */
 export async function fetchSchemaByUri(
   uri: string,
   opts: SchemaFetcherOptions = {},
 ): Promise<Schema> {
-  const { cid } = parseSchemaUri(uri)
+  const { location } = parseSchemaUri(uri)
 
   if (opts.localResolver) {
-    const local = await opts.localResolver(cid)
+    const local = await opts.localResolver(location)
     if (local) return local
   }
 
   const gateway = opts.ipfsGateway ?? DEFAULT_IPFS_GATEWAY
   const timeoutMs = opts.timeoutMs ?? 15_000
-  return fetchFromGateway(cid, gateway, timeoutMs)
+  return fetchFromGateway(location, gateway, timeoutMs)
 }

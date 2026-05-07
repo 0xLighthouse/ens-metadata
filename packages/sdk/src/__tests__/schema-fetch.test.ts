@@ -16,12 +16,14 @@ const sampleSchema: Schema = {
 }
 
 describe('parseSchemaUri', () => {
-  it('parses an ipfs:// URI', () => {
-    expect(parseSchemaUri('ipfs://QmAbc123')).toEqual({ cid: 'QmAbc123' })
+  it('parses a bare CID ipfs:// URI', () => {
+    expect(parseSchemaUri('ipfs://QmAbc123')).toEqual({ location: 'QmAbc123' })
   })
 
-  it('strips the path component', () => {
-    expect(parseSchemaUri('ipfs://QmAbc123/schema.json')).toEqual({ cid: 'QmAbc123' })
+  it('preserves a directory-style sub-path', () => {
+    expect(parseSchemaUri('ipfs://QmAbc123/schemas/agent-schema-v1.json')).toEqual({
+      location: 'QmAbc123/schemas/agent-schema-v1.json',
+    })
   })
 
   it('rejects non-ipfs schemes', () => {
@@ -82,6 +84,27 @@ describe('fetchSchemaByUri', () => {
     })
     expect(result.title).toBe('Sample')
     expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/ipfs/QmDirect')
+  })
+
+  it('appends a directory sub-path to the gateway URL', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify(sampleSchema), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    const localResolver = vi.fn(async () => null)
+    const result = await fetchSchemaByUri(
+      'ipfs://bafybeighgfsdllcwlb7uvga5foqonx52vnoryede72jo6k2a4rtj5naq3i/schemas/agent-schema-v1.json',
+      { ipfsGateway: 'https://gw.test', localResolver },
+    )
+    expect(result.title).toBe('Sample')
+    expect(localResolver).toHaveBeenCalledWith(
+      'bafybeighgfsdllcwlb7uvga5foqonx52vnoryede72jo6k2a4rtj5naq3i/schemas/agent-schema-v1.json',
+    )
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://gw.test/ipfs/bafybeighgfsdllcwlb7uvga5foqonx52vnoryede72jo6k2a4rtj5naq3i/schemas/agent-schema-v1.json',
+    )
   })
 
   it('hard-fails on non-2xx responses', async () => {
