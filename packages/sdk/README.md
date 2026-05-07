@@ -136,6 +136,74 @@ await writer.setMetadata({
 })
 ```
 
+### Lower-level read helpers
+
+`readTextRecords` / `readTextRecordsStrict` / `getResolverAddress` / `getResolverAddressStrict` skip the high-level wrapper. The strict variants throw on RPC errors so callers can distinguish "no record set" from "transport blip".
+
+```ts
+import { readTextRecordsStrict, getResolverAddressStrict } from '@ensmetadata/sdk'
+
+const records = await readTextRecordsStrict({
+  client: publicClient,
+  name: 'mynode.eth',
+  keys: ['description', 'avatar', 'schema'],
+})
+
+const resolver = await getResolverAddressStrict({ client: publicClient, name: 'mynode.eth' })
+```
+
+## Schema fetch
+
+```ts
+import { fetchSchemaByUri, resolveSchemaForName } from '@ensmetadata/sdk'
+
+// Resolve any ipfs://<cid> URI to a Schema. The optional localResolver is a
+// fast-path you can use to short-circuit the gateway (e.g. point at a bundled
+// registry).
+const schema = await fetchSchemaByUri('ipfs://Qm...', {
+  ipfsGateway: 'https://ipfs.io',
+  localResolver: async (cid) => bundledLookup(cid),
+})
+
+// Cascade: payload URI → ENS `schema` text → none.
+const resolved = await resolveSchemaForName({
+  client: publicClient,
+  name: 'mynode.eth',
+  payloadSchemaUri: payload.schema ?? null,
+})
+```
+
+## Prepare / estimate
+
+When you need to inspect or estimate before broadcasting:
+
+```ts
+import { metadataEstimator, metadataWriter } from '@ensmetadata/sdk'
+
+const estimator = metadataEstimator({ publicClient })
+
+const prepared = await estimator.prepareSetMetadata({
+  name: 'mynode.eth',
+  desired: { description: 'New', avatar: 'ipfs://a' },
+})
+// { resolverAddress, existing, delta, calldata, to, validation }
+
+const estimate = await estimator.estimateSetMetadata({
+  name: 'mynode.eth',
+  desired: { description: 'New' },
+  account: '0x...',
+})
+// { prepared, gas, maxFeePerGas, costWei, balance }
+
+// Read+delta+write in one call:
+const writer = metadataWriter({ publicClient })(walletClient)
+await writer.setMetadataWithDelta({
+  name: 'mynode.eth',
+  desired: { description: 'New' },
+  schema: SCHEMA_MAP.Agent,
+})
+```
+
 ## API
 
 ### Read — `metadataReader()`
@@ -145,17 +213,30 @@ await writer.setMetadata({
 | `getSchema({ name })` | Fetch schema, class, version, and CID text records |
 | `getMetadata({ name, schema?, keys? })` | Fetch resolver, address, and text records |
 
-### Write — `metadataWriter({ publicClient })`
+### Write — `metadataWriter({ publicClient })(walletClient)`
 
 | Method | Description |
 |---|---|
 | `setMetadata({ name, records, deleted?, schema? })` | Write text records, optionally validate first |
 | `applyDelta({ name, delta, resolverAddress })` | Apply a `{ changes, deleted }` delta |
+| `setMetadataWithDelta({ name, desired, existing?, schema? })` | Read existing, validate, compute delta, write |
+| `prepareSetMetadata({ name, desired, ... })` | Read + validate + delta + encode calldata (no broadcast) |
+| `estimateSetMetadata({ name, desired, account, ... })` | `prepareSetMetadata` + gas/fee/balance |
+
+### Estimate-only — `metadataEstimator({ publicClient })`
+
+Same `prepareSetMetadata` / `estimateSetMetadata` methods without requiring a wallet client.
 
 ### Standalone functions
 
 | Function | Description |
 |---|---|
+| `readTextRecords(opts)` / `readTextRecordsStrict(opts)` | Batch read text records (lenient or strict) |
+| `getResolverAddress(opts)` / `getResolverAddressStrict(opts)` | Look up the resolver for a name |
+| `fetchSchemaByUri(uri, opts)` | Resolve `ipfs://<cid>` → `Schema` (optional `localResolver` fast-path) |
+| `parseSchemaUri(uri)` | Parse `ipfs://<cid>` to `{ cid }` |
+| `resolveSchemaForName(opts)` | Cascade payload URI → ENS text → none |
 | `validateMetadataSchema(data, schema)` | Validate data against a schema |
 | `computeDelta(original, desired)` | Compute `{ changes, deleted }` between two states |
 | `hasChanges(original, desired)` | Boolean check for differences |
+| `extractSchemaFields(texts)` | Pick `schema` / `class` / `version` / `cid` from a text-record map |
