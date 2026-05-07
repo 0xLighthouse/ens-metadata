@@ -1,22 +1,86 @@
-import { SCHEMA_MAP } from '@ensmetadata/schemas'
-import { metadataReader } from '@ensmetadata/sdk'
+import { metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { clientFromContext, globalEnv, globalOptions, validateName } from '../lib/context.js'
+import { fetchSchemaByUri } from '../lib/schema-fetch.js'
 import { queryDomain } from '../lib/subgraph.js'
+
+const viewOptions = globalOptions.extend({
+  ipfsGateway: z
+    .string()
+    .optional()
+    .describe(
+      'IPFS gateway origin used to fetch the schema document declared on the name (defaults to https://ipfs.io, env: IPFS_GATEWAY).',
+    ),
+})
+
+const viewEnv = globalEnv.extend({
+  IPFS_GATEWAY: z.string().optional().describe('IPFS gateway origin (e.g. https://ipfs.io)'),
+})
+
+type MatchedSchema =
+  | { title: string; version: string; uri: string; valid: true }
+  | {
+      title: string
+      version: string
+      uri: string
+      valid: false
+      errors: { key: string; message: string }[]
+    }
+  | { uri: string; valid: false; error: string }
+
+/**
+ * If a `schema` URI is set on the name, fetch the schema document and validate
+ * the name's properties against it. Returns `null` when no URI is declared.
+ *
+ * Fetch failures are surfaced as a soft failure (`valid: false` with an
+ * `error` string) rather than throwing, so a `view` call still returns the
+ * rest of the metadata even if IPFS is unreachable.
+ */
+async function buildMatchedSchema(
+  schemaUri: string | undefined | null,
+  properties: Record<string, unknown>,
+  ipfsGateway: string | undefined,
+): Promise<MatchedSchema | null> {
+  if (!schemaUri) return null
+
+  let schema: Awaited<ReturnType<typeof fetchSchemaByUri>>
+  try {
+    schema = await fetchSchemaByUri(schemaUri, ipfsGateway ? { ipfsGateway } : {})
+  } catch (err) {
+    return {
+      uri: schemaUri,
+      valid: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+
+  const result = validateMetadataSchema(properties, schema)
+  if (result.success) {
+    return { title: schema.title, version: schema.version, uri: schemaUri, valid: true }
+  }
+  return {
+    title: schema.title,
+    version: schema.version,
+    uri: schemaUri,
+    valid: false,
+    errors: result.errors.map(({ key, message }) => ({ key, message })),
+  }
+}
 
 export const viewCommand = {
   description: 'View ENS node metadata',
   args: z.object({
     name: z.string().describe('ENS name (e.g. myagent.eth)'),
   }),
-  options: globalOptions,
-  env: globalEnv,
+  options: viewOptions,
+  env: viewEnv,
   async run(c: {
     args: { name: string }
-    options: z.infer<typeof globalOptions>
-    env: z.infer<typeof globalEnv>
+    options: z.infer<typeof viewOptions>
+    env: z.infer<typeof viewEnv>
   }) {
     const ensName = validateName(c.args.name)
+    const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
     const { client } = clientFromContext(c, 'mainnet')
     const reader = client.extend(metadataReader())
 
@@ -33,6 +97,7 @@ export const viewCommand = {
         address: domain.resolvedAddress?.id ?? null,
         class: null,
         schema: null,
+        matchedSchema: null,
         properties: {},
       }
     }
@@ -42,8 +107,11 @@ export const viewCommand = {
       ...(textKeys ? { keys: textKeys } : {}),
     })
 
-    const cls = metadata.class
-    const matchedSchema = cls && SCHEMA_MAP[cls] ? cls : null
+    const matchedSchema = await buildMatchedSchema(
+      metadata.schema,
+      metadata.properties,
+      ipfsGateway,
+    )
 
     return {
       name: metadata.name,
@@ -51,7 +119,7 @@ export const viewCommand = {
       address: metadata.address ?? null,
       class: metadata.class ?? null,
       schema: metadata.schema ?? null,
-      ...(matchedSchema ? { matchedSchema } : {}),
+      matchedSchema,
       properties: metadata.properties,
     }
   },
