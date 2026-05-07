@@ -3,7 +3,12 @@ import { normalize } from 'viem/ens'
 import {
   buildTextOptions,
   extractSchemaFields,
+  fetchAddrDirect,
   fetchTextRecords,
+  fetchTextRecordsDirect,
+  getBaseResolverAddress,
+  getOrCreateBasePublicClient,
+  isBasename,
   normalizeResolverAddress,
   withTimeout,
 } from './internal'
@@ -29,8 +34,24 @@ const SCHEMA_KEYS = ['schema', 'class', 'schemaVersion', 'schemaCid']
 async function getSchemaImpl(
   client: PublicClient,
   opts: GetSchemaOptions,
+  basePublicClient?: PublicClient,
 ): Promise<GetSchemaResult> {
   const normalizedName = normalize(opts.name)
+  if (isBasename(normalizedName)) {
+    const baseClient = getOrCreateBasePublicClient(basePublicClient)
+    try {
+      const resolverAddress = await getBaseResolverAddress(baseClient, normalizedName)
+      const texts = await fetchTextRecordsDirect(
+        baseClient,
+        resolverAddress,
+        normalizedName,
+        SCHEMA_KEYS,
+      )
+      return extractSchemaFields(texts)
+    } catch {
+      return extractSchemaFields({})
+    }
+  }
   const textOptions = buildTextOptions(opts)
   const texts = await fetchTextRecords(client, normalizedName, SCHEMA_KEYS, textOptions)
   return extractSchemaFields(texts)
@@ -39,6 +60,7 @@ async function getSchemaImpl(
 async function getMetadataImpl(
   client: PublicClient,
   opts: GetMetadataOptions,
+  basePublicClient?: PublicClient,
 ): Promise<GetMetadataResult> {
   const normalizedName = normalize(opts.name)
   const coinType = opts.coinType ?? 60
@@ -52,6 +74,43 @@ async function getMetadataImpl(
     keys = [...new Set(opts.keys)]
   } else {
     keys = DEFAULT_KEYS
+  }
+
+  if (isBasename(normalizedName)) {
+    const baseClient = getOrCreateBasePublicClient(basePublicClient)
+    let resolverAddress: `0x${string}` | null = null
+    try {
+      resolverAddress = await getBaseResolverAddress(baseClient, normalizedName)
+    } catch {
+      resolverAddress = null
+    }
+
+    if (!resolverAddress) {
+      const empty = Object.fromEntries(keys.map((k) => [k, null]))
+      const schemaFields = extractSchemaFields(empty)
+      return {
+        name: normalizedName,
+        resolver: null,
+        address: null,
+        class: schemaFields.class,
+        schema: schemaFields.schema,
+        properties: empty,
+      }
+    }
+
+    const [texts, address] = await Promise.all([
+      fetchTextRecordsDirect(baseClient, resolverAddress, normalizedName, keys),
+      fetchAddrDirect(baseClient, resolverAddress, normalizedName, coinType),
+    ])
+    const schemaFields = extractSchemaFields(texts)
+    return {
+      name: normalizedName,
+      resolver: resolverAddress,
+      address,
+      class: schemaFields.class,
+      schema: schemaFields.schema,
+      properties: texts,
+    }
   }
 
   const commonOptions = {
@@ -87,9 +146,10 @@ async function getMetadataImpl(
   }
 }
 
-export function metadataReader() {
+export function metadataReader(config: { basePublicClient?: PublicClient } = {}) {
   return (client: PublicClient) => ({
-    getSchema: (opts: GetSchemaOptions) => getSchemaImpl(client, opts),
-    getMetadata: (opts: GetMetadataOptions) => getMetadataImpl(client, opts),
+    getSchema: (opts: GetSchemaOptions) => getSchemaImpl(client, opts, config.basePublicClient),
+    getMetadata: (opts: GetMetadataOptions) =>
+      getMetadataImpl(client, opts, config.basePublicClient),
   })
 }

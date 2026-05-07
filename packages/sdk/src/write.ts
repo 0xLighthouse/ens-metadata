@@ -3,15 +3,12 @@ import { normalize } from 'viem/ens'
 import { computeDelta } from './delta'
 import {
   BASE_CHAIN_ID,
+  fetchTextRecordsDirect,
   getBaseResolverAddress,
   getOrCreateBasePublicClient,
   isBasename,
 } from './internal'
-import {
-  getResolverAddressStrict,
-  readTextRecordsFromResolver,
-  readTextRecordsStrict,
-} from './read-helpers'
+import { getResolverAddressStrict, readTextRecordsStrict } from './read-helpers'
 import type {
   ApplyDeltaOptions,
   EstimateResult,
@@ -224,12 +221,7 @@ async function prepareSetMetadataImpl(
       existing = {}
     } else if (isBase) {
       const baseClient = getOrCreateBasePublicClient(basePublicClient)
-      existing = await readTextRecordsFromResolver({
-        client: baseClient,
-        resolverAddress,
-        name,
-        keys,
-      })
+      existing = await fetchTextRecordsDirect(baseClient, resolverAddress, name, keys)
     } else {
       existing = await readTextRecordsStrict({ client: publicClient, name, keys })
     }
