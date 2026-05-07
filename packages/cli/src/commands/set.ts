@@ -3,14 +3,15 @@ import {
   computeDelta,
   metadataWriter,
   readTextRecordsStrict,
+  resolveSchemaForName,
   validateMetadataSchema,
 } from '@ensmetadata/sdk'
-import type { MetadataDelta } from '@ensmetadata/sdk'
-import type { Schema } from '@ensmetadata/schemas/types'
+import type { MetadataDelta, ResolvedSchema } from '@ensmetadata/sdk'
 import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
+import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import {
   buildFallbackTransport,
   globalEnv,
@@ -23,7 +24,6 @@ import {
   formatCost,
   validateEnsTextRecordsCost,
 } from '../lib/ens-write.js'
-import { fetchSchemaByUri } from '../lib/schema-fetch.js'
 import { queryDomainStrict } from '../lib/subgraph.js'
 
 const setOptions = globalOptions.extend({
@@ -55,14 +55,6 @@ const setEnv = globalEnv.extend({
   IPFS_GATEWAY: z.string().optional().describe('IPFS gateway origin (e.g. https://ipfs.io)'),
 })
 
-type SchemaSource = 'payload' | 'ens' | 'none'
-
-interface ResolvedSchema {
-  schema: Schema | null
-  source: SchemaSource
-  uri: string | null
-}
-
 /**
  * Filter payload entries that should be sent to ENS. By default, entries with
  * empty-string values are dropped (so the user's blank template fields don't
@@ -90,11 +82,6 @@ async function buildPublicClient(rpcUrl?: string): Promise<PublicClient> {
   const chain = addEnsContracts(mainnet)
   const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
   return createPublicClient({ chain, transport }) as PublicClient
-}
-
-async function readEnsSchemaUri(client: PublicClient, ensName: string): Promise<string | null> {
-  const records = await readTextRecordsStrict({ client, name: ensName, keys: ['schema'] })
-  return records.schema ?? null
 }
 
 export interface PayloadDiff {
@@ -167,57 +154,6 @@ export async function readEnsManager(ensName: string): Promise<Address> {
   return candidate as Address
 }
 
-/**
- * Resolve the schema to validate against following the documented cascade:
- *  - If the payload includes `schema`, fetch it (hard-fail on any error).
- *  - Otherwise read the `schema` text record off ENS. If the read itself
- *    fails (RPC error, timeout) → hard-fail. If the read succeeds and no
- *    record is set → no validation. If a URI comes back → fetch it
- *    (hard-fail on any error).
- *
- * `ensSchemaUri`, when provided, replaces the per-call ENS read — the caller
- * has already fetched the `schema` record (e.g. as part of a delta batch) and
- * a `null`/empty string means "no record set" exactly as it does after a
- * direct read.
- */
-export async function resolveSchemaForPayload(args: {
-  payload: Record<string, unknown>
-  ensName: string
-  publicClient: PublicClient
-  ipfsGateway?: string
-  ensSchemaUri?: string | null
-}): Promise<ResolvedSchema> {
-  const payloadSchema =
-    typeof args.payload.schema === 'string' && args.payload.schema.length > 0
-      ? args.payload.schema
-      : null
-
-  if (payloadSchema) {
-    const schema = await fetchSchemaByUri(payloadSchema, { ipfsGateway: args.ipfsGateway })
-    return { schema, source: 'payload', uri: payloadSchema }
-  }
-
-  let ensUri: string | null
-  if (args.ensSchemaUri !== undefined) {
-    ensUri = args.ensSchemaUri && args.ensSchemaUri.length > 0 ? args.ensSchemaUri : null
-  } else {
-    try {
-      ensUri = await readEnsSchemaUri(args.publicClient, args.ensName)
-    } catch (err) {
-      throw new Error(
-        `Failed to read 'schema' text record from ENS for ${args.ensName}: ${err instanceof Error ? err.message : String(err)}`,
-      )
-    }
-  }
-
-  if (!ensUri) {
-    return { schema: null, source: 'none', uri: null }
-  }
-
-  const schema = await fetchSchemaByUri(ensUri, { ipfsGateway: args.ipfsGateway })
-  return { schema, source: 'ens', uri: ensUri }
-}
-
 export const setCommand = {
   description: 'Set ENS metadata text records from a payload file',
   args: z.object({
@@ -271,12 +207,15 @@ export const setCommand = {
       )
     }
 
-    const resolved = await resolveSchemaForPayload({
-      payload: rawRecord,
-      ensName,
-      publicClient,
-      ipfsGateway,
-      ensSchemaUri: existing.schema ?? null,
+    const payloadSchemaUri =
+      typeof rawRecord.schema === 'string' && rawRecord.schema.length > 0 ? rawRecord.schema : null
+    const resolved: ResolvedSchema = await resolveSchemaForName({
+      client: publicClient,
+      name: ensName,
+      payloadSchemaUri,
+      ensSchemaText: existing.schema ?? null,
+      ...(ipfsGateway ? { ipfsGateway } : {}),
+      localResolver: bundledSchemaResolver,
     })
 
     if (resolved.schema) {
