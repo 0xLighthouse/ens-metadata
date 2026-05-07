@@ -8,7 +8,6 @@ import {
   buildPayloadDiff,
   filterPayloadEntries,
   readEnsManager,
-  readExistingTextRecords,
   resolveSchemaForPayload,
   setCommand,
 } from './set.js'
@@ -315,40 +314,6 @@ describe('setCommand.run — broadcast guard', () => {
         env: {},
       }),
     ).rejects.toThrow(/--private-key is required when --broadcast is set/)
-  })
-})
-
-describe('readExistingTextRecords', () => {
-  it('reads each requested key in parallel and returns a map', async () => {
-    const seen: { key: string }[] = []
-    const client = makeClient(async ({ key }) => {
-      seen.push({ key })
-      if (key === 'description') return 'hello'
-      if (key === 'avatar') return 'ipfs://avatar'
-      return null
-    })
-    const out = await readExistingTextRecords(client, 'myagent.eth', [
-      'description',
-      'avatar',
-      'url',
-    ])
-    expect(out).toEqual({ description: 'hello', avatar: 'ipfs://avatar', url: null })
-    expect(seen.map((s) => s.key).sort()).toEqual(['avatar', 'description', 'url'])
-  })
-
-  it('normalises empty strings to null', async () => {
-    const client = makeClient(async ({ key }) => (key === 'description' ? '' : null))
-    const out = await readExistingTextRecords(client, 'myagent.eth', ['description'])
-    expect(out).toEqual({ description: null })
-  })
-
-  it('propagates RPC errors instead of silently dropping them', async () => {
-    const client = makeClient(async () => {
-      throw new Error('RPC 500 boom')
-    })
-    await expect(
-      readExistingTextRecords(client, 'myagent.eth', ['description']),
-    ).rejects.toThrow(/RPC 500 boom/)
   })
 })
 

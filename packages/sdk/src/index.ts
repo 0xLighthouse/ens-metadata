@@ -1,4 +1,13 @@
 export { metadataReader } from './read'
+export {
+  readTextRecords,
+  readTextRecordsStrict,
+  getResolverAddress,
+  getResolverAddressStrict,
+  type ReadTextRecordsOptions,
+  type GetResolverAddressOptions,
+} from './read-helpers'
+export { extractSchemaFields } from './internal'
 export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
 export { metadataWriter, MetadataWriteError } from './write'
