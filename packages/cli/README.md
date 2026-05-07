@@ -85,11 +85,16 @@ These operate on ENS text records for any ENS name.
 
 #### `view <name>`
 
-Read resolved metadata for an ENS name. Reads the resolver, walks declared text-record keys, and matches against known schemas.
+Read resolved metadata for an ENS name and, if the name declares a `schema` text record, fetch that schema and validate the on-chain properties against it.
 
 ```sh
 ens-metadata view myagent.eth
+ens-metadata view myagent.eth --ipfs-gateway https://my-gateway.example
 ```
+
+When the name's `schema` record is set, the CLI fetches the schema document (preferring the bundled cache before falling back to the IPFS gateway), validates the recorded properties against it, and reports the result in `matchedSchema`.
+
+Valid against the declared schema:
 
 ```json
 {
@@ -97,8 +102,13 @@ ens-metadata view myagent.eth
   "resolver": "0x231b...",
   "address": "0xAbC0...",
   "class": "Agent",
-  "schema": "ipfs://bafybeib6...schema",
-  "matchedSchema": "Agent",
+  "schema": "ipfs://bafy...",
+  "matchedSchema": {
+    "title": "Agent",
+    "version": "1.0.0",
+    "uri": "ipfs://bafy...",
+    "valid": true
+  },
   "properties": {
     "name": "My Agent",
     "description": "Helps with on-chain research.",
@@ -107,7 +117,39 @@ ens-metadata view myagent.eth
 }
 ```
 
-`matchedSchema` is only present when `class` matches one of the bundled schemas in `@ensmetadata/schemas`. `resolver`, `address`, `class`, and `schema` are `null` when the corresponding record isn't set.
+Invalid against the declared schema (the URI was fetched but the properties don't conform):
+
+```json
+{
+  "matchedSchema": {
+    "title": "Agent",
+    "version": "1.0.0",
+    "uri": "ipfs://bafy...",
+    "valid": false,
+    "errors": [
+      { "key": "image", "message": "Required field \"image\" is missing" }
+    ]
+  }
+}
+```
+
+When the schema URI can't be fetched (gateway unreachable, bad CID, malformed JSON), the rest of the metadata is still returned and `matchedSchema` carries a soft-failure shape:
+
+```json
+{
+  "matchedSchema": {
+    "uri": "ipfs://bafy...",
+    "valid": false,
+    "error": "Failed to fetch schema from IPFS gateway (...): HTTP 504 Gateway Timeout"
+  }
+}
+```
+
+When no `schema` record is declared on the name, `matchedSchema` is `null` and no fetch is performed. `resolver`, `address`, `class`, and `schema` are `null` when their corresponding records are unset.
+
+Options:
+
+- `--ipfs-gateway <origin>` (env: `IPFS_GATEWAY`): override the gateway used to fetch the schema document. Defaults to `https://ipfs.io`. Has no effect when the schema CID is already in the bundled `@ensmetadata/schemas` registry.
 
 #### `set <name> <payload>`
 
