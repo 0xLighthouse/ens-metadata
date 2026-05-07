@@ -8,6 +8,18 @@ export {
   type GetResolverAddressOptions,
 } from './read-helpers'
 export { extractSchemaFields } from './internal'
+export {
+  parseSchemaUri,
+  fetchSchemaByUri,
+  DEFAULT_IPFS_GATEWAY,
+  type SchemaFetcherOptions,
+} from './schema-fetch'
+export {
+  resolveSchemaForName,
+  type ResolveSchemaOptions,
+  type ResolvedSchema,
+  type SchemaSource,
+} from './schema-resolve'
 export { validateMetadataSchema, validate } from './validate'
 export { computeDelta, hasChanges } from './delta'
 export { metadataWriter, MetadataWriteError } from './write'

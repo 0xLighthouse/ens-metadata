@@ -1,7 +1,7 @@
-import { metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
+import { fetchSchemaByUri, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
 import { z } from 'zod'
+import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import { clientFromContext, globalEnv, globalOptions, validateName } from '../lib/context.js'
-import { fetchSchemaByUri } from '../lib/schema-fetch.js'
 import { queryDomain } from '../lib/subgraph.js'
 
 const viewOptions = globalOptions.extend({
@@ -45,7 +45,10 @@ async function buildMatchedSchema(
 
   let schema: Awaited<ReturnType<typeof fetchSchemaByUri>>
   try {
-    schema = await fetchSchemaByUri(schemaUri, ipfsGateway ? { ipfsGateway } : {})
+    schema = await fetchSchemaByUri(schemaUri, {
+      localResolver: bundledSchemaResolver,
+      ...(ipfsGateway ? { ipfsGateway } : {}),
+    })
   } catch (err) {
     return {
       uri: schemaUri,
