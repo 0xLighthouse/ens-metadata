@@ -209,6 +209,31 @@ await writer.applyDelta({
 })
 ```
 
+### Writing to Basenames
+
+`*.base.eth` names live on Base L2 (chain 8453). The SDK detects them automatically: pass an extra `basePublicClient` so the writer can read the L2 resolver from the Base registry, and connect the wallet to Base before signing.
+
+```ts
+import { createPublicClient, http } from 'viem'
+import { base, mainnet } from 'viem/chains'
+import { metadataWriter } from '@ensmetadata/sdk'
+
+const publicClient = createPublicClient({ chain: mainnet, transport: http() })
+const basePublicClient = createPublicClient({ chain: base, transport: http() })
+
+// walletClient must be connected to Base (chain 8453) before calling.
+const writer = metadataWriter({ publicClient, basePublicClient })(walletClient)
+
+await writer.setMetadata({
+  name: 'alice.base.eth',
+  records: { description: 'On Base' },
+})
+```
+
+Detection is by suffix: any name ending in `.base.eth` (other than `base.eth` itself) is routed through the L2 path. Mainnet names are unchanged.
+
+If the wallet is on the wrong chain the SDK throws `MetadataWriteError` with `code === 'wrong-chain'`. Drive `wallet_switchEthereumChain` from your UI before retrying.
+
 ### Validation
 
 `validateMetadataSchema` checks a record map against a schema. Schemas can come from `@ensmetadata/schemas`, from `fetchSchemaByUri`, or from your own registry.
