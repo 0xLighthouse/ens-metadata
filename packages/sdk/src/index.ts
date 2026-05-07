@@ -13,6 +13,7 @@ export {
   extractSchemaFields,
   isBasename,
   getBaseResolverAddress,
+  getBaseRegistryOwner,
   getResolverForName,
   fetchTextRecordsDirect,
   fetchAddrDirect,
