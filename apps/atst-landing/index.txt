@@ -1,0 +1,254 @@
+ENS Social Media Account Attestation Format
+===========================================
+
+Table of Contents
+
+   1. Introduction
+   2. Claims
+   3. Payload
+   4. Envelope
+   5. Issuance
+   6. Storage and Addressing
+   7. Verification
+   8. Failure Modes
+   9. Handle Persistence Variant
+
+
+1. Introduction
+
+   An ENS social media account attestation is a signed claim that
+   the owner of a particular ENS name is also the owner of a
+   particular social media account. An attestation comprises six
+   data points:
+
+      1. The wallet address of the user
+      2. The ENS name of the user
+      3. The social media account identifier (platform and handle)
+      4. The time the attestation was created
+      5. The ENS name of the attester
+      6. The wallet address of the attester
+
+   At verification time, all six data points are collected from
+   ENS and checked against the signature. If any of them have
+   changed since issuance, the signature will no longer match.
+
+
+2. Claims
+
+   A valid attestation asserts that all of the following were true
+   at the time of issuance:
+
+      o  The person requesting the attestation had control of the
+         wallet address.
+
+      o  The wallet address was set as the manager of the ENS name.
+
+      o  The person requesting the attestation was able to log in
+         to the social media account specified by the social media
+         account identifier.
+
+
+3. Payload
+
+   The payload contains items 1-4 from Section 1, encoded as a map
+   using DAG-CBOR [DAG-CBOR]:
+
+      +-----------+-----+-----------------------------------------+
+      | Field     | Key | Description                             |
+      +-----------+-----+-----------------------------------------+
+      | Name      |  n  | The ENS name the attestation is bound   |
+      |           |     | to.                                     |
+      | Address   |  a  | The wallet address that manages the     |
+      |           |     | ENS name.                               |
+      | Platform  |  p  | Reverse-DNS platform identifier (e.g.,  |
+      |           |     | "com.x", "org.telegram").               |
+      | Handle    |  h  | The user's social media handle.         |
+      | Issued at |  t  | The timestamp of issuance.              |
+      +-----------+-----+-----------------------------------------+
+
+
+4. Envelope
+
+   The envelope is encoded with CBOR and identified by tag
+   1635021684 (0x61747374, the ASCII encoding of "atst"):
+
+      Tag(1635021684) [
+         2,                ; envelope version
+         <integer>,        ; timestamp
+         <bytes 65>,       ; signature, EIP-191 over
+                           ;   keccak256(payload)
+      ]
+
+   The envelope carries only the version, the timestamp, and the
+   signature. Every other field required to reconstruct the payload
+   is obtained by the verifier as described in Section 7.
+
+
+5. Issuance
+
+   Issuance proceeds in two phases. The attester first establishes,
+   within a single session, that the same person controls the
+   user's wallet, the user's ENS name, and the user's social media
+   account. The attester then signs a payload that binds these
+   facts together.
+
+      1. The user authenticates with the attester by signing a
+         challenge with their wallet key. This yields a verified
+         wallet address a.
+
+      2. The attester performs an on-chain check that a is the
+         current manager of the user's ENS name n.
+
+      3. The user authenticates to the social media account via an
+         OAuth flow whose session is bound to the wallet login from
+         step 1. This yields a verified handle h on platform p.
+
+      4. With n, a, p, and h all bound to the same session, set t
+         to the current time and assemble the payload.
+
+      5. Encode the payload as canonical DAG-CBOR.
+
+      6. Compute keccak256 of the encoded bytes to produce the
+         signing digest.
+
+      7. Sign the digest with the attester's wallet key using
+         EIP-191.
+
+      8. Construct the envelope with version 2, the timestamp t,
+         and the 65-byte signature.
+
+      9. The user publishes the envelope as a text record on their
+         ENS name, under the key defined in Section 6.
+
+
+6. Storage and Addressing
+
+   Once issued, an attestation is published by the user as a text
+   record on their ENS name. The text record key has the form:
+
+      attestations[<platform>][<attester ENS name>]
+
+   This binds each attestation to a specific (user, platform,
+   attester) triple, and is the location from which a verifier
+   retrieves the envelope. The <platform> value MUST match the
+   key under which the user's handle is published to their ENS
+   name.
+
+
+7. Verification
+
+   Inputs: user ENS name, platform, attester ENS name.
+
+      1. Resolve the user's ENS name to obtain its current manager
+         address. This yields a. The user ENS name itself is n.
+
+      2. Read the user's ENS text record for the given platform to
+         obtain h. The platform identifier is p.
+
+      3. Read the text record at the key defined in Section 6 to
+         retrieve the envelope. Extract t and the signature.
+
+      4. Reconstruct the payload from n, a, p, h, t and encode it
+         as canonical DAG-CBOR.
+
+      5. Compute keccak256 of the encoded payload and recover the
+         signer address from the digest and the signature, using
+         EIP-191.
+
+      6. Resolve the attester's ENS name to obtain the expected
+         attester address.
+
+      7. The attestation is valid if, and only if, the recovered
+         signer address equals the expected attester address.
+
+
+8. Failure Modes
+
+   Because every payload field is reconstructed at verification
+   time, any change to the underlying ENS data after issuance will
+   cause signature recovery to yield an address that does not match
+   the address resolved by the attester's ENS name. Notable
+   failure modes include:
+
+      o  The user's ENS name is transferred to another owner or
+         manager. (Step 1 yields a different a.)
+
+      o  The user republishes the attestation under a different ENS
+         name they control. (Step 1 yields a different n.)
+
+      o  The attester rotates the wallet address attached to their
+         ENS name (key deprecation). (Step 6 yields a different
+         expected address.)
+
+      o  The user removes or replaces the text record for the
+         attested platform. (Step 2 yields a different h, or no
+         value at all.)
+
+      o  The user changes the handle on the underlying social
+         media account. The base attestation does not detect this
+         case; see Section 9 for a variant that does.
+
+
+9. Handle Persistence Variant
+
+   The attestation type defined in Sections 1-8 attests to the
+   user's ownership of a handle at the time of issuance, but does
+   not detect a subsequent rename of the handle on the platform.
+   This section defines an optional extended variant that
+   additionally attests to the persistence of the handle.
+
+   Most social media platforms assign each account an immutable
+   internal user identifier (UID) that is independent of the
+   handle. When a user changes their handle, the UID is
+   unchanged. The extended variant includes the UID in the signed
+   payload. At verification time, the verifier looks up the UID
+   currently associated with the handle and uses that value when
+   reconstructing the payload. If the handle has been renamed or
+   reassigned since issuance, the looked-up UID will differ from
+   the signed UID, the reconstructed payload will not match, and
+   signature recovery will not yield the attester's address.
+
+   The extended payload adds one field to the schema in Section 3:
+
+      +-------+-----+-------------------------------------------+
+      | Field | Key | Description                               |
+      +-------+-----+-------------------------------------------+
+      | UID   |  u  | The user's immutable platform user ID,    |
+      |       |     | as a string.                              |
+      +-------+-----+-------------------------------------------+
+
+   Extended attestations are instead published as text records
+   under the key:
+
+      uid[<platform>][<attester ENS name>]
+
+   The distinct prefix signals to a verifier that the envelope at
+   this record carries the extended payload and can also attest to
+   the user's UID for <platform>.
+
+   Issuance proceeds as in Section 5. The OAuth response is also
+   used to obtain the user's UID u, which is included in the
+   payload alongside n, a, p, h, and t.
+
+   Verification proceeds as in Section 7. The verifier may obtain
+   u by querying the platform directly, where it has access, or
+   by receiving the value from the user through some out-of-band
+   channel. The mechanism by which the user supplies the UID is
+   out of scope.
+
+   This variant is feasible only on platforms that assign stable
+   UIDs and where the verifier can obtain the UID for a given
+   handle. UIDs may be privileged information that the user does
+   not wish to publish; in such cases verifiers without platform
+   access cannot validate this variant.
+
+
+References
+
+   [DAG-CBOR]  IPLD, "DAG-CBOR Specification",
+               https://ipld.io/docs/codecs/known/dag-cbor/
+
+https://atst.me is run by the Lighthouse Labs social media attestation service.
+Our attester's ENS name is atst.lighthousegov.eth.
+
+Contact for more info: hello@lighthouse.cx
