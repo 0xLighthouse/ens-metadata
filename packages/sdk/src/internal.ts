@@ -16,6 +16,32 @@ export const baseRegistryAbi = [
   },
 ] as const
 
+export const resolverTextAbi = [
+  {
+    name: 'text',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'key', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'string' }],
+  },
+] as const
+
+export const resolverAddrAbi = [
+  {
+    name: 'addr',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'coinType', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bytes' }],
+  },
+] as const
+
 /**
  * Returns true for strict subdomains of `base.eth`. The 2LD `base.eth` itself
  * is excluded because it is owned and resolved on L1.
@@ -146,4 +172,89 @@ export async function fetchTextRecords(
     }),
   )
   return Object.fromEntries(results)
+}
+
+/**
+ * Read text records by calling `text(node, key)` directly on a resolver
+ * contract. No CCIP-Read, no universal resolver — the caller chooses the
+ * chain via `client`. Per-key errors surface as `null`; empty strings are
+ * normalised to `null`.
+ */
+export async function fetchTextRecordsDirect(
+  client: PublicClient,
+  resolverAddress: `0x${string}`,
+  name: string,
+  keys: string[],
+): Promise<Record<string, string | null>> {
+  const node = namehash(normalize(name))
+  const entries = await Promise.all(
+    keys.map(async (key) => {
+      try {
+        const value = (await client.readContract({
+          address: resolverAddress,
+          abi: resolverTextAbi,
+          functionName: 'text',
+          args: [node, key],
+        })) as string
+        return [key, typeof value === 'string' && value.length > 0 ? value : null] as const
+      } catch {
+        return [key, null] as const
+      }
+    }),
+  )
+  return Object.fromEntries(entries)
+}
+
+/**
+ * Read `addr(node, coinType)` directly on a resolver contract. Returns the
+ * 0x-prefixed bytes value, or `null` when unset.
+ */
+export async function fetchAddrDirect(
+  client: PublicClient,
+  resolverAddress: `0x${string}`,
+  name: string,
+  coinType: number,
+): Promise<string | null> {
+  const node = namehash(normalize(name))
+  try {
+    const value = (await client.readContract({
+      address: resolverAddress,
+      abi: resolverAddrAbi,
+      functionName: 'addr',
+      args: [node, BigInt(coinType)],
+    })) as `0x${string}`
+    if (!value || value === '0x' || /^0x0+$/i.test(value)) return null
+    return value
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resolve the resolver address for a name on the appropriate chain. Returns
+ * `null` when no resolver is configured. Auto-detects Basenames and reads
+ * their resolver from the Base registry; mainnet names go through ensjs's
+ * universal-resolver path.
+ */
+export async function getResolverForName(
+  name: string,
+  clients: { mainnetClient: PublicClient; basePublicClient?: PublicClient },
+): Promise<`0x${string}` | null> {
+  if (isBasename(name)) {
+    const baseClient = getOrCreateBasePublicClient(clients.basePublicClient)
+    try {
+      return await getBaseResolverAddress(baseClient, name)
+    } catch {
+      return null
+    }
+  }
+  try {
+    const resolved =
+      await // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
+      (clients.mainnetClient as any).getEnsResolver({ name: normalize(name) })
+    const address = normalizeResolverAddress(resolved)
+    return address ? (address as `0x${string}`) : null
+  } catch {
+    return null
+  }
 }

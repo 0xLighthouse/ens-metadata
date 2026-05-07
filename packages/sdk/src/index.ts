@@ -13,6 +13,9 @@ export {
   extractSchemaFields,
   isBasename,
   getBaseResolverAddress,
+  getResolverForName,
+  fetchTextRecordsDirect,
+  fetchAddrDirect,
   BASE_CHAIN_ID,
   BASE_REGISTRY,
 } from './internal'
