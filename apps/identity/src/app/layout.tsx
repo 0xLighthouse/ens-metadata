@@ -7,8 +7,8 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import { Web3Provider } from '@/contexts/Web3Provider'
 
 export const metadata: Metadata = {
-  title: 'ENS Metadata Link',
-  description: 'Attach verifiable social proofs to your ENS name',
+  title: 'ENS Profile Metadata',
+  description: 'Attach metadata and social media accounts to your ENS profile',
 }
 
 export default function RootLayout({
