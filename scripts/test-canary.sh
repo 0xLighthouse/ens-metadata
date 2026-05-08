@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+TARGET="${1:-all}" # sdk, cli, or all (default)
+
+if [[ "$TARGET" != "sdk" && "$TARGET" != "cli" && "$TARGET" != "all" ]]; then
+  echo "Usage: $0 [sdk|cli|all]"
+  exit 1
+fi
+
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
@@ -15,14 +22,17 @@ cat > package.json << 'EOF'
 }
 EOF
 
-echo "==> Installing @ensmetadata/sdk@canary..."
-pnpm add @ensmetadata/sdk@canary viem @ensdomains/ensjs 2>&1
+FAILED=false
 
-echo "==> Running smoke test..."
-cat > smoke.mjs << 'SMOKE'
+# --- SDK smoke test ---
+if [[ "$TARGET" == "sdk" || "$TARGET" == "all" ]]; then
+  echo "==> Installing @ensmetadata/sdk@canary..."
+  pnpm add @ensmetadata/sdk@canary viem @ensdomains/ensjs 2>&1
+
+  echo "==> Running SDK smoke test..."
+  cat > smoke-sdk.mjs << 'SMOKE'
 import { metadataReader, metadataWriter, validateMetadataSchema, computeDelta, hasChanges } from '@ensmetadata/sdk'
 
-// Verify all exports exist and are the right type
 const checks = [
   ['metadataReader', typeof metadataReader, 'function'],
   ['metadataWriter', typeof metadataWriter, 'function'],
@@ -41,7 +51,6 @@ for (const [name, actual, expected] of checks) {
   }
 }
 
-// Test computeDelta works at runtime
 const delta = computeDelta({ a: 'old' }, { a: 'new', b: 'added' })
 if (delta.changes.a !== 'new' || delta.changes.b !== 'added') {
   console.error('FAIL: computeDelta returned unexpected result')
@@ -50,7 +59,6 @@ if (delta.changes.a !== 'new' || delta.changes.b !== 'added') {
   console.log('  OK: computeDelta works correctly')
 }
 
-// Test metadataReader returns correct shape
 const reader = metadataReader()
 if (typeof reader !== 'function') {
   console.error('FAIL: metadataReader() should return a function')
@@ -60,14 +68,50 @@ if (typeof reader !== 'function') {
 }
 
 if (failed) {
-  console.error('\nSmoke test FAILED')
+  console.error('\nSDK smoke test FAILED')
   process.exit(1)
 } else {
-  console.log('\nSmoke test PASSED')
+  console.log('\nSDK smoke test PASSED')
 }
 SMOKE
 
-node smoke.mjs
+  if ! node smoke-sdk.mjs; then
+    FAILED=true
+  fi
+fi
+
+# --- CLI smoke test ---
+if [[ "$TARGET" == "cli" || "$TARGET" == "all" ]]; then
+  echo "==> Installing @ensmetadata/cli@canary..."
+  pnpm add @ensmetadata/cli@canary 2>&1
+
+  echo "==> Running CLI smoke test..."
+  if npx ens-metadata --help > /dev/null 2>&1; then
+    echo "  OK: ens-metadata --help exits successfully"
+  else
+    echo "FAIL: ens-metadata --help failed"
+    FAILED=true
+  fi
+
+  if npx ens-metadata --version > /dev/null 2>&1; then
+    echo "  OK: ens-metadata --version exits successfully"
+  else
+    echo "FAIL: ens-metadata --version failed"
+    FAILED=true
+  fi
+
+  echo ""
+  if [[ "$FAILED" == "false" ]]; then
+    echo "CLI smoke test PASSED"
+  else
+    echo "CLI smoke test FAILED"
+  fi
+fi
 
 echo ""
-echo "==> Canary smoke test complete!"
+if [[ "$FAILED" == "true" ]]; then
+  echo "==> Canary smoke test FAILED"
+  exit 1
+else
+  echo "==> Canary smoke test complete!"
+fi
