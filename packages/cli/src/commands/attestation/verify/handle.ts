@@ -1,9 +1,10 @@
 import { addEnsContracts } from '@ensdomains/ensjs'
-import { DEFAULT_ATTESTER_ENS, verifyHandleAttestation } from '@ensmetadata/sdk'
+import { DEFAULT_ATTESTER_ENS, isBasename, verifyHandleAttestation } from '@ensmetadata/sdk'
 import { type PublicClient, createPublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
 import {
+  baseClientForName,
   buildFallbackTransport,
   globalEnv,
   globalOptions,
@@ -38,16 +39,25 @@ export const verifyHandleCommand = {
     env: z.infer<typeof globalEnv>
   }) {
     const ensName = validateName(c.args.name)
+    if (isBasename(c.options.attester)) {
+      throw new Error(
+        '--attester must be a mainnet ENS name. Custom attesters on Base are not yet supported.',
+      )
+    }
     const rpcUrl = resolveRpcUrl(mainnet.id, c.options, c.env as Record<string, string | undefined>)
     const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
     const client = createPublicClient({
       chain: addEnsContracts(mainnet),
       transport,
     }) as unknown as PublicClient
+    const basePublicClient = baseClientForName(c, ensName)
 
     return verifyHandleAttestation(
       client,
-      c.options.maxAge !== undefined ? { maxAge: c.options.maxAge } : {},
+      {
+        ...(c.options.maxAge !== undefined ? { maxAge: c.options.maxAge } : {}),
+        ...(basePublicClient ? { basePublicClient } : {}),
+      },
       {
         name: ensName,
         platform: c.args.platform,
