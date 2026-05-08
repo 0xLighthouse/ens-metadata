@@ -17,6 +17,7 @@ export {
   getResolverForName,
   fetchTextRecordsDirect,
   fetchAddrDirect,
+  BaseResolverError,
   BASE_CHAIN_ID,
   BASE_REGISTRY,
 } from './internal'

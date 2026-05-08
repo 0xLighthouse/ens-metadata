@@ -1,6 +1,7 @@
 import type { PublicClient } from 'viem'
 import { normalize } from 'viem/ens'
 import {
+  BaseResolverError,
   buildTextOptions,
   extractSchemaFields,
   fetchAddrDirect,
@@ -48,8 +49,13 @@ async function getSchemaImpl(
         SCHEMA_KEYS,
       )
       return extractSchemaFields(texts)
-    } catch {
-      return extractSchemaFields({})
+    } catch (err) {
+      // Unconfigured names degrade to "no schema fields" so callers don't
+      // have to special-case them; transport errors propagate.
+      if (err instanceof BaseResolverError && err.code === 'unconfigured') {
+        return extractSchemaFields({})
+      }
+      throw err
     }
   }
   const textOptions = buildTextOptions(opts)
@@ -81,8 +87,14 @@ async function getMetadataImpl(
     let resolverAddress: `0x${string}` | null = null
     try {
       resolverAddress = await getBaseResolverAddress(baseClient, normalizedName)
-    } catch {
-      resolverAddress = null
+    } catch (err) {
+      // Unconfigured → return the same empty shape mainnet would; transport
+      // errors propagate so callers see the real cause (rate limit, etc.).
+      if (err instanceof BaseResolverError && err.code === 'unconfigured') {
+        resolverAddress = null
+      } else {
+        throw err
+      }
     }
 
     if (!resolverAddress) {
