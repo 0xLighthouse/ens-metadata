@@ -7,10 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Identity attestation system: new `apps/identity` flow for linking X and Telegram accounts to ENS names, backed by a Cloudflare Worker attester (`apps/attester`) with Turnkey production signing. The wizard supports multi-schema profile building, URL pre-fill, multiple attestations per request, and Cloudflare KV-backed intents.
+- Native support for `*.base.eth` (Basenames): the SDK and CLI route reads, writes, and attestation verification through Base L2 via direct resolver calls, with a Base public-client factory and curated public Base RPC fallbacks.
+- CLI: `verify-attestation` and `template` commands, a `--rpc` flag with env URL fallbacks, dry-run without a private key, and a `set` command that accepts schemas from multiple sources and handles empty values.
+- SDK 0.3.0: text-record and resolver read primitives, schema fetch and resolution helpers, `prepare`/`estimate`/`setMetadataWithDelta` writer, and identity attestation primitives plus verifier. Refreshed README.
+- atst.me static landing page hosting the attestation spec.
+- `social-proofs` schema field and reverse-DNS namespacing (`com.x`, `org.telegram`) for attestation text records.
+
 ### Changed
 
+- **BREAKING:** Renamed the attestation API from "proofs" across the SDK, and renamed `apps/proofs` to `apps/identity`. Reverse-DNS record keys replace the old naming.
+- **BREAKING:** Attestation envelope finalized as v1 tagged CBOR (tag `atst`) with binary encoding, compact keys, and split handle/uid envelopes per platform binding. Platform UIDs are blinded before signing.
+- Identity wizard: complete redesign with a new intent builder, signature at step 2, support for multiple attestations in a single request, and consolidated CSS.
+- CLI rebuilt: migrated from Pastel/Ink to `incur`, refactored to a context pattern, matches schemas by CID instead of class name, and avoids rewriting unchanged ENS records.
+- Docs renamed to "ENS Metadata"; landing page, schemas overview, and attestations guide rewritten. ENS-name keying and key rotation are now documented.
+- Attester: Turnkey remote signer in production, attestation records keyed by attester ENS name (configurable via `ATTESTER_ENS`), separate handle and uid envelopes per platform.
+- viem unified to 2.47.6 across all apps to match the SDK.
 - [81f641e] [803d364] Renamed the GitHub repository from `ens-node-metadata` to `ens-metadata`. All schema `$id` URLs, READMEs, the interface footer, and CLI docs now point at the new location.
 - [803d364] Republished every schema as v3.0.1 with the updated `$id` URL. New IPFS CIDs are recorded in `_registry.json`; v3.0.0 remains pinned at its original CIDs.
+
+### Removed
+
+- `apps/contracts` placeholder and the ENSNode subgraph dependency (replaced by direct on-chain reads).
+- Dead code, orphaned files, and unused dependencies across the monorepo.
+
+### Fixed
+
+- Security hardening across the CLI: shell injection, error leakage, and input sanitization (#67).
+- SDK now distinguishes unconfigured Basenames from RPC errors on read.
+- CLI `verify-attestation` requires a platform argument and redacts RPC URLs to hostname; `withTimeout` clears its setTimeout when the wrapped promise wins.
+- Wizard preserves user input when clicking back, and existing ENS text records are detected and not rewritten on `set`.
 
 ## [0.1.0] - 2026-04-14
 
