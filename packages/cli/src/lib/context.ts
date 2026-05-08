@@ -94,6 +94,11 @@ export function resolveRpcUrl(
 const SUPPLEMENTAL_RPCS: Record<number, string[]> = {
   1: ['https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth'],
   11155111: ['https://1rpc.io/sepolia', 'https://ethereum-sepolia-rpc.publicnode.com'],
+  // Viem's default Base RPC (`https://mainnet.base.org`) rate-limits the
+  // back-to-back resolver lookups in `view`/`set`. These fallbacks make the
+  // common case work without forcing every user to set RPC_URL_8453.
+  8453: ['https://base-rpc.publicnode.com', 'https://1rpc.io/base'],
+  84532: ['https://base-sepolia-rpc.publicnode.com'],
 }
 
 // ─── Context type + client factory ──────────────────────────────────────────
