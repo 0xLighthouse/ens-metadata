@@ -32,7 +32,10 @@ describe('templateCommand', () => {
     const out = await runTemplate('agent')
     expect(typeof out).toBe('object')
     expect(out).toHaveProperty('class', 'Agent')
-    expect(out).toHaveProperty('schema', `ipfs://${agentRegistry.published[agentRegistry.latest].cid}`)
+    expect(out).toHaveProperty(
+      'schema',
+      `ipfs://${agentRegistry.published[agentRegistry.latest].cid}`,
+    )
   })
 
   it('resolves TitleCase title (`Organization`) to the org registry id', async () => {

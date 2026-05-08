@@ -5,10 +5,14 @@
  * clientFromContext, validateName) so commands sourced from there drop in
  * with minimal adaptation.
  */
+import { isBasename } from '@ensmetadata/sdk'
 import { http, type PublicClient, createPublicClient, fallback } from 'viem'
+import { base } from 'viem/chains'
 import { normalize } from 'viem/ens'
 import { z } from 'zod'
 import { SUPPORTED_CHAINS, resolveChain } from './registry.js'
+
+export { base }
 
 // ─── Option schemas ─────────────────────────────────────────────────────────
 
@@ -134,6 +138,36 @@ export function clientFromContext(
   const transport = buildFallbackTransport(chain.id, rpc, chain.rpcUrls.default.http)
   const client = createPublicClient({ chain, transport })
   return { client, chain, registryAddress }
+}
+
+/**
+ * Build a viem PublicClient connected to Base (chain 8453). Uses the same env
+ * precedence as the mainnet client (`RPC_URL_8453` → `ETH_RPC_URL` → viem
+ * defaults). `--rpc` is honoured only when `useFlagOverride: true`, so
+ * Basename-bound commands can flow the flag through while mainnet-bound
+ * commands keep `--rpc` bound to mainnet.
+ */
+export function basePublicClientFromContext(
+  c: Context,
+  opts?: { useFlagOverride?: boolean },
+): PublicClient {
+  const useFlag = opts?.useFlagOverride === true
+  const flagOptions = useFlag ? c.options : {}
+  const rpc = resolveRpcUrl(base.id, flagOptions, c.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport(base.id, rpc, base.rpcUrls.default.http)
+  return createPublicClient({ chain: base, transport })
+}
+
+/**
+ * Convenience: returns a Base PublicClient when `name` is a Basename, else
+ * `undefined`. The caller threads the result into SDK factories (which treat
+ * `undefined` as "this name lives on mainnet, no Base reads needed"). When
+ * the name is a Basename, `--rpc` is bound to the Base client because the
+ * Base chain is the subject of the command.
+ */
+export function baseClientForName(c: Context, name: string): PublicClient | undefined {
+  if (!isBasename(name)) return undefined
+  return basePublicClientFromContext(c, { useFlagOverride: true })
 }
 
 // ─── Name normalization ─────────────────────────────────────────────────────
