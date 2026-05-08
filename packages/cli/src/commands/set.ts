@@ -1,17 +1,27 @@
 import { readFileSync } from 'node:fs'
 import {
+  getBaseRegistryOwner,
+  isBasename,
   metadataEstimator,
   metadataWriter,
   readTextRecordsStrict,
   resolveSchemaForName,
 } from '@ensmetadata/sdk'
 import type { EstimateResult, MetadataDelta, ResolvedSchema } from '@ensmetadata/sdk'
-import { type Address, type PublicClient, createPublicClient, createWalletClient } from 'viem'
+import {
+  type Address,
+  type PublicClient,
+  createPublicClient,
+  createWalletClient,
+  isAddress,
+} from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import {
+  base,
+  baseClientForName,
   buildFallbackTransport,
   globalEnv,
   globalOptions,
@@ -19,7 +29,6 @@ import {
   validateName,
 } from '../lib/context.js'
 import { enforceCostPolicy, formatCost, formatEstimate } from '../lib/estimate-cost.js'
-import { queryDomainStrict } from '../lib/subgraph.js'
 
 const setOptions = globalOptions.extend({
   privateKey: z
@@ -70,7 +79,7 @@ export function filterPayloadEntries(
 
 /**
  * Build an ENS-aware viem PublicClient. We need ensjs's extensions
- * (`getEnsText`) to read existing schema records.
+ * (`getEnsText`, `getOwner`) for mainnet reads.
  */
 async function buildPublicClient(rpcUrl?: string): Promise<PublicClient> {
   const { addEnsContracts } = await import('@ensdomains/ensjs')
@@ -117,36 +126,41 @@ export function buildPayloadDiff(
   return diff
 }
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
 /**
- * Look up the address authorised to set records on `ensName` via ENSNode (the
- * project's standard indexed-data source). Used as the `from` address for
- * dry-run gas estimation when no `--private-key` is supplied.
+ * Look up the address authorised to set records on `ensName` directly on-chain.
+ * Used as the `from` address for dry-run gas estimation when no `--private-key`
+ * is supplied.
  *
- * Resolution: prefer `wrappedOwnerId` when set (wrapped names hold the
- * NameWrapper as the registry owner), otherwise fall back to `ownerId`.
+ * For mainnet names this uses ensjs's `getOwner`, which transparently handles
+ * the registry / registrar / NameWrapper distinction. For Basenames it reads
+ * `owner(node)` from the Base L2 registry.
  */
-export async function readEnsManager(ensName: string): Promise<Address> {
-  const domain = await queryDomainStrict(ensName)
-  if (!domain) {
-    throw new Error(
-      `ENSNode has no record of ${ensName}. Pass --private-key to provide a from-address explicitly.`,
-    )
+export async function readEnsManager(
+  ensName: string,
+  mainnetClient: PublicClient,
+  basePublicClient?: PublicClient,
+): Promise<Address> {
+  if (isBasename(ensName)) {
+    if (!basePublicClient) {
+      throw new Error(`Basename ${ensName} requires a Base public client.`)
+    }
+    const owner = await getBaseRegistryOwner(basePublicClient, ensName)
+    if (!owner) {
+      throw new Error(
+        `Could not determine the manager of ${ensName} on Base (registry returned the zero address). Pass --private-key to provide a from-address explicitly.`,
+      )
+    }
+    return owner as Address
   }
 
-  const candidate =
-    domain.wrappedOwnerId && domain.wrappedOwnerId !== ZERO_ADDRESS
-      ? domain.wrappedOwnerId
-      : domain.ownerId
-
-  if (!candidate || candidate === ZERO_ADDRESS) {
+  const { getOwner } = await import('@ensdomains/ensjs/public')
+  const owner = await getOwner(mainnetClient as never, { name: ensName })
+  if (!owner?.owner || !isAddress(owner.owner)) {
     throw new Error(
-      `Could not determine the manager of ${ensName} from ENSNode. Pass --private-key to provide a from-address explicitly.`,
+      `Could not determine the manager of ${ensName} on mainnet. Pass --private-key to provide a from-address explicitly.`,
     )
   }
-
-  return candidate as Address
+  return owner.owner as Address
 }
 
 export const setCommand = {
@@ -163,8 +177,8 @@ export const setCommand = {
     env: z.infer<typeof setEnv>
   }) {
     const ensName = validateName(c.args.name)
+    const isBase = isBasename(ensName)
     const { privateKey, broadcast, includeEmpty } = c.options
-    const rpcUrl = resolveRpcUrl(mainnet.id, c.options, c.env as Record<string, string | undefined>)
     const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
 
     if (broadcast && !privateKey) {
@@ -179,13 +193,25 @@ export const setCommand = {
 
     const filtered = filterPayloadEntries(rawRecord, { includeEmpty })
 
-    const publicClient = await buildPublicClient(rpcUrl)
+    /**
+     * `--rpc` binds to the chain that the subject name lives on (see README).
+     * For Basenames the mainnet client takes its RPC from the env-only
+     * precedence (`RPC_URL_1` / `MAINNET_RPC_URL` / `ETH_RPC_URL`).
+     */
+    const mainnetRpcOptions = isBase ? {} : c.options
+    const mainnetRpcUrl = resolveRpcUrl(
+      mainnet.id,
+      mainnetRpcOptions,
+      c.env as Record<string, string | undefined>,
+    )
+    const publicClient = await buildPublicClient(mainnetRpcUrl)
+    const basePublicClient = baseClientForName(c, ensName)
 
     /**
      * Batch-read existing values for every payload key plus `schema` (always
      * needed for schema resolution). Doing this once here lets us
      *   1. compute a delta and skip records that already match on-chain, and
-     *   2. reuse the `schema` value inside `resolveSchemaForPayload` instead
+     *   2. reuse the `schema` value inside `resolveSchemaForName` instead
      *      of issuing a second `getEnsText('schema')` call.
      */
     const keysToRead = Array.from(new Set([...Object.keys(filtered), 'schema']))
@@ -193,6 +219,7 @@ export const setCommand = {
     try {
       existing = await readTextRecordsStrict({
         client: publicClient,
+        ...(basePublicClient ? { basePublicClient } : {}),
         name: ensName,
         keys: keysToRead,
       })
@@ -216,11 +243,12 @@ export const setCommand = {
     /**
      * Resolve the from-address used for gas estimation and broadcast:
      *   - private key supplied → derive from it
-     *   - otherwise            → look up the ENS manager via ENSNode
+     *   - otherwise            → look up the on-chain manager (ensjs for
+     *                            mainnet, Base registry for Basenames)
      */
     const signerAddress: Address = privateKey
       ? privateKeyToAccount(privateKey as `0x${string}`).address
-      : await readEnsManager(ensName)
+      : await readEnsManager(ensName, publicClient, basePublicClient)
     const signerSource: 'privateKey' | 'ensManager' = privateKey ? 'privateKey' : 'ensManager'
 
     /**
@@ -228,7 +256,10 @@ export const setCommand = {
      * need for diff display, plus calldata + gas estimate in one call. Reusing
      * the pre-fetched `existing` map avoids a second round trip to ENS.
      */
-    const estimator = metadataEstimator({ publicClient })
+    const estimator = metadataEstimator({
+      publicClient,
+      ...(basePublicClient ? { basePublicClient } : {}),
+    })
     let estimate: EstimateResult
     try {
       estimate = await estimator.estimateSetMetadata({
@@ -272,6 +303,7 @@ export const setCommand = {
       return {
         dryRun: !broadcast,
         name: ensName,
+        chain: isBase ? 'base' : 'mainnet',
         schema: schemaInfo,
         noOp: true,
         diff,
@@ -289,6 +321,7 @@ export const setCommand = {
       return {
         dryRun: true,
         name: ensName,
+        chain: isBase ? 'base' : 'mainnet',
         schema: schemaInfo,
         signer: { address: signerAddress, source: signerSource },
         records: texts,
@@ -310,24 +343,69 @@ export const setCommand = {
     await enforceCostPolicy(estimate)
 
     const account = privateKeyToAccount(privateKey as `0x${string}`)
-    const { addEnsContracts } = await import('@ensdomains/ensjs')
-    const chain = addEnsContracts(mainnet)
-    const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
-    const walletClient = createWalletClient({ account, chain, transport })
 
-    const writer = metadataWriter({ publicClient })(walletClient)
-    const result = await writer.setMetadata({
-      name: ensName,
-      records: delta.changes,
-      deleted: delta.deleted,
+    /**
+     * Auto-select the wallet-client chain from the subject name. Basename
+     * writes go through the L2 resolver's `multicall(bytes[])` and need a
+     * Base-connected wallet; mainnet writes use ensjs's `setRecords`, which
+     * needs `addEnsContracts(mainnet)` for its address book.
+     */
+    let walletChain: { id: number; rpcUrls: { default: { http: readonly string[] } } }
+    if (isBase) {
+      walletChain = base
+    } else {
+      const { addEnsContracts } = await import('@ensdomains/ensjs')
+      walletChain = addEnsContracts(mainnet) as unknown as typeof walletChain
+    }
+    const walletRpcUrl = resolveRpcUrl(
+      walletChain.id,
+      c.options,
+      c.env as Record<string, string | undefined>,
+    )
+    const walletTransport = buildFallbackTransport(
+      walletChain.id,
+      walletRpcUrl,
+      walletChain.rpcUrls.default.http,
+    )
+    const walletClient = createWalletClient({
+      account,
+      // biome-ignore lint/suspicious/noExplicitAny: viem's chain types differ between mainnet (ensjs-extended) and base
+      chain: walletChain as any,
+      transport: walletTransport,
     })
+
+    const writer = metadataWriter({
+      publicClient,
+      ...(basePublicClient ? { basePublicClient } : {}),
+    })(walletClient)
+    let result: { txHash: string }
+    try {
+      result = await writer.setMetadata({
+        name: ensName,
+        records: delta.changes,
+        deleted: delta.deleted,
+      })
+    } catch (err) {
+      // The CLI pre-selects the wallet chain so this normally can't fire.
+      // Defence in depth: surface the SDK's `wrong-chain` error code with
+      // a friendly message instead of the raw stack.
+      if (err instanceof Error && (err as Error & { code?: string }).code === 'wrong-chain') {
+        throw new Error(
+          `Wallet must be connected to ${isBase ? 'Base (chain 8453)' : 'mainnet'} to write to ${ensName}.`,
+        )
+      }
+      throw err
+    }
+
+    const explorerBase = isBase ? 'https://basescan.org/tx/' : 'https://etherscan.io/tx/'
 
     return {
       broadcast: true,
       name: ensName,
+      chain: isBase ? 'base' : 'mainnet',
       schema: schemaInfo,
       txHash: result.txHash,
-      explorerUrl: `https://etherscan.io/tx/${result.txHash}`,
+      explorerUrl: `${explorerBase}${result.txHash}`,
       diff,
     }
   },

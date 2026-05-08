@@ -107,6 +107,8 @@ Override the IPFS gateway with `--ipfs-gateway https://my-gateway.example` or th
 
 Update metadata when agent skills, identity, or capabilities change. Remember to also update your `<agent-uri>`.
 
+The same workflow applies to `*.base.eth` (Basenames). The CLI auto-detects them and routes reads + writes to Base; the dry-run output reports `chain: 'base'` and the broadcast `explorerUrl` resolves on BaseScan. Set `RPC_URL_8453` for a Base RPC (or use `--rpc <url>` — it binds to the chain the subject name lives on).
+
 ## References
 
 - [ERC-8004 Agent Metadata Standard](https://best-practices.8004scan.io/docs/01-agent-metadata-standard.html) — used for `registration-file` commands

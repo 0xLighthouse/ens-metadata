@@ -1,12 +1,29 @@
 import { computeDelta } from '@ensmetadata/sdk'
+import type { PublicClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const getOwnerMock = vi.fn()
+const getBaseRegistryOwnerMock = vi.fn()
+
+/**
+ * Mock ensjs's `getOwner` (used for mainnet manager lookup). The dynamic
+ * import in `set.ts` resolves to this mocked module.
+ */
+vi.mock('@ensdomains/ensjs/public', () => ({
+  getOwner: (client: unknown, opts: { name: string }) => getOwnerMock(client, opts),
+}))
+
+vi.mock('@ensmetadata/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
+  return {
+    ...actual,
+    getBaseRegistryOwner: (client: unknown, name: string) => getBaseRegistryOwnerMock(client, name),
+  }
+})
+
 import { buildPayloadDiff, filterPayloadEntries, readEnsManager, setCommand } from './set.js'
 
-const queryDomainStrictMock = vi.fn()
-vi.mock('../lib/subgraph.js', () => ({
-  queryDomainStrict: (name: string) => queryDomainStrictMock(name),
-  queryDomain: (name: string) => queryDomainStrictMock(name),
-}))
+const STUB_CLIENT = {} as unknown as PublicClient
 
 describe('filterPayloadEntries', () => {
   it('drops empty-string values by default', () => {
@@ -18,10 +35,7 @@ describe('filterPayloadEntries', () => {
   })
 
   it('keeps empty-string values when includeEmpty is true', () => {
-    const out = filterPayloadEntries(
-      { class: 'Agent', alias: '' },
-      { includeEmpty: true },
-    )
+    const out = filterPayloadEntries({ class: 'Agent', alias: '' }, { includeEmpty: true })
     expect(out).toEqual({ class: 'Agent', alias: '' })
   })
 
@@ -34,47 +48,52 @@ describe('filterPayloadEntries', () => {
   })
 })
 
-describe('readEnsManager (via ENSNode)', () => {
-  const ZERO = '0x0000000000000000000000000000000000000000'
-
+describe('readEnsManager (on-chain)', () => {
   beforeEach(() => {
-    queryDomainStrictMock.mockReset()
+    getOwnerMock.mockReset()
+    getBaseRegistryOwnerMock.mockReset()
   })
 
-  it('returns ownerId for unwrapped names', async () => {
-    queryDomainStrictMock.mockResolvedValue({
-      ownerId: '0x1111111111111111111111111111111111111111',
-      wrappedOwnerId: ZERO,
-    })
-    const owner = await readEnsManager('myagent.eth')
+  it('resolves mainnet names via ensjs getOwner', async () => {
+    getOwnerMock.mockResolvedValue({ owner: '0x1111111111111111111111111111111111111111' })
+    const owner = await readEnsManager('myagent.eth', STUB_CLIENT)
     expect(owner).toBe('0x1111111111111111111111111111111111111111')
+    expect(getOwnerMock).toHaveBeenCalledWith(STUB_CLIENT, { name: 'myagent.eth' })
+    expect(getBaseRegistryOwnerMock).not.toHaveBeenCalled()
   })
 
-  it('prefers wrappedOwnerId when set (wrapped names)', async () => {
-    queryDomainStrictMock.mockResolvedValue({
-      ownerId: '0x000000000000000000000000d4416b13d2b3a9abae7acd5d6c2bbdbe25686401', // NameWrapper-ish
-      wrappedOwnerId: '0x2222222222222222222222222222222222222222',
-    })
-    const owner = await readEnsManager('myagent.eth')
+  it('resolves Basenames via the SDK getBaseRegistryOwner', async () => {
+    getBaseRegistryOwnerMock.mockResolvedValue('0x2222222222222222222222222222222222222222')
+    const owner = await readEnsManager('alice.base.eth', STUB_CLIENT, STUB_CLIENT)
     expect(owner).toBe('0x2222222222222222222222222222222222222222')
+    expect(getBaseRegistryOwnerMock).toHaveBeenCalledWith(STUB_CLIENT, 'alice.base.eth')
+    expect(getOwnerMock).not.toHaveBeenCalled()
   })
 
-  it('hard-fails when ENSNode is unreachable', async () => {
-    queryDomainStrictMock.mockRejectedValue(new Error('ENSNode request failed: ECONNREFUSED'))
-    await expect(readEnsManager('myagent.eth')).rejects.toThrow(/ENSNode request failed/)
-  })
-
-  it('hard-fails when ENSNode has no record of the name', async () => {
-    queryDomainStrictMock.mockResolvedValue(null)
-    await expect(readEnsManager('doesnotexist.eth')).rejects.toThrow(
-      /ENSNode has no record of/,
+  it('hard-fails when the Base registry returns null (zero owner)', async () => {
+    getBaseRegistryOwnerMock.mockResolvedValue(null)
+    await expect(readEnsManager('alice.base.eth', STUB_CLIENT, STUB_CLIENT)).rejects.toThrow(
+      /Could not determine the manager of alice\.base\.eth on Base/,
     )
   })
 
-  it('hard-fails when both owner fields are zero/missing', async () => {
-    queryDomainStrictMock.mockResolvedValue({ ownerId: ZERO, wrappedOwnerId: ZERO })
-    await expect(readEnsManager('myagent.eth')).rejects.toThrow(
-      /Could not determine the manager/,
+  it('hard-fails when no Base public client is supplied for a Basename', async () => {
+    await expect(readEnsManager('alice.base.eth', STUB_CLIENT)).rejects.toThrow(
+      /requires a Base public client/,
+    )
+  })
+
+  it('hard-fails when ensjs returns no owner for a mainnet name', async () => {
+    getOwnerMock.mockResolvedValue({ owner: undefined })
+    await expect(readEnsManager('myagent.eth', STUB_CLIENT)).rejects.toThrow(
+      /Could not determine the manager of myagent\.eth on mainnet/,
+    )
+  })
+
+  it('hard-fails when ensjs returns a non-address owner', async () => {
+    getOwnerMock.mockResolvedValue({ owner: 'not-an-address' })
+    await expect(readEnsManager('myagent.eth', STUB_CLIENT)).rejects.toThrow(
+      /Could not determine the manager of myagent\.eth on mainnet/,
     )
   })
 })

@@ -178,7 +178,9 @@ Schema resolution cascade:
 
 By default empty-string entries in the payload are dropped so blank template fields don't overwrite existing records. Pass `--include-empty` to send empty strings (this is how you delete records via the payload).
 
-`--private-key` is optional in dry-run; when omitted, the CLI looks up the ENS manager from ENSNode and uses that as the from-address for gas estimation. `--private-key` is required for `--broadcast`.
+`--private-key` is optional in dry-run; when omitted, the CLI reads the ENS manager directly on-chain (ensjs `getOwner` for mainnet, the Base L2 registry for `*.base.eth`) and uses that as the from-address for gas estimation. `--private-key` is required for `--broadcast`.
+
+For `*.base.eth` subjects, the wallet client's chain is auto-selected as Base; no flag is needed. The dry-run output includes `chain: 'base'` and the broadcast `explorerUrl` points to `https://basescan.org/tx/...`. See [Basenames](#basenames-baseeth) for RPC env precedence and the `--rpc` semantics.
 
 ```sh
 ens-metadata set myagent.eth ./payload.json
@@ -196,6 +198,7 @@ Dry-run output:
 {
   "dryRun": true,
   "name": "myagent.eth",
+  "chain": "mainnet",
   "schema": {
     "source": "ens",
     "uri": "ipfs://bafy...",
@@ -231,6 +234,7 @@ Broadcast output:
 {
   "broadcast": true,
   "name": "myagent.eth",
+  "chain": "mainnet",
   "schema": {
     "source": "ens",
     "uri": "ipfs://bafy...",
@@ -609,7 +613,7 @@ RPC timeouts or `429`/`Too Many Requests`. The public fallback RPCs are best-eff
 
 `Signature does not recover to wallet <address>` from `set-wallet`. The `--signature` you supplied was not produced by the wallet you're trying to link, or the `--deadline` doesn't match the deadline that was signed over. Re-sign against the EIP-712 domain shown in the dry-run output, including the same `agentId`, `newWallet`, `owner`, and `deadline`.
 
-`ENSNode has no record of <name>.` `set` was invoked without `--private-key` and the indexer doesn't know about the name yet (recently registered names take time to propagate). Pass `--private-key` to skip the manager lookup.
+`Could not determine the manager of <name>` from `set`. `set` was invoked without `--private-key` and the on-chain owner read returned no result (zero-address registrant or non-EOA owner). Pass `--private-key` to skip the manager lookup.
 
 Validation failure on `set` with `Invalid payload (validated against schema from ens: ipfs://...)`. The `schema` text record on the name points to a schema that the payload doesn't conform to. Either edit the payload to match, or override with `payload.schema` to validate against a different schema.
 
