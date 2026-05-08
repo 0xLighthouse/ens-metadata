@@ -1,8 +1,8 @@
+import type { Schema } from '@ensmetadata/schemas/types'
 import { fetchSchemaByUri, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import { clientFromContext, globalEnv, globalOptions, validateName } from '../lib/context.js'
-import { queryDomain } from '../lib/subgraph.js'
 
 const viewOptions = globalOptions.extend({
   ipfsGateway: z
@@ -29,42 +29,29 @@ type MatchedSchema =
   | { uri: string; valid: false; error: string }
 
 /**
- * If a `schema` URI is set on the name, fetch the schema document and validate
- * the name's properties against it. Returns `null` when no URI is declared.
- *
- * Fetch failures are surfaced as a soft failure (`valid: false` with an
- * `error` string) rather than throwing, so a `view` call still returns the
- * rest of the metadata even if IPFS is unreachable.
+ * Build the validation outcome for the schema URI declared on the name.
+ * Returns `null` when no URI is declared. The schema document is fetched
+ * upstream so a fetch failure can degrade gracefully without losing the
+ * rest of the metadata read.
  */
-async function buildMatchedSchema(
-  schemaUri: string | undefined | null,
-  properties: Record<string, unknown>,
-  ipfsGateway: string | undefined,
-): Promise<MatchedSchema | null> {
-  if (!schemaUri) return null
+function buildMatchedSchema(
+  uri: string | null,
+  schema: Schema | null,
+  fetchError: string | null,
+  payload: Record<string, string>,
+): MatchedSchema | null {
+  if (!uri) return null
+  if (fetchError) return { uri, valid: false, error: fetchError }
+  if (!schema) return { uri, valid: false, error: 'schema not loaded' }
 
-  let schema: Awaited<ReturnType<typeof fetchSchemaByUri>>
-  try {
-    schema = await fetchSchemaByUri(schemaUri, {
-      localResolver: bundledSchemaResolver,
-      ...(ipfsGateway ? { ipfsGateway } : {}),
-    })
-  } catch (err) {
-    return {
-      uri: schemaUri,
-      valid: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-
-  const result = validateMetadataSchema(properties, schema)
+  const result = validateMetadataSchema(payload, schema)
   if (result.success) {
-    return { title: schema.title, version: schema.version, uri: schemaUri, valid: true }
+    return { title: schema.title, version: schema.version, uri, valid: true }
   }
   return {
     title: schema.title,
     version: schema.version,
-    uri: schemaUri,
+    uri,
     valid: false,
     errors: result.errors.map(({ key, message }) => ({ key, message })),
   }
@@ -87,43 +74,45 @@ export const viewCommand = {
     const { client } = clientFromContext(c, 'mainnet')
     const reader = client.extend(metadataReader())
 
-    const domain = await queryDomain(ensName)
-    if (domain && !domain.resolver) {
-      throw new Error(`No resolver set for ${ensName}`)
-    }
+    const schemaInfo = await reader.getSchema({ name: ensName })
 
-    const textKeys = domain?.resolver?.texts
-    if (domain && textKeys && textKeys.length === 0) {
-      return {
-        name: ensName,
-        resolver: domain.resolver?.address ?? null,
-        address: domain.resolvedAddress?.id ?? null,
-        class: null,
-        schema: null,
-        matchedSchema: null,
-        properties: {},
+    let schema: Schema | null = null
+    let schemaError: string | null = null
+    if (schemaInfo.schema) {
+      try {
+        schema = await fetchSchemaByUri(schemaInfo.schema, {
+          localResolver: bundledSchemaResolver,
+          ...(ipfsGateway ? { ipfsGateway } : {}),
+        })
+      } catch (err) {
+        schemaError = err instanceof Error ? err.message : String(err)
       }
     }
 
     const metadata = await reader.getMetadata({
       name: ensName,
-      ...(textKeys ? { keys: textKeys } : {}),
+      ...(schema ? { schema } : {}),
     })
 
-    const matchedSchema = await buildMatchedSchema(
-      metadata.schema,
-      metadata.properties,
-      ipfsGateway,
-    )
+    if (metadata.resolver === null) {
+      throw new Error(`No resolver set for ${ensName}`)
+    }
+
+    const payload: Record<string, string> = {}
+    for (const [k, v] of Object.entries(metadata.properties)) {
+      if (typeof v === 'string' && v.length > 0) payload[k] = v
+    }
+
+    const matchedSchema = buildMatchedSchema(schemaInfo.schema, schema, schemaError, payload)
 
     return {
       name: metadata.name,
-      resolver: metadata.resolver ?? null,
+      resolver: metadata.resolver,
       address: metadata.address ?? null,
       class: metadata.class ?? null,
       schema: metadata.schema ?? null,
       matchedSchema,
-      properties: metadata.properties,
+      properties: payload,
     }
   },
 }
