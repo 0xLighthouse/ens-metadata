@@ -611,6 +611,8 @@ For the full walkthrough (suggested artifact directory layout, dry-run/broadcast
 
 RPC timeouts or `429`/`Too Many Requests`. The public fallback RPCs are best-effort and rate-limited. Supply your own with `--rpc <url>`, or via `RPC_URL_<chainId>` (for example `RPC_URL_1` for mainnet, `RPC_URL_8453` for Base), `MAINNET_RPC_URL`, or `ETH_RPC_URL`.
 
+`Failed to read resolver from Base registry for <name>: ... over rate limit`. The default Base RPC (`https://mainnet.base.org`) rate-limits the back-to-back resolver lookups in `view`/`set`. The CLI falls back to curated public Base endpoints (PublicNode, 1rpc.io); for production usage set `RPC_URL_8453` to a private endpoint (Alchemy, QuickNode, etc.).
+
 `Signature does not recover to wallet <address>` from `set-wallet`. The `--signature` you supplied was not produced by the wallet you're trying to link, or the `--deadline` doesn't match the deadline that was signed over. Re-sign against the EIP-712 domain shown in the dry-run output, including the same `agentId`, `newWallet`, `owner`, and `deadline`.
 
 `Could not determine the manager of <name>` from `set`. `set` was invoked without `--private-key` and the on-chain owner read returned no result (zero-address registrant or non-EOA owner). Pass `--private-key` to skip the manager lookup.
