@@ -60,46 +60,74 @@ export function isBasename(name: string): boolean {
 }
 
 /**
+ * Distinguishes "name is unconfigured on the Base L2 registry" from "the read
+ * itself failed (RPC error, rate limit, network, decode)". Callers that want
+ * to silently treat unconfigured names as missing data can do so without also
+ * swallowing transport failures.
+ */
+export class BaseResolverError extends Error {
+  code: 'unconfigured' | 'rpc-error'
+  cause?: unknown
+
+  constructor(message: string, code: 'unconfigured' | 'rpc-error', cause?: unknown) {
+    super(message)
+    this.name = 'BaseResolverError'
+    this.code = code
+    if (cause !== undefined) this.cause = cause
+  }
+}
+
+/**
  * Read `owner(node)` for `name` on the Base L2 registry. Returns `null` when
- * the registry returns the zero address or the read fails. Works at any
- * subname depth without the registrar/wrapper distinction.
+ * the registry definitively reports no owner (zero address). RPC / network
+ * failures propagate so callers can surface them instead of silently treating
+ * a transport error as "unowned".
  */
 export async function getBaseRegistryOwner(
   client: PublicClient,
   name: string,
 ): Promise<`0x${string}` | null> {
   const node = namehash(normalize(name))
-  try {
-    const address = (await client.readContract({
-      address: BASE_REGISTRY,
-      abi: baseRegistryAbi,
-      functionName: 'owner',
-      args: [node],
-    })) as `0x${string}`
-    if (!address || address === '0x0000000000000000000000000000000000000000') return null
-    return address
-  } catch {
-    return null
-  }
+  const address = (await client.readContract({
+    address: BASE_REGISTRY,
+    abi: baseRegistryAbi,
+    functionName: 'owner',
+    args: [node],
+  })) as `0x${string}`
+  if (!address || address === '0x0000000000000000000000000000000000000000') return null
+  return address
 }
 
 /**
- * Read the resolver address for `name` from the Base L2 registry. Throws
- * when the registry returns the zero address (name unconfigured on L2).
+ * Read the resolver address for `name` from the Base L2 registry. Throws a
+ * `BaseResolverError` distinguishing the two failure modes:
+ *   - `code: 'unconfigured'` — registry returned the zero address.
+ *   - `code: 'rpc-error'`    — the read itself failed (rate limit, network,
+ *                              decode). The original error is attached as
+ *                              `cause`.
  */
 export async function getBaseResolverAddress(
   client: PublicClient,
   name: string,
 ): Promise<`0x${string}`> {
   const node = namehash(normalize(name))
-  const address = (await client.readContract({
-    address: BASE_REGISTRY,
-    abi: baseRegistryAbi,
-    functionName: 'resolver',
-    args: [node],
-  })) as `0x${string}`
+  let address: `0x${string}`
+  try {
+    address = (await client.readContract({
+      address: BASE_REGISTRY,
+      abi: baseRegistryAbi,
+      functionName: 'resolver',
+      args: [node],
+    })) as `0x${string}`
+  } catch (err) {
+    throw new BaseResolverError(
+      `Failed to read resolver from Base registry for ${name}: ${err instanceof Error ? err.message : String(err)}`,
+      'rpc-error',
+      err,
+    )
+  }
   if (!address || address === '0x0000000000000000000000000000000000000000') {
-    throw new Error(`No resolver set on Base registry for ${name}`)
+    throw new BaseResolverError(`No resolver set on Base registry for ${name}`, 'unconfigured')
   }
   return address
 }

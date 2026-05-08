@@ -11,6 +11,7 @@ import type {
   VerifyUidAttestationOptions,
 } from './attestation-types'
 import {
+  BaseResolverError,
   fetchTextRecordsDirect,
   getBaseRegistryOwner,
   getBaseResolverAddress,
@@ -84,8 +85,12 @@ async function readBaseTextsForVerify(
   let resolverAddress: `0x${string}` | null = null
   try {
     resolverAddress = await getBaseResolverAddress(baseClient, name)
-  } catch {
-    resolverAddress = null
+  } catch (err) {
+    if (err instanceof BaseResolverError && err.code === 'unconfigured') {
+      resolverAddress = null
+    } else {
+      throw err
+    }
   }
   if (!resolverAddress) {
     return Object.fromEntries(keys.map((k) => [k, null]))
