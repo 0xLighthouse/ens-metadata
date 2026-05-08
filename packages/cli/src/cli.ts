@@ -24,8 +24,7 @@ const attestationVerifyGroup = Cli.create('verify', {
 
 const attestationGroup = Cli.create('attestation', {
   description: 'Attestations added to ENS names',
-})
-  .command(attestationVerifyGroup)
+}).command(attestationVerifyGroup)
 
 const agentRegistrationFileGroup = Cli.create('registration-file', {
   description: 'Build, validate, and publish ERC-8004 v2.0 agent registration files',
