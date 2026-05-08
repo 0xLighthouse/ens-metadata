@@ -79,7 +79,34 @@ git add packages/cli/package.json pnpm-lock.yaml
 git commit -m "chore: Release cli@<version>"
 ```
 
-Do NOT create git tags — version tracking is handled by npm only.
+## Tag and GitHub release
+
+1. Capture the release commit SHA: `git rev-parse HEAD`.
+
+2. Determine the previous bound for the scoped log:
+   - If a `cli-v*` tag exists, use the latest one.
+   - Otherwise use the prior `chore: Release cli@` commit (same query as Change detection).
+
+3. Gather the scoped commit log:
+   ```
+   git log <prev-bound>..HEAD -- packages/cli
+   ```
+
+4. Synthesize release notes by applying the rules from `.claude/skills/changelog/SKILL.md` — categorize into **Added** / **Changed** / **Fixed** (omit empty), summarize in user voice, merge related commits, drop chore/format-only noise. Do not paste commit hashes.
+
+5. Tag the release commit and push:
+   ```
+   git tag cli-v<version> <SHA>
+   git push origin cli-v<version>
+   ```
+
+6. Create the GitHub release (notes via heredoc to preserve formatting):
+   ```
+   gh release create cli-v<version> --title "@ensmetadata/cli@<version>" --notes "$(cat <<'EOF'
+   <synthesized notes>
+   EOF
+   )"
+   ```
 
 ## Verification checklist
 
@@ -88,6 +115,8 @@ Do NOT create git tags — version tracking is handled by npm only.
 - [ ] No `workspace:*` in pack dry-run
 - [ ] CLI published to npm
 - [ ] Version bump committed
+- [ ] `cli-v<version>` tag pushed
+- [ ] GitHub release created
 
 ## Troubleshooting
 
