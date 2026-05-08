@@ -2,7 +2,13 @@ import type { Schema } from '@ensmetadata/schemas/types'
 import { fetchSchemaByUri, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
-import { clientFromContext, globalEnv, globalOptions, validateName } from '../lib/context.js'
+import {
+  baseClientForName,
+  clientFromContext,
+  globalEnv,
+  globalOptions,
+  validateName,
+} from '../lib/context.js'
 
 const viewOptions = globalOptions.extend({
   ipfsGateway: z
@@ -72,7 +78,8 @@ export const viewCommand = {
     const ensName = validateName(c.args.name)
     const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
     const { client } = clientFromContext(c, 'mainnet')
-    const reader = client.extend(metadataReader())
+    const basePublicClient = baseClientForName(c, ensName)
+    const reader = client.extend(metadataReader(basePublicClient ? { basePublicClient } : {}))
 
     const schemaInfo = await reader.getSchema({ name: ensName })
 

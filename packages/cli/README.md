@@ -60,6 +60,20 @@ Testnets: `sepolia`, `base-sepolia`, `arbitrum-sepolia`, `optimism-sepolia`, `po
 
 The authoritative list is defined in [`src/lib/registry.ts`](./src/lib/registry.ts).
 
+### Basenames (`*.base.eth`)
+
+Subnames of `base.eth` (for example `alice.base.eth`) live on Base (chain 8453) and are read from the L2 resolver directly. The CLI auto-detects them via `isBasename(name)` from the SDK and routes reads — and, for `set`, writes — through Base. No flag changes are required for the user.
+
+When operating on a Basename:
+
+- The command builds a Base public client in addition to the mainnet client. The Base RPC follows `RPC_URL_8453` → `ETH_RPC_URL` → public defaults.
+- `--rpc <url>` is bound to **the chain the subject name lives on**. For `view alice.base.eth` and `attestation verify * alice.base.eth`, `--rpc` overrides the Base client. Mainnet calls (used incidentally to resolve the attester ENS in `attestation verify`) take their RPC from `RPC_URL_1` / `MAINNET_RPC_URL` / `ETH_RPC_URL`.
+- For `set alice.base.eth ...`, the wallet client's chain is auto-selected as Base; no manual chain flag is needed.
+
+The 2LD `base.eth` itself is treated as mainnet (consistent with the SDK).
+
+Custom attesters whose ENS names end in `.base.eth` are not yet supported by `attestation verify handle/uid`; pass a mainnet attester or use the default `atst.lighthousegov.eth`.
+
 ### Pinata (IPFS publishing)
 
 The `agent registration-file publish` command uploads to IPFS via Pinata. Provide either:
@@ -150,6 +164,8 @@ When no `schema` record is declared on the name, `matchedSchema` is `null` and n
 Options:
 
 - `--ipfs-gateway <origin>` (env: `IPFS_GATEWAY`): override the gateway used to fetch the schema document. Defaults to `https://ipfs.io`. Has no effect when the schema CID is already in the bundled `@ensmetadata/schemas` registry.
+
+`*.base.eth` is auto-detected and read directly from the Base L2 resolver; the `resolver` field carries the L2 resolver address. See [Basenames](#basenames-baseeth) for the RPC envs.
 
 #### `set <name> <payload>`
 
@@ -486,6 +502,8 @@ Output shape matches the other registry write commands, with `function: "unsetAg
 ### `attestation verify` group
 
 Verify EIP-712 attestation envelopes that have been written into ENS text records by an attester. Read-only; no signing key needed.
+
+For `*.base.eth` subjects, the CLI reads the attestation text record from the Base L2 resolver and reads the owner from the Base registry; the attester ENS is still resolved on mainnet. See [Basenames](#basenames-baseeth). Custom `--attester` values that end in `.base.eth` are rejected — pass a mainnet attester or omit the flag to use the default.
 
 #### `attestation verify handle <name> <platform>`
 

@@ -4,15 +4,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const getSchemaMock = vi.fn()
 const getMetadataMock = vi.fn()
 const fetchSchemaByUriMock = vi.fn()
+const metadataReaderConfigMock = vi.fn()
 
 vi.mock('@ensmetadata/sdk', async () => {
   const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
   return {
     ...actual,
-    metadataReader: () => () => ({
-      getSchema: (opts: unknown) => getSchemaMock(opts),
-      getMetadata: (opts: unknown) => getMetadataMock(opts),
-    }),
+    metadataReader: (config?: unknown) => {
+      metadataReaderConfigMock(config)
+      return () => ({
+        getSchema: (opts: unknown) => getSchemaMock(opts),
+        getMetadata: (opts: unknown) => getMetadataMock(opts),
+      })
+    },
     fetchSchemaByUri: (uri: string, opts?: unknown) => fetchSchemaByUriMock(uri, opts),
   }
 })
@@ -80,6 +84,7 @@ describe('viewCommand.run', () => {
     getSchemaMock.mockReset()
     getMetadataMock.mockReset()
     fetchSchemaByUriMock.mockReset()
+    metadataReaderConfigMock.mockReset()
   })
 
   it('happy path: reads schema, fetches it, validates payload', async () => {
@@ -306,5 +311,63 @@ describe('viewCommand.run', () => {
         env: {},
       }),
     ).rejects.toThrow(/No resolver set for unset\.eth/)
+  })
+
+  it('routes *.base.eth through the SDK with a basePublicClient', async () => {
+    const schemaUri = 'ipfs://QmBaseSchema'
+    getSchemaMock.mockResolvedValue({
+      schema: schemaUri,
+      class: 'Sample',
+      version: '1.0.0',
+      cid: null,
+    })
+    fetchSchemaByUriMock.mockResolvedValue(sampleSchema)
+    getMetadataMock.mockResolvedValue({
+      name: 'alice.base.eth',
+      resolver: '0xL2Resolver',
+      address: '0xAddr',
+      class: 'Sample',
+      schema: schemaUri,
+      properties: {
+        class: 'Sample',
+        schema: schemaUri,
+        description: 'hello from base',
+        avatar: null,
+      },
+    })
+
+    const out = await viewCommand.run({
+      args: { name: 'alice.base.eth' },
+      options: {},
+      env: {},
+    })
+
+    expect(metadataReaderConfigMock).toHaveBeenCalledTimes(1)
+    const cfg = metadataReaderConfigMock.mock.calls[0][0] as { basePublicClient?: unknown }
+    expect(cfg.basePublicClient).toBeDefined()
+    expect(out.resolver).toBe('0xL2Resolver')
+  })
+
+  it('does not pass basePublicClient for mainnet names', async () => {
+    getSchemaMock.mockResolvedValue({
+      schema: null,
+      class: null,
+      version: null,
+      cid: null,
+    })
+    getMetadataMock.mockResolvedValue({
+      name: 'myagent.eth',
+      resolver: '0xResolver',
+      address: null,
+      class: null,
+      schema: null,
+      properties: { description: 'mainnet only' },
+    })
+
+    await viewCommand.run({ args: { name: 'myagent.eth' }, options: {}, env: {} })
+
+    expect(metadataReaderConfigMock).toHaveBeenCalledTimes(1)
+    const cfg = metadataReaderConfigMock.mock.calls[0][0] as { basePublicClient?: unknown }
+    expect(cfg.basePublicClient).toBeUndefined()
   })
 })
