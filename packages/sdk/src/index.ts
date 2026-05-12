@@ -1,41 +1,74 @@
+// --- Core (single-chain) ---
 export { metadataReader } from './read'
+export { metadataWriter, metadataEstimator, MetadataWriteError } from './write'
+
+// --- Routing primitives ---
 export {
-  readTextRecords,
-  readTextRecordsStrict,
-  readTextRecordsFromResolver,
-  getResolverAddress,
-  getResolverAddressStrict,
-  type ReadTextRecordsOptions,
-  type ReadTextRecordsFromResolverOptions,
-  type GetResolverAddressOptions,
-} from './read-helpers'
+  chainForName,
+  MissingChainClientError,
+  type SupportedChain,
+  type ChainClients,
+  type ChainWalletClients,
+} from './multichain/routing'
+
+// --- Multichain wrappers ---
 export {
-  extractSchemaFields,
+  multichainMetadataReader,
+  multichainMetadataWriter,
+  multichainMetadataEstimator,
+  multichainAttestationVerifier,
+  verifyHandleAttestation,
+  verifyUidAttestation,
+  handleAttestationRecordKey,
+  uidAttestationRecordKey,
+  DEFAULT_ATTESTER_ENS,
+  type MultichainAttestationVerifierConfig,
+  type AttestationVerifierConfig,
+} from './multichain'
+
+// --- Chain helpers (Base) ---
+export {
   isBasename,
   getBaseResolverAddress,
   getBaseRegistryOwner,
-  getResolverForName,
-  fetchTextRecordsDirect,
-  fetchAddrDirect,
+  getOrCreateBasePublicClient,
   BaseResolverError,
   BASE_CHAIN_ID,
   BASE_REGISTRY,
-} from './internal'
+} from './chains/base'
+
+// --- Standalone read helpers (chain-agnostic) ---
 export {
-  parseSchemaUri,
-  fetchSchemaByUri,
-  DEFAULT_IPFS_GATEWAY,
-  type SchemaFetcherOptions,
-} from './schema-fetch'
-export {
+  readTextRecords,
+  readTextRecordsStrict,
+  getResolverAddress,
+  getResolverAddressStrict,
   resolveSchemaForName,
+  type GetResolverAddressOptions,
   type ResolveSchemaOptions,
   type ResolvedSchema,
   type SchemaSource,
-} from './schema-resolve'
-export { validateMetadataSchema, validate } from './validate'
+} from './read'
+
+// --- Low-level chain-agnostic primitives ---
+export { fetchTextRecordsDirect } from './multichain'
+
+// --- Schema fetch / resolve ---
+export {
+  fetchSchema,
+  fetchSchemaFromHttps,
+  fetchSchemaFromIpfs,
+  fetchSchemaFromLocal,
+  getSchemaKeys,
+  DEFAULT_IPFS_GATEWAY,
+  type SchemaResolver,
+} from './schema'
+
+// --- Validation + delta ---
+export { validateMetadataSchema, validate } from './schema'
 export { computeDelta, hasChanges } from './delta'
-export { metadataWriter, metadataEstimator, MetadataWriteError } from './write'
+
+// --- Attestation primitives (sign / verify-claim, encoding) ---
 export {
   encodeHandlePayload,
   encodeUidPayload,
@@ -48,19 +81,11 @@ export {
   CLAIM_VERSION,
   ENVELOPE_TAG,
 } from './attestation'
-export {
-  attestationVerifier,
-  verifyHandleAttestation,
-  verifyUidAttestation,
-  handleAttestationRecordKey,
-  uidAttestationRecordKey,
-  DEFAULT_ATTESTER_ENS,
-  type AttestationVerifierConfig,
-} from './verify'
 
+// --- Public types ---
 export type {
+  ReadTextRecordsOptions,
   GetSchemaOptions,
-  GetSchemaResult,
   GetMetadataOptions,
   GetMetadataResult,
   MetadataValidationError,

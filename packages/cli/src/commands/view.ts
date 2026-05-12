@@ -1,5 +1,5 @@
 import type { Schema } from '@ensmetadata/schemas/types'
-import { fetchSchemaByUri, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
+import { fetchSchema, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import {
@@ -87,9 +87,9 @@ export const viewCommand = {
     let schemaError: string | null = null
     if (schemaInfo.schema) {
       try {
-        schema = await fetchSchemaByUri(schemaInfo.schema, {
-          localResolver: bundledSchemaResolver,
-          ...(ipfsGateway ? { ipfsGateway } : {}),
+        schema = await fetchSchema(schemaInfo.schema, {
+          resolver: bundledSchemaResolver,
+          ...(ipfsGateway ? { gateway: ipfsGateway } : {}),
         })
       } catch (err) {
         schemaError = err instanceof Error ? err.message : String(err)

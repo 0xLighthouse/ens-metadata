@@ -1,6 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import { describe, expect, it } from 'vitest'
-import { validate, validateMetadataSchema } from '../validate'
+import { validate, validateMetadataSchema } from '../schema'
 
 const testSchema: Schema = {
   $id: 'test',

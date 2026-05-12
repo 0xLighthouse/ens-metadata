@@ -1,14 +1,7 @@
 import { type Hex, type PublicClient, type WalletClient, encodeFunctionData } from 'viem'
 import { normalize } from 'viem/ens'
 import { computeDelta } from './delta'
-import {
-  BASE_CHAIN_ID,
-  fetchTextRecordsDirect,
-  getBaseResolverAddress,
-  getOrCreateBasePublicClient,
-  isBasename,
-} from './internal'
-import { getResolverAddressStrict, readTextRecordsStrict } from './read-helpers'
+import { getResolverAddressStrict, readTextRecordsStrict } from './read'
 import type {
   ApplyDeltaOptions,
   EstimateResult,
@@ -19,7 +12,7 @@ import type {
   SetMetadataOptions,
   SetMetadataResult,
 } from './types'
-import { validateMetadataSchema } from './validate'
+import { validateMetadataSchema } from './schema'
 
 export class MetadataWriteError extends Error {
   errors: { key: string; message: string }[]
@@ -30,13 +23,6 @@ export class MetadataWriteError extends Error {
     this.name = 'MetadataWriteError'
     this.errors = errors
     if (code !== undefined) this.code = code
-  }
-}
-
-function assertWalletOnBaseIfBasename(walletClient: WalletClient, name: string) {
-  if (!isBasename(name)) return
-  if (walletClient.chain?.id !== BASE_CHAIN_ID) {
-    throw new MetadataWriteError('wallet must be connected to Base (chain 8453)', [], 'wrong-chain')
   }
 }
 
@@ -62,16 +48,8 @@ function deltaToRecords(delta: MetadataDelta): {
   return { texts, coins }
 }
 
-async function resolveResolver(
-  publicClient: PublicClient,
-  name: string,
-  basePublicClient?: PublicClient,
-): Promise<`0x${string}`> {
+async function resolveResolver(publicClient: PublicClient, name: string): Promise<`0x${string}`> {
   try {
-    if (isBasename(name)) {
-      const client = getOrCreateBasePublicClient(basePublicClient)
-      return await getBaseResolverAddress(client, name)
-    }
     return await getResolverAddressStrict({ client: publicClient, name })
   } catch (err) {
     throw new MetadataWriteError(
@@ -85,7 +63,6 @@ async function setMetadataImpl(
   walletClient: WalletClient,
   publicClient: PublicClient,
   opts: SetMetadataOptions,
-  basePublicClient?: PublicClient,
 ): Promise<SetMetadataResult> {
   if (opts.schema) {
     const result = validateMetadataSchema(opts.records, opts.schema)
@@ -100,9 +77,7 @@ async function setMetadataImpl(
   }
 
   const name = normalize(opts.name)
-  assertWalletOnBaseIfBasename(walletClient, name)
-  const resolverAddress =
-    opts.resolverAddress ?? (await resolveResolver(publicClient, name, basePublicClient))
+  const resolverAddress = opts.resolverAddress ?? (await resolveResolver(publicClient, name))
   const { texts, coins } = deltaToRecords(delta)
 
   if (texts.length === 0 && coins.length === 0) {
@@ -124,11 +99,10 @@ async function setMetadataImpl(
 
 async function applyDeltaImpl(
   walletClient: WalletClient,
-  publicClient: PublicClient,
+  _publicClient: PublicClient,
   opts: ApplyDeltaOptions,
 ): Promise<SetMetadataResult> {
   const name = normalize(opts.name)
-  assertWalletOnBaseIfBasename(walletClient, name)
   const { texts, coins } = deltaToRecords(opts.delta)
 
   if (texts.length === 0 && coins.length === 0) {
@@ -198,7 +172,6 @@ function normalizeDesired(
 async function prepareSetMetadataImpl(
   publicClient: PublicClient,
   opts: PrepareSetMetadataOptions,
-  basePublicClient?: PublicClient,
 ): Promise<PrepareResult> {
   const name = normalize(opts.name)
   const desired = normalizeDesired(opts.desired)
@@ -208,9 +181,7 @@ async function prepareSetMetadataImpl(
     throw new MetadataWriteError('Validation failed', validation.errors)
   }
 
-  const isBase = isBasename(name)
-  const resolverAddress =
-    opts.resolverAddress ?? (await resolveResolver(publicClient, name, basePublicClient))
+  const resolverAddress = opts.resolverAddress ?? (await resolveResolver(publicClient, name))
 
   let existing: Record<string, string | null>
   if (opts.existing) {
@@ -219,9 +190,6 @@ async function prepareSetMetadataImpl(
     const keys = Object.keys(desired).filter((k) => k !== 'address')
     if (keys.length === 0) {
       existing = {}
-    } else if (isBase) {
-      const baseClient = getOrCreateBasePublicClient(basePublicClient)
-      existing = await fetchTextRecordsDirect(baseClient, resolverAddress, name, keys)
     } else {
       existing = await readTextRecordsStrict({ client: publicClient, name, keys })
     }
@@ -248,15 +216,11 @@ async function prepareSetMetadataImpl(
 async function estimateSetMetadataImpl(
   publicClient: PublicClient,
   opts: EstimateSetMetadataOptions,
-  basePublicClient?: PublicClient,
 ): Promise<EstimateResult> {
-  const prepared = await prepareSetMetadataImpl(publicClient, opts, basePublicClient)
-  const gasClient = isBasename(prepared.name)
-    ? getOrCreateBasePublicClient(basePublicClient)
-    : publicClient
+  const prepared = await prepareSetMetadataImpl(publicClient, opts)
 
   if (!prepared.calldata) {
-    const balance = await gasClient.getBalance({ address: opts.account })
+    const balance = await publicClient.getBalance({ address: opts.account })
     return {
       prepared,
       gas: 0n,
@@ -267,13 +231,13 @@ async function estimateSetMetadataImpl(
   }
 
   const [gas, fees, balance] = await Promise.all([
-    gasClient.estimateGas({
+    publicClient.estimateGas({
       account: opts.account,
       to: prepared.to,
       data: prepared.calldata,
     }),
-    gasClient.estimateFeesPerGas(),
-    gasClient.getBalance({ address: opts.account }),
+    publicClient.estimateFeesPerGas(),
+    publicClient.getBalance({ address: opts.account }),
   ])
 
   const maxFeePerGas = fees.maxFeePerGas ?? 0n
@@ -290,11 +254,8 @@ async function setMetadataWithDeltaImpl(
   walletClient: WalletClient,
   publicClient: PublicClient,
   opts: PrepareSetMetadataOptions,
-  basePublicClient?: PublicClient,
 ): Promise<SetMetadataResult> {
-  const name = normalize(opts.name)
-  assertWalletOnBaseIfBasename(walletClient, name)
-  const prepared = await prepareSetMetadataImpl(publicClient, opts, basePublicClient)
+  const prepared = await prepareSetMetadataImpl(publicClient, opts)
   const { texts, coins } = deltaToRecords(prepared.delta)
   if (texts.length === 0 && coins.length === 0) {
     throw new MetadataWriteError('No records to write', [])
@@ -313,33 +274,34 @@ async function setMetadataWithDeltaImpl(
   return { txHash, texts, coins }
 }
 
-export function metadataWriter(config: {
-  publicClient: PublicClient
-  basePublicClient?: PublicClient
-}) {
+/**
+ * Single-chain metadata writer. The supplied `publicClient` and
+ * `walletClient` are assumed to be on the same chain as the names being
+ * written; the core does no chain detection. Use `multichainMetadataWriter`
+ * from `./multichain` if you need a single object that dispatches across
+ * chains and enforces the wallet-on-correct-chain guard.
+ */
+export function metadataWriter(config: { publicClient: PublicClient }) {
   return (walletClient: WalletClient) => ({
     setMetadata: (opts: SetMetadataOptions) =>
-      setMetadataImpl(walletClient, config.publicClient, opts, config.basePublicClient),
+      setMetadataImpl(walletClient, config.publicClient, opts),
     applyDelta: (opts: ApplyDeltaOptions) =>
       applyDeltaImpl(walletClient, config.publicClient, opts),
     setMetadataWithDelta: (opts: PrepareSetMetadataOptions) =>
-      setMetadataWithDeltaImpl(walletClient, config.publicClient, opts, config.basePublicClient),
+      setMetadataWithDeltaImpl(walletClient, config.publicClient, opts),
     prepareSetMetadata: (opts: PrepareSetMetadataOptions) =>
-      prepareSetMetadataImpl(config.publicClient, opts, config.basePublicClient),
+      prepareSetMetadataImpl(config.publicClient, opts),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadataImpl(config.publicClient, opts, config.basePublicClient),
+      estimateSetMetadataImpl(config.publicClient, opts),
   })
 }
 
 /** Estimate without a wallet client (useful for dry-run flows that don't yet have a signer). */
-export function metadataEstimator(config: {
-  publicClient: PublicClient
-  basePublicClient?: PublicClient
-}) {
+export function metadataEstimator(config: { publicClient: PublicClient }) {
   return {
     prepareSetMetadata: (opts: PrepareSetMetadataOptions) =>
-      prepareSetMetadataImpl(config.publicClient, opts, config.basePublicClient),
+      prepareSetMetadataImpl(config.publicClient, opts),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadataImpl(config.publicClient, opts, config.basePublicClient),
+      estimateSetMetadataImpl(config.publicClient, opts),
   }
 }

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getSchemaMock = vi.fn()
 const getMetadataMock = vi.fn()
-const fetchSchemaByUriMock = vi.fn()
+const fetchSchemaMock = vi.fn()
 const metadataReaderConfigMock = vi.fn()
 
 vi.mock('@ensmetadata/sdk', async () => {
@@ -17,7 +17,7 @@ vi.mock('@ensmetadata/sdk', async () => {
         getMetadata: (opts: unknown) => getMetadataMock(opts),
       })
     },
-    fetchSchemaByUri: (uri: string, opts?: unknown) => fetchSchemaByUriMock(uri, opts),
+    fetchSchema: (uri: string, opts?: unknown) => fetchSchemaMock(uri, opts),
   }
 })
 
@@ -83,7 +83,7 @@ describe('viewCommand.run', () => {
   beforeEach(() => {
     getSchemaMock.mockReset()
     getMetadataMock.mockReset()
-    fetchSchemaByUriMock.mockReset()
+    fetchSchemaMock.mockReset()
     metadataReaderConfigMock.mockReset()
   })
 
@@ -95,7 +95,7 @@ describe('viewCommand.run', () => {
       version: '1.0.0',
       cid: null,
     })
-    fetchSchemaByUriMock.mockResolvedValue(sampleSchema)
+    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       resolver: '0xResolver',
@@ -114,10 +114,10 @@ describe('viewCommand.run', () => {
 
     expect(getSchemaMock).toHaveBeenCalledTimes(1)
     expect(getSchemaMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
-    expect(fetchSchemaByUriMock).toHaveBeenCalledTimes(1)
-    const [calledUri, calledOpts] = fetchSchemaByUriMock.mock.calls[0]
+    expect(fetchSchemaMock).toHaveBeenCalledTimes(1)
+    const [calledUri, calledOpts] = fetchSchemaMock.mock.calls[0]
     expect(calledUri).toBe(schemaUri)
-    expect(calledOpts).toMatchObject({ localResolver: expect.any(Function) })
+    expect(calledOpts).toMatchObject({ resolver: expect.any(Function) })
     expect(getMetadataMock).toHaveBeenCalledTimes(1)
     expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth', schema: sampleSchema })
     expect(out.matchedSchema).toEqual({
@@ -141,7 +141,7 @@ describe('viewCommand.run', () => {
       version: '1.0.0',
       cid: null,
     })
-    fetchSchemaByUriMock.mockResolvedValue(sampleSchema)
+    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       resolver: '0xResolver',
@@ -200,7 +200,7 @@ describe('viewCommand.run', () => {
 
     const out = await baseRun()
 
-    expect(fetchSchemaByUriMock).not.toHaveBeenCalled()
+    expect(fetchSchemaMock).not.toHaveBeenCalled()
     // Called without `schema` so getMetadata falls back to DEFAULT_KEYS.
     expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
     expect(out.matchedSchema).toBeNull()
@@ -215,7 +215,7 @@ describe('viewCommand.run', () => {
       version: null,
       cid: null,
     })
-    fetchSchemaByUriMock.mockRejectedValue(new Error('gateway down'))
+    fetchSchemaMock.mockRejectedValue(new Error('gateway down'))
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       resolver: '0xResolver',
@@ -256,7 +256,7 @@ describe('viewCommand.run', () => {
       version: null,
       cid: null,
     })
-    fetchSchemaByUriMock.mockResolvedValue(patternSchema)
+    fetchSchemaMock.mockResolvedValue(patternSchema)
     // Schema-driven getMetadata only asks for static `properties` keys, so
     // pattern-matched keys aren't even returned by the mocked reader.
     getMetadataMock.mockResolvedValue({
@@ -321,7 +321,7 @@ describe('viewCommand.run', () => {
       version: '1.0.0',
       cid: null,
     })
-    fetchSchemaByUriMock.mockResolvedValue(sampleSchema)
+    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'alice.base.eth',
       resolver: '0xL2Resolver',

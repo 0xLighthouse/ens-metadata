@@ -16,7 +16,7 @@ import {
   verifyUidClaim,
 } from '../attestation'
 import type { Envelope, HandlePayloadFields, UidPayloadFields } from '../attestation-types'
-import { handleAttestationRecordKey, uidAttestationRecordKey } from '../verify'
+import { handleAttestationRecordKey, uidAttestationRecordKey } from '../multichain/verifier'
 
 // Fixed test keys — not secret, never used outside tests.
 const ATTESTER_PRIVATE_KEY =

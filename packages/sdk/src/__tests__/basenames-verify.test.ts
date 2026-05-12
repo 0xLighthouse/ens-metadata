@@ -23,8 +23,12 @@ vi.mock('@ensdomains/ensjs/public', () => ({
 }))
 
 import { encodeEnvelope, signHandleClaim, signUidClaim } from '../attestation'
-import { BASE_REGISTRY } from '../internal'
-import { attestationVerifier, handleAttestationRecordKey, uidAttestationRecordKey } from '../verify'
+import { BASE_REGISTRY } from '../chains/base'
+import {
+  handleAttestationRecordKey,
+  multichainAttestationVerifier,
+  uidAttestationRecordKey,
+} from '../multichain/verifier'
 
 const ATTESTER_PK = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as const
 const WALLET_PK = '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba' as const
@@ -100,7 +104,9 @@ describe('verifyHandleAttestation for *.base.eth', () => {
       texts: { [attestationKey]: envHex, [platform]: handle },
     })
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyHandleAttestation({ name, platform })
 
     expect(result.valid).toBe(true)
@@ -128,7 +134,9 @@ describe('verifyHandleAttestation for *.base.eth', () => {
       texts: { [attestationKey]: envHex, [platform]: handle },
     })
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyHandleAttestation({ name, platform })
 
     expect(result.valid).toBe(false)
@@ -143,7 +151,9 @@ describe('verifyHandleAttestation for *.base.eth', () => {
 
     const { client: baseClient } = makeBaseClient({ texts: {} })
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyHandleAttestation({ name, platform })
 
     expect(result.valid).toBe(false)
@@ -167,7 +177,9 @@ describe('verifyUidAttestation for *.base.eth', () => {
       texts: { [attestationKey]: envHex },
     })
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyUidAttestation({ name, platform, uid })
 
     expect(result.valid).toBe(true)
@@ -194,7 +206,9 @@ describe('verifyUidAttestation for *.base.eth', () => {
       texts: { [attestationKey]: envHex },
     })
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyUidAttestation({ name, platform, uid })
 
     expect(result.valid).toBe(false)
@@ -224,7 +238,9 @@ describe('mainnet names continue to use ensjs getOwner / viem getEnsText', () =>
     const baseRead = vi.fn()
     const baseClient = { readContract: baseRead } as unknown as PublicClient
 
-    const verifier = attestationVerifier({ basePublicClient: baseClient })(mainnetClient)
+    const verifier = multichainAttestationVerifier({
+      publicClients: { mainnet: mainnetClient, base: baseClient },
+    })
     const result = await verifier.verifyHandleAttestation({ name, platform })
 
     expect(result.valid).toBe(true)

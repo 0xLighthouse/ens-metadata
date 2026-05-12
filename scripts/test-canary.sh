@@ -31,11 +31,31 @@ if [[ "$TARGET" == "sdk" || "$TARGET" == "all" ]]; then
 
   echo "==> Running SDK smoke test..."
   cat > smoke-sdk.mjs << 'SMOKE'
-import { metadataReader, metadataWriter, validateMetadataSchema, computeDelta, hasChanges } from '@ensmetadata/sdk'
+import {
+  chainForName,
+  computeDelta,
+  hasChanges,
+  metadataEstimator,
+  metadataReader,
+  metadataWriter,
+  multichainAttestationVerifier,
+  multichainMetadataEstimator,
+  multichainMetadataReader,
+  multichainMetadataWriter,
+  MissingChainClientError,
+  validateMetadataSchema,
+} from '@ensmetadata/sdk'
 
 const checks = [
   ['metadataReader', typeof metadataReader, 'function'],
   ['metadataWriter', typeof metadataWriter, 'function'],
+  ['metadataEstimator', typeof metadataEstimator, 'function'],
+  ['multichainMetadataReader', typeof multichainMetadataReader, 'function'],
+  ['multichainMetadataWriter', typeof multichainMetadataWriter, 'function'],
+  ['multichainMetadataEstimator', typeof multichainMetadataEstimator, 'function'],
+  ['multichainAttestationVerifier', typeof multichainAttestationVerifier, 'function'],
+  ['chainForName', typeof chainForName, 'function'],
+  ['MissingChainClientError', typeof MissingChainClientError, 'function'],
   ['validateMetadataSchema', typeof validateMetadataSchema, 'function'],
   ['computeDelta', typeof computeDelta, 'function'],
   ['hasChanges', typeof hasChanges, 'function'],
@@ -65,6 +85,13 @@ if (typeof reader !== 'function') {
   failed = true
 } else {
   console.log('  OK: metadataReader() returns extension function')
+}
+
+if (chainForName('alice.base.eth') !== 'base' || chainForName('alice.eth') !== 'mainnet') {
+  console.error('FAIL: chainForName routing is broken')
+  failed = true
+} else {
+  console.log('  OK: chainForName routes basenames vs mainnet correctly')
 }
 
 if (failed) {

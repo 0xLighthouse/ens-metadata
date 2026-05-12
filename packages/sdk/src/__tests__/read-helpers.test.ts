@@ -5,7 +5,7 @@ import {
   getResolverAddressStrict,
   readTextRecords,
   readTextRecordsStrict,
-} from '../read-helpers'
+} from '../read'
 
 function makeClient(overrides: {
   getEnsText?: (args: { name: string; key: string }) => Promise<unknown>

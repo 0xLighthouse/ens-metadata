@@ -236,8 +236,8 @@ export const setCommand = {
       name: ensName,
       payloadSchemaUri,
       ensSchemaText: existing.schema ?? null,
-      ...(ipfsGateway ? { ipfsGateway } : {}),
-      localResolver: bundledSchemaResolver,
+      ...(ipfsGateway ? { gateway: ipfsGateway } : {}),
+      resolver: bundledSchemaResolver,
     })
 
     /**
