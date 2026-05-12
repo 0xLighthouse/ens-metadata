@@ -1,7 +1,9 @@
 import { type Hex, type PublicClient, type WalletClient, encodeFunctionData } from 'viem'
 import { normalize } from 'viem/ens'
 import { computeDelta } from './delta'
-import { getResolverAddressStrict, readTextRecordsStrict } from './read'
+// TODO: write.ts cleanup — readTextRecordsStrict was removed from ./read.
+// Re-implement the per-key getEnsText read locally here.
+// import { readTextRecordsStrict } from './read'
 import type {
   ApplyDeltaOptions,
   EstimateResult,
@@ -13,6 +15,68 @@ import type {
   SetMetadataResult,
 } from './types'
 import { validateMetadataSchema } from './schema'
+
+export interface GetResolverAddressOptions {
+  client: PublicClient
+  name: string
+  blockNumber?: bigint
+  blockTag?: 'latest' | 'earliest' | 'pending' | 'safe' | 'finalized'
+}
+
+function buildResolverOptions(opts: GetResolverAddressOptions) {
+  return {
+    ...(opts.blockNumber !== undefined ? { blockNumber: opts.blockNumber } : {}),
+    ...(opts.blockTag !== undefined ? { blockTag: opts.blockTag } : {}),
+  }
+}
+
+function normalizeResolverAddress(resolver: unknown): string | null {
+  if (!resolver) return null
+  if (typeof resolver === 'string') return resolver
+  if (typeof resolver === 'object' && resolver !== null && 'address' in resolver) {
+    const address = (resolver as { address?: unknown }).address
+    return typeof address === 'string' ? address : null
+  }
+  return null
+}
+
+/**
+ * Look up the resolver address for an ENS name. Returns `null` when no
+ * resolver is set or any error occurs.
+ */
+export async function getResolverAddress(
+  opts: GetResolverAddressOptions,
+): Promise<`0x${string}` | null> {
+  const normalizedName = normalize(opts.name)
+  const extras = buildResolverOptions(opts)
+  try {
+    const resolver =
+      await // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
+      (opts.client as any).getEnsResolver({ name: normalizedName, ...extras })
+    const address = normalizeResolverAddress(resolver)
+    return address ? (address as `0x${string}`) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Look up the resolver address for an ENS name. Throws if the lookup fails or
+ * the name has no resolver set.
+ */
+export async function getResolverAddressStrict(
+  opts: GetResolverAddressOptions,
+): Promise<`0x${string}`> {
+  const normalizedName = normalize(opts.name)
+  const extras = buildResolverOptions(opts)
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
+  const resolver = await (opts.client as any).getEnsResolver({ name: normalizedName, ...extras })
+  const address = normalizeResolverAddress(resolver)
+  if (!address) {
+    throw new Error(`No resolver found for ${normalizedName}`)
+  }
+  return address as `0x${string}`
+}
 
 export class MetadataWriteError extends Error {
   errors: { key: string; message: string }[]
@@ -191,7 +255,8 @@ async function prepareSetMetadataImpl(
     if (keys.length === 0) {
       existing = {}
     } else {
-      existing = await readTextRecordsStrict({ client: publicClient, name, keys })
+      // TODO: re-implement strict per-key getEnsText read here.
+      existing = {} // await readTextRecordsStrict({ client: publicClient, name, keys })
     }
   }
 

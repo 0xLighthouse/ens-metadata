@@ -1,6 +1,13 @@
 // --- Core (single-chain) ---
 export { metadataReader } from './read'
-export { metadataWriter, metadataEstimator, MetadataWriteError } from './write'
+export {
+  metadataWriter,
+  metadataEstimator,
+  MetadataWriteError,
+  getResolverAddress,
+  getResolverAddressStrict,
+  type GetResolverAddressOptions,
+} from './write'
 
 // --- Routing primitives ---
 export {
@@ -37,19 +44,6 @@ export {
   BASE_REGISTRY,
 } from './chains/base'
 
-// --- Standalone read helpers (chain-agnostic) ---
-export {
-  readTextRecords,
-  readTextRecordsStrict,
-  getResolverAddress,
-  getResolverAddressStrict,
-  resolveSchemaForName,
-  type GetResolverAddressOptions,
-  type ResolveSchemaOptions,
-  type ResolvedSchema,
-  type SchemaSource,
-} from './read'
-
 // --- Low-level chain-agnostic primitives ---
 export { fetchTextRecordsDirect } from './multichain'
 
@@ -84,7 +78,6 @@ export {
 
 // --- Public types ---
 export type {
-  ReadTextRecordsOptions,
   GetSchemaOptions,
   GetMetadataOptions,
   GetMetadataResult,

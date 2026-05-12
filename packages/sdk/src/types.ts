@@ -1,19 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
-import type { PublicClient } from 'viem'
 
 // --- Read types ---
-
-export interface ReadTextRecordsOptions {
-  client: PublicClient
-  name: string
-  keys: string[]
-  blockNumber?: bigint
-  blockTag?: 'latest' | 'earliest' | 'pending' | 'safe' | 'finalized'
-  gatewayUrls?: string[]
-  strict?: boolean
-  universalResolverAddress?: string
-  timeoutMs?: number
-}
 
 export interface GetSchemaOptions {
   name: string
@@ -40,6 +27,14 @@ export interface GetMetadataResult {
   class: string | null
   schema: string | null
   properties: Record<string, string | null>
+}
+
+export interface GetSchemaResult {
+  records: {
+    schema: string | null
+    class: string | null
+  }
+  schema: Schema | null
 }
 
 // --- Validation types ---
