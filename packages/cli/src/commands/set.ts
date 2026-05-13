@@ -270,11 +270,17 @@ export const setCommand = {
         ...(resolved.schema ? { schema: resolved.schema } : {}),
       })
     } catch (err) {
-      if (err instanceof Error && err.name === 'MetadataWriteError') {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'success' in err &&
+        (err as { success: unknown }).success === false &&
+        'errors' in err &&
+        Array.isArray((err as { errors: unknown }).errors)
+      ) {
+        const errors = (err as { errors: { key: string; message: string }[] }).errors
         throw new Error(
-          `Invalid payload (validated against schema from ${resolved.source}${resolved.uri ? `: ${resolved.uri}` : ''}):\n${(
-            err as Error & { errors: { key: string; message: string }[] }
-          ).errors
+          `Invalid payload (validated against schema from ${resolved.source}${resolved.uri ? `: ${resolved.uri}` : ''}):\n${errors
             .map((e) => `[${e.key}] ${e.message}`)
             .join('\n')}`,
         )
@@ -387,9 +393,9 @@ export const setCommand = {
       })
     } catch (err) {
       // The CLI pre-selects the wallet chain so this normally can't fire.
-      // Defence in depth: surface the SDK's `wrong-chain` error code with
-      // a friendly message instead of the raw stack.
-      if (err instanceof Error && (err as Error & { code?: string }).code === 'wrong-chain') {
+      // Defence in depth: surface the SDK's wrong-chain message with a
+      // friendly rewrap instead of the raw stack.
+      if (err instanceof Error && /must be connected to Base/.test(err.message)) {
         throw new Error(
           `Wallet must be connected to ${isBase ? 'Base (chain 8453)' : 'mainnet'} to write to ${ensName}.`,
         )

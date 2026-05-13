@@ -1,5 +1,19 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 
+/**
+ * A map of ENS text records keyed by name.
+ *
+ * Two semantic uses:
+ *  - **State RecordSet** (current/projected on-chain state, e.g. `existing`
+ *    or the result of `applyDelta`): only keys that are populated on-chain
+ *    appear. Absent keys are unset.
+ *  - **Changes RecordSet** (broadcast-ready, e.g. `prepared.changes`):
+ *    non-empty `string` sets the new value, `""` explicitly deletes the key,
+ *    absent keys are left untouched (unless `ignoreMissing` is `false` in a
+ *    diff op).
+ */
+export type RecordSet = Record<string, string>
+
 // --- Read types ---
 
 export interface GetSchemaOptions {
@@ -26,7 +40,7 @@ export interface GetMetadataResult {
   name: string
   class: string | null
   schema: string | null
-  properties: Record<string, string | null>
+  properties: RecordSet
 }
 
 export interface GetSchemaResult {
@@ -59,61 +73,43 @@ export interface ComputeDeltaOptions {
 
 export interface SetMetadataOptions {
   name: string
-  records: Record<string, string>
-  deleted?: string[]
   schema?: Schema
-  resolverAddress?: `0x${string}`
-}
-
-export interface ApplyDeltaOptions {
-  name: string
-  delta: MetadataDelta
-  resolverAddress: `0x${string}`
+  resolver?: `0x${string}`
+  ignoreMissing?: boolean
+  desired: RecordSet
+  existing?: RecordSet
 }
 
 export interface SetMetadataResult {
   txHash: `0x${string}`
   texts: { key: string; value: string }[]
-  coins: { coin: string; value: string }[]
 }
 
 // --- prepare/estimate types ---
 
-export interface PrepareSetMetadataOptions {
+export interface ChangePreview {
   name: string
-  /** Desired record values keyed by ENS text key. Empty string / null marks the key for deletion. */
-  desired: Record<string, string | null | undefined>
-  /**
-   * Pre-read existing values. If omitted the SDK reads the union of
-   * `Object.keys(desired)` strictly from ENS.
-   */
-  existing?: Record<string, string | null>
-  /** Validation runs before the delta is computed, against `desired`. */
-  schema?: Schema
-  /** Forwarded to computeDelta. */
-  ignoreKeys?: Set<string>
-  resolverAddress?: `0x${string}`
-}
-
-export interface PrepareResult {
-  name: string
-  resolverAddress: `0x${string}`
-  existing: Record<string, string | null>
-  delta: MetadataDelta
-  /** Multicall calldata ready for sendTransaction. Empty string when delta is a no-op. */
-  calldata: `0x${string}` | null
-  /** Always equals the resolver address. */
-  to: `0x${string}`
+  resolver: `0x${string}`
+  existing?: RecordSet
+  /** Keys to publish: `string` = set new value, "" = delete the key. */
+  changes: RecordSet
   /** Validation outcome — `null` when no schema was supplied. */
   validation: MetadataValidationResult | null
 }
 
-export interface EstimateSetMetadataOptions extends PrepareSetMetadataOptions {
+export interface PreparedMetadata {
+  name: string
+  resolver: `0x${string}`
+  schema: Schema
+  changePreview: ChangePreview
+}
+
+export interface EstimateSetMetadataOptions extends SetMetadataOptions {
   account: `0x${string}`
 }
 
 export interface EstimateResult {
-  prepared: PrepareResult
+  prepared: PreparedMetadata
   gas: bigint
   maxFeePerGas: bigint
   costWei: bigint

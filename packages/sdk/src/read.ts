@@ -7,6 +7,7 @@ import type {
   GetMetadataResult,
   GetSchemaOptions,
   GetSchemaResult,
+  RecordSet,
 } from './types'
 
 const SCHEMA_KEYS = ['schema', 'class']
@@ -33,7 +34,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 
 // Strict read: RPC errors and timeouts propagate; empty strings normalise to null.
-async function readTextRecords(opts: {
+export async function readTextRecords(opts: {
   client: PublicClient
   name: string
   keys: string[]
@@ -78,7 +79,7 @@ async function readTextRecords(opts: {
  *
  * The single read is strict: any RPC error or per-key timeout throws.
  */
-async function getMetadataRecords(
+export async function getMetadataRecords(
   client: PublicClient,
   opts: GetMetadataOptions,
 ): Promise<GetMetadataResult> {
@@ -105,7 +106,14 @@ async function getMetadataRecords(
   const texts =
     keys.size > 0 ? await readTextRecords({ ...opts, client, keys: [...keys] }) : {}
 
-  const properties: Record<string, string | null> = { ...preFetched, ...texts }
+  // State RecordSet convention: only keys with values on-chain appear.
+  const properties: RecordSet = {}
+  for (const [k, v] of Object.entries(preFetched)) {
+    if (v !== null) properties[k] = v
+  }
+  for (const [k, v] of Object.entries(texts)) {
+    if (v !== null) properties[k] = v
+  }
 
   return {
     name: normalize(opts.name),
@@ -126,7 +134,7 @@ async function getMetadataRecords(
  *                        `properties.class.default`, that default is used
  *  - `schema`         — the resolved Schema object, or null when no URI is set
  */
-async function getSchemaRecords(
+export async function getSchemaRecords(
   client: PublicClient,
   opts: GetSchemaOptions,
 ): Promise<GetSchemaResult> {

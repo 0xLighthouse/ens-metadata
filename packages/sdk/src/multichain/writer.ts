@@ -8,15 +8,14 @@ import {
   chainForName,
 } from './routing'
 import type {
-  ApplyDeltaOptions,
+  EstimateModifyExistingMetadataOptions,
   EstimateResult,
   EstimateSetMetadataOptions,
-  PrepareResult,
-  PrepareSetMetadataOptions,
+  ModifyExistingMetadataOptions,
   SetMetadataOptions,
   SetMetadataResult,
 } from '../types'
-import { MetadataWriteError, metadataEstimator, metadataWriter } from '../write'
+import { metadataEstimator, metadataWriter } from '../write'
 
 type WriterApi = ReturnType<ReturnType<typeof metadataWriter>>
 type EstimatorApi = ReturnType<typeof metadataEstimator>
@@ -30,10 +29,8 @@ type EstimatorApi = ReturnType<typeof metadataEstimator>
 function assertWalletOnChain(walletClient: WalletClient, chain: SupportedChain, name: string) {
   if (chain !== 'base') return
   if (walletClient.chain?.id !== BASE_CHAIN_ID) {
-    throw new MetadataWriteError(
+    throw new Error(
       `wallet for '${name}' must be connected to Base (chain ${BASE_CHAIN_ID})`,
-      [],
-      'wrong-chain',
     )
   }
 }
@@ -106,22 +103,26 @@ export function multichainMetadataWriter(config: {
       const chain = chainForName(opts.name)
       return writer.setMetadata(await withBasenameResolver(chain, config.publicClients, opts))
     },
-    applyDelta: async (opts: ApplyDeltaOptions): Promise<SetMetadataResult> =>
-      pickAndGuard(opts.name).applyDelta(opts),
-    setMetadataWithDelta: async (opts: PrepareSetMetadataOptions): Promise<SetMetadataResult> => {
+    modifyExistingMetadata: async (
+      opts: ModifyExistingMetadataOptions,
+    ): Promise<SetMetadataResult> => {
       const writer = pickAndGuard(opts.name)
       const chain = chainForName(opts.name)
-      return writer.setMetadataWithDelta(
+      return writer.modifyExistingMetadata(
         await withBasenameResolver(chain, config.publicClients, opts),
       )
-    },
-    prepareSetMetadata: async (opts: PrepareSetMetadataOptions): Promise<PrepareResult> => {
-      const { writer, chain } = pick(opts.name)
-      return writer.prepareSetMetadata(await withBasenameResolver(chain, config.publicClients, opts))
     },
     estimateSetMetadata: async (opts: EstimateSetMetadataOptions): Promise<EstimateResult> => {
       const { writer, chain } = pick(opts.name)
       return writer.estimateSetMetadata(
+        await withBasenameResolver(chain, config.publicClients, opts),
+      )
+    },
+    estimateModifyExistingMetadata: async (
+      opts: EstimateModifyExistingMetadataOptions,
+    ): Promise<EstimateResult> => {
+      const { writer, chain } = pick(opts.name)
+      return writer.estimateModifyExistingMetadata(
         await withBasenameResolver(chain, config.publicClients, opts),
       )
     },
@@ -130,7 +131,7 @@ export function multichainMetadataWriter(config: {
 
 /**
  * Multichain estimator. No wallet client required; same dispatch rules as
- * `multichainMetadataWriter`, exposing only the prepare/estimate methods.
+ * `multichainMetadataWriter`, exposing only the estimate methods.
  */
 export function multichainMetadataEstimator(config: { publicClients: ChainClients }) {
   const estimators: { mainnet: EstimatorApi; base: EstimatorApi | null } = {
@@ -150,15 +151,17 @@ export function multichainMetadataEstimator(config: { publicClients: ChainClient
   }
 
   return {
-    prepareSetMetadata: async (opts: PrepareSetMetadataOptions): Promise<PrepareResult> => {
-      const { estimator, chain } = pick(opts.name)
-      return estimator.prepareSetMetadata(
-        await withBasenameResolver(chain, config.publicClients, opts),
-      )
-    },
     estimateSetMetadata: async (opts: EstimateSetMetadataOptions): Promise<EstimateResult> => {
       const { estimator, chain } = pick(opts.name)
       return estimator.estimateSetMetadata(
+        await withBasenameResolver(chain, config.publicClients, opts),
+      )
+    },
+    estimateModifyExistingMetadata: async (
+      opts: EstimateModifyExistingMetadataOptions,
+    ): Promise<EstimateResult> => {
+      const { estimator, chain } = pick(opts.name)
+      return estimator.estimateModifyExistingMetadata(
         await withBasenameResolver(chain, config.publicClients, opts),
       )
     },

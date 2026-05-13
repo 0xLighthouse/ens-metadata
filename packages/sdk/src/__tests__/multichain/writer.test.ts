@@ -1,7 +1,18 @@
 import type { PublicClient, WalletClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { setRecordsMock } = vi.hoisted(() => ({ setRecordsMock: vi.fn() }))
+const { setRecordsMock } = vi.hoisted(() => {
+  const mock = vi.fn() as ReturnType<typeof vi.fn> & {
+    makeFunctionData: ReturnType<typeof vi.fn>
+  }
+  mock.makeFunctionData = vi.fn(
+    (_wallet: unknown, args: { resolverAddress: `0x${string}` }) => ({
+      to: args.resolverAddress,
+      data: '0xfakedata' as `0x${string}`,
+    }),
+  )
+  return { setRecordsMock: mock }
+})
 vi.mock('@ensdomains/ensjs/wallet', () => ({
   setRecords: setRecordsMock,
 }))
@@ -9,7 +20,6 @@ vi.mock('@ensdomains/ensjs/wallet', () => ({
 import { BASE_CHAIN_ID, BASE_REGISTRY } from '../../chains/base'
 import { multichainMetadataEstimator, multichainMetadataWriter } from '../../multichain/writer'
 import { MissingChainClientError } from '../../multichain/routing'
-import { MetadataWriteError } from '../../write'
 
 const L1_RESOLVER = '0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR' as `0x${string}`
 const L2_RESOLVER = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB' as `0x${string}`
@@ -112,13 +122,13 @@ describe('multichainMetadataWriter — basename writes', () => {
       await writer.setMetadata({
         name: 'foo.base.eth',
         records: { description: 'new' },
-        resolverAddress: L2_RESOLVER,
+        resolver: L2_RESOLVER,
       })
     } catch (err) {
       caught = err
     }
-    expect(caught).toBeInstanceOf(MetadataWriteError)
-    expect((caught as MetadataWriteError).code).toBe('wrong-chain')
+    expect(caught).toBeInstanceOf(Error)
+    expect((caught as Error).message).toMatch(/must be connected to Base/)
     expect(setRecordsMock).not.toHaveBeenCalled()
   })
 
@@ -156,7 +166,7 @@ describe('multichainMetadataWriter — basename writes', () => {
       writer.setMetadata({
         name: 'foo.base.eth',
         records: { description: 'new' },
-        resolverAddress: L2_RESOLVER,
+        resolver: L2_RESOLVER,
       }),
     ).rejects.toBeInstanceOf(MissingChainClientError)
   })

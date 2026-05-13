@@ -1,7 +1,7 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import type { PublicClient, WalletClient } from 'viem'
 import { describe, expect, it, vi } from 'vitest'
-import { MetadataWriteError, metadataEstimator, metadataWriter } from '../write'
+import { metadataEstimator, metadataWriter } from '../write'
 
 const RESOLVER = '0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR' as `0x${string}`
 
@@ -63,7 +63,7 @@ describe('prepareSetMetadata', () => {
     expect(prepared.delta.changes).toEqual({ description: 'new' })
   })
 
-  it('throws MetadataWriteError when validation fails', async () => {
+  it('throws the validation result when validation fails', async () => {
     const client = makePublicClient()
     const writer = metadataEstimator({ publicClient: client })
     const strictSchema: Schema = {
@@ -79,7 +79,10 @@ describe('prepareSetMetadata', () => {
         existing: {},
         schema: strictSchema,
       }),
-    ).rejects.toBeInstanceOf(MetadataWriteError)
+    ).rejects.toMatchObject({
+      success: false,
+      errors: expect.any(Array),
+    })
   })
 
   it('returns null calldata when delta is a no-op', async () => {
@@ -162,7 +165,7 @@ describe('estimateSetMetadata', () => {
 })
 
 describe('setMetadataWithDelta', () => {
-  it('throws MetadataWriteError when delta is empty', async () => {
+  it('throws when delta is empty', async () => {
     const client = makePublicClient()
     const wallet = {
       account: { address: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
@@ -174,6 +177,6 @@ describe('setMetadataWithDelta', () => {
         desired: { description: 'same' },
         existing: { description: 'same' },
       }),
-    ).rejects.toBeInstanceOf(MetadataWriteError)
+    ).rejects.toThrow(/No records to write/)
   })
 })

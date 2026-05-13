@@ -1,7 +1,18 @@
 import type { PublicClient, WalletClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { setRecordsMock } = vi.hoisted(() => ({ setRecordsMock: vi.fn() }))
+const { setRecordsMock } = vi.hoisted(() => {
+  const mock = vi.fn() as ReturnType<typeof vi.fn> & {
+    makeFunctionData: ReturnType<typeof vi.fn>
+  }
+  mock.makeFunctionData = vi.fn(
+    (_wallet: unknown, args: { resolverAddress: `0x${string}` }) => ({
+      to: args.resolverAddress,
+      data: '0xfakedata' as `0x${string}`,
+    }),
+  )
+  return { setRecordsMock: mock }
+})
 vi.mock('@ensdomains/ensjs/wallet', () => ({
   setRecords: setRecordsMock,
 }))
@@ -67,7 +78,7 @@ describe.skip('prepareSetMetadata for *.base.eth', () => {
 })
 
 describe.skip('setMetadata wrong-chain enforcement', () => {
-  it('throws MetadataWriteError with code "wrong-chain" when wallet is on chain 1 for a *.base.eth write', async () => {
+  it('throws wrong-chain error when wallet is on chain 1 for a *.base.eth write', async () => {
     // Skipped: the wrong-chain guard now lives in the multichain wrapper. See
     // multichain/writer.test.ts.
   })

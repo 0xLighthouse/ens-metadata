@@ -3,7 +3,12 @@ import { normalize } from 'viem/ens'
 import { BaseResolverError, getBaseResolverAddress } from '../chains/base'
 import { metadataReader } from '../read'
 import { type ChainClients, MissingChainClientError, chainForName } from './routing'
-import type { GetMetadataOptions, GetMetadataResult, GetSchemaOptions } from '../types'
+import type {
+  GetMetadataOptions,
+  GetMetadataResult,
+  GetSchemaOptions,
+  RecordSet,
+} from '../types'
 
 const DEFAULT_KEYS = ['alias', 'description', 'avatar', 'url']
 
@@ -83,9 +88,14 @@ export function multichainMetadataReader(clients: ChainClients) {
       }
     }
 
-    const properties = resolverAddress
+    const raw = resolverAddress
       ? await fetchTextRecordsDirect(baseClient, resolverAddress, name, keys)
-      : Object.fromEntries(keys.map((k) => [k, null]))
+      : {}
+    // State RecordSet convention: only keys with values on-chain appear.
+    const properties: RecordSet = {}
+    for (const [k, v] of Object.entries(raw)) {
+      if (v !== null) properties[k] = v
+    }
     return {
       name,
       schema: properties.schema ?? null,

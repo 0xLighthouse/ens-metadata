@@ -1,13 +1,6 @@
 // --- Core (single-chain) ---
 export { metadataReader } from './read'
-export {
-  metadataWriter,
-  metadataEstimator,
-  MetadataWriteError,
-  getResolverAddress,
-  getResolverAddressStrict,
-  type GetResolverAddressOptions,
-} from './write'
+export { metadataWriter, metadataEstimator } from './write'
 
 // --- Routing primitives ---
 export {
@@ -86,11 +79,13 @@ export type {
   MetadataDelta,
   ComputeDeltaOptions,
   SetMetadataOptions,
+  ModifyExistingMetadataOptions,
   ApplyDeltaOptions,
   SetMetadataResult,
   PrepareSetMetadataOptions,
-  PrepareResult,
+  ChangePreview as PrepareResult,
   EstimateSetMetadataOptions,
+  EstimateModifyExistingMetadataOptions,
   EstimateResult,
 } from './types'
 

@@ -1,372 +1,235 @@
-import { type Hex, type PublicClient, type WalletClient, encodeFunctionData } from 'viem'
+import { zeroAddress, type PublicClient, type WalletClient } from 'viem'
 import { normalize } from 'viem/ens'
-import { computeDelta } from './delta'
-// TODO: write.ts cleanup — readTextRecordsStrict was removed from ./read.
-// Re-implement the per-key getEnsText read locally here.
-// import { readTextRecordsStrict } from './read'
+import { getMetadataRecords, getSchemaRecords } from './read'
+import { validateMetadataSchema } from './schema'
 import type {
-  ApplyDeltaOptions,
+  ChangePreview,
   EstimateResult,
   EstimateSetMetadataOptions,
-  MetadataDelta,
-  PrepareResult,
-  PrepareSetMetadataOptions,
+  PreparedMetadata,
+  RecordSet,
   SetMetadataOptions,
   SetMetadataResult,
 } from './types'
-import { validateMetadataSchema } from './schema'
 
-export interface GetResolverAddressOptions {
-  client: PublicClient
-  name: string
-  blockNumber?: bigint
-  blockTag?: 'latest' | 'earliest' | 'pending' | 'safe' | 'finalized'
-}
-
-function buildResolverOptions(opts: GetResolverAddressOptions) {
-  return {
-    ...(opts.blockNumber !== undefined ? { blockNumber: opts.blockNumber } : {}),
-    ...(opts.blockTag !== undefined ? { blockTag: opts.blockTag } : {}),
-  }
-}
-
-function normalizeResolverAddress(resolver: unknown): string | null {
-  if (!resolver) return null
-  if (typeof resolver === 'string') return resolver
-  if (typeof resolver === 'object' && resolver !== null && 'address' in resolver) {
-    const address = (resolver as { address?: unknown }).address
-    return typeof address === 'string' ? address : null
-  }
-  return null
-}
+// --- Internal helpers ---
 
 /**
- * Look up the resolver address for an ENS name. Returns `null` when no
- * resolver is set or any error occurs.
+ * Compute the diff between a `desired` changes RecordSet and an `existing`
+ * state RecordSet. Returns a broadcast-ready changes RecordSet: non-empty
+ * `string` = set new value, `""` = delete the key, absent key = no change.
+ *
+ * `desired` follows the changes convention: a `""` value deletes the key, a
+ * non-empty string sets it, and any key not present is left alone.
+ *
+ * When `ignoreMissing` is `false` (default), keys present in `existing` but
+ * absent from `desired` are also marked for deletion. When `true`, those keys
+ * are left untouched.
  */
-export async function getResolverAddress(
-  opts: GetResolverAddressOptions,
-): Promise<`0x${string}` | null> {
-  const normalizedName = normalize(opts.name)
-  const extras = buildResolverOptions(opts)
-  try {
-    const resolver =
-      await // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
-      (opts.client as any).getEnsResolver({ name: normalizedName, ...extras })
-    const address = normalizeResolverAddress(resolver)
-    return address ? (address as `0x${string}`) : null
-  } catch {
-    return null
-  }
-}
+export function computeDelta(
+  desired: RecordSet,
+  existing: RecordSet,
+  options?: { ignoreMissing?: boolean },
+): RecordSet {
+  const ignoreMissing = options?.ignoreMissing ?? false
+  const changes: RecordSet = {}
 
-/**
- * Look up the resolver address for an ENS name. Throws if the lookup fails or
- * the name has no resolver set.
- */
-export async function getResolverAddressStrict(
-  opts: GetResolverAddressOptions,
-): Promise<`0x${string}`> {
-  const normalizedName = normalize(opts.name)
-  const extras = buildResolverOptions(opts)
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsResolver
-  const resolver = await (opts.client as any).getEnsResolver({ name: normalizedName, ...extras })
-  const address = normalizeResolverAddress(resolver)
-  if (!address) {
-    throw new Error(`No resolver found for ${normalizedName}`)
-  }
-  return address as `0x${string}`
-}
-
-export class MetadataWriteError extends Error {
-  errors: { key: string; message: string }[]
-  code?: string
-
-  constructor(message: string, errors: { key: string; message: string }[], code?: string) {
-    super(message)
-    this.name = 'MetadataWriteError'
-    this.errors = errors
-    if (code !== undefined) this.code = code
-  }
-}
-
-function deltaToRecords(delta: MetadataDelta): {
-  texts: { key: string; value: string }[]
-  coins: { coin: string; value: string }[]
-} {
-  const texts: { key: string; value: string }[] = []
-  const coins: { coin: string; value: string }[] = []
-
-  for (const [key, value] of Object.entries(delta.changes)) {
-    if (key === 'address') {
-      coins.push({ coin: 'ETH', value })
-    } else {
-      texts.push({ key, value })
+  for (const [key, value] of Object.entries(desired)) {
+    const existingValue = existing[key]
+    if (value === '') {
+      // Delete only if the key is currently set.
+      if (existingValue !== undefined) changes[key] = ''
+    } else if (value !== existingValue) {
+      changes[key] = value
     }
   }
 
-  for (const key of delta.deleted) {
-    texts.push({ key, value: '' })
+  if (!ignoreMissing) {
+    for (const key of Object.keys(existing)) {
+      if (key in desired) continue
+      changes[key] = ''
+    }
   }
 
-  return { texts, coins }
+  return changes
 }
 
-async function resolveResolver(publicClient: PublicClient, name: string): Promise<`0x${string}`> {
-  try {
-    return await getResolverAddressStrict({ client: publicClient, name })
-  } catch (err) {
-    throw new MetadataWriteError(
-      err instanceof Error ? err.message : `No resolver found for ${name}`,
-      [],
-    )
+/**
+ * Project the state RecordSet that will result from publishing `changes` on
+ * top of `existing`. Keys with `""` in `changes` are deletions and don't
+ * appear in the result.
+ */
+export function applyDelta(existing: RecordSet, changes: RecordSet): RecordSet {
+  const results: RecordSet = { ...existing }
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === '') delete results[key]
+    else results[key] = value
   }
+  return results
 }
 
-async function setMetadataImpl(
+async function broadcast(
+  walletClient: WalletClient,
+  args: { name: string; records: RecordSet; resolverAddress: `0x${string}` },
+): Promise<SetMetadataResult> {
+  const texts = Object.entries(args.records).map(([key, value]) => ({ key, value }))
+  if (texts.length === 0) throw new Error('No records to write')
+
+  const { setRecords } = await import('@ensdomains/ensjs/wallet')
+  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
+  const txHash = await setRecords(walletClient as any, {
+    name: args.name,
+    texts,
+    coins: [],
+    resolverAddress: args.resolverAddress,
+    account: walletClient.account!,
+  })
+  return { txHash, texts }
+}
+
+/**
+ * Estimate the gas cost of setting `records` on `resolver` for `name`. Pure
+ * gas helper — does no diffing, validation, or PreparedResult construction.
+ * Returns zeros (with the current balance) when `records` is empty.
+ */
+async function gasEstimate(
+  publicClient: PublicClient,
+  args: {
+    name: string
+    resolver: `0x${string}`
+    records: RecordSet
+    account: `0x${string}`
+  },
+): Promise<{ gas: bigint; maxFeePerGas: bigint; costWei: bigint; balance: bigint }> {
+  const texts = Object.entries(args.records).map(([key, value]) => ({ key, value }))
+
+  if (texts.length === 0) {
+    const balance = await publicClient.getBalance({ address: args.account })
+    return { gas: 0n, maxFeePerGas: 0n, costWei: 0n, balance }
+  }
+
+  const { setRecords } = await import('@ensdomains/ensjs/wallet')
+  // biome-ignore lint/suspicious/noExplicitAny: makeFunctionData's wallet param is unused
+  const { data } = setRecords.makeFunctionData(null as any, {
+    name: args.name,
+    resolverAddress: args.resolver,
+    texts,
+    coins: [],
+  })
+
+  const [gas, fees, balance] = await Promise.all([
+    publicClient.estimateGas({ account: args.account, to: args.resolver, data }),
+    publicClient.estimateFeesPerGas(),
+    publicClient.getBalance({ address: args.account }),
+  ])
+  const maxFeePerGas = fees.maxFeePerGas ?? 0n
+  return { gas, maxFeePerGas, costWei: gas * maxFeePerGas, balance }
+}
+
+// --- Public functions ---
+
+/**
+ * Read whatever isn't supplied, diff `desired` against `existing`, and return
+ * a `PreparedMetadata` bundle ready for `setPreparedMetadata` or
+ * `estimateSetMetadata`. Throws if the name has no resolver or no schema.
+ */
+async function prepareSetMetadata(
+  publicClient: PublicClient,
+  opts: SetMetadataOptions,
+): Promise<PreparedMetadata> {
+  const name = normalize(opts.name)
+
+  const resolver = opts.resolver ?? (await publicClient.getEnsResolver({ name })) as `0x${string}`
+  if (resolver === zeroAddress) throw new Error(`No resolver found for ${name}`)
+
+  const schema =
+    opts.schema ?? (await getSchemaRecords(publicClient, { name })).schema
+  if (!schema) throw new Error(`No schema found for ${name}`)
+
+  const existing: RecordSet =
+    opts.existing ?? (await getMetadataRecords(publicClient, { name, schema })).properties
+
+  const changes = computeDelta(opts.desired, existing, {
+    ignoreMissing: opts.ignoreMissing ?? false,
+  })
+  const projected = applyDelta(existing, changes)
+  const validation = validateMetadataSchema(projected, schema)
+
+  const changePreview: ChangePreview = {
+    name,
+    resolver,
+    existing,
+    changes,
+    validation,
+  }
+
+  return { name, resolver, schema, changePreview }
+}
+
+/**
+ * Broadcast a previously prepared `PreparedMetadata`.
+ */
+async function setPreparedMetadata(
+  walletClient: WalletClient,
+  prepared: PreparedMetadata,
+): Promise<SetMetadataResult> {
+  return broadcast(walletClient, {
+    name: prepared.name,
+    records: prepared.changePreview.changes,
+    resolverAddress: prepared.resolver,
+  })
+}
+
+/**
+ * Prepare the change set and return a gas estimate without broadcasting.
+ */
+async function estimateSetMetadata(
+  publicClient: PublicClient,
+  opts: EstimateSetMetadataOptions,
+): Promise<EstimateResult> {
+  const prepared = await prepareSetMetadata(publicClient, opts)
+  const estimate = await gasEstimate(publicClient, {
+    name: prepared.name,
+    resolver: prepared.resolver,
+    records: prepared.changePreview.changes,
+    account: opts.account,
+  })
+  return { prepared, ...estimate }
+}
+
+/**
+ * Prepare and broadcast in one call.
+ */
+async function setMetadata(
   walletClient: WalletClient,
   publicClient: PublicClient,
   opts: SetMetadataOptions,
 ): Promise<SetMetadataResult> {
-  if (opts.schema) {
-    const result = validateMetadataSchema(opts.records, opts.schema)
-    if (!result.success) {
-      throw new MetadataWriteError('Validation failed', result.errors)
-    }
-  }
-
-  const delta: MetadataDelta = {
-    changes: opts.records,
-    deleted: opts.deleted ?? [],
-  }
-
-  const name = normalize(opts.name)
-  const resolverAddress = opts.resolverAddress ?? (await resolveResolver(publicClient, name))
-  const { texts, coins } = deltaToRecords(delta)
-
-  if (texts.length === 0 && coins.length === 0) {
-    throw new MetadataWriteError('No records to write', [])
-  }
-
-  const { setRecords } = await import('@ensdomains/ensjs/wallet')
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
-  const txHash = await setRecords(walletClient as any, {
-    name,
-    texts,
-    coins,
-    resolverAddress,
-    account: walletClient.account!,
-  })
-
-  return { txHash, texts, coins }
+  const prepared = await prepareSetMetadata(publicClient, opts)
+  return setPreparedMetadata(walletClient, prepared)
 }
 
-async function applyDeltaImpl(
-  walletClient: WalletClient,
-  _publicClient: PublicClient,
-  opts: ApplyDeltaOptions,
-): Promise<SetMetadataResult> {
-  const name = normalize(opts.name)
-  const { texts, coins } = deltaToRecords(opts.delta)
+// --- Factories ---
 
-  if (texts.length === 0 && coins.length === 0) {
-    throw new MetadataWriteError('No records to write', [])
-  }
-
-  const { setRecords } = await import('@ensdomains/ensjs/wallet')
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
-  const txHash = await setRecords(walletClient as any, {
-    name,
-    texts,
-    coins,
-    resolverAddress: opts.resolverAddress,
-    account: walletClient.account!,
-  })
-
-  return { txHash, texts, coins }
-}
-
-/**
- * Compute the multicall calldata for writing the given delta against the
- * resolver. Returns `null` when there is nothing to write.
- */
-async function encodeDeltaCalldata(
-  name: string,
-  delta: MetadataDelta,
-): Promise<`0x${string}` | null> {
-  const { texts, coins } = deltaToRecords(delta)
-  if (texts.length === 0 && coins.length === 0) return null
-
-  const { namehash, generateRecordCallArray } = await import('@ensdomains/ensjs/utils')
-  const node = namehash(name)
-  const calls = generateRecordCallArray({
-    namehash: node,
-    texts,
-    coins: coins.map((c) => ({ coin: c.coin, value: c.value })),
-  })
-
-  if (calls.length === 0) return null
-  if (calls.length === 1) return calls[0] as `0x${string}`
-
-  return encodeFunctionData({
-    abi: [
-      {
-        name: 'multicall',
-        type: 'function',
-        inputs: [{ name: 'data', type: 'bytes[]' }],
-        outputs: [{ name: '', type: 'bytes[]' }],
-      },
-    ] as const,
-    functionName: 'multicall',
-    args: [calls as Hex[]],
-  })
-}
-
-function normalizeDesired(
-  desired: Record<string, string | null | undefined>,
-): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const [key, value] of Object.entries(desired)) {
-    if (typeof value === 'string') out[key] = value
-    else if (value === null || value === undefined) out[key] = ''
-  }
-  return out
-}
-
-async function prepareSetMetadataImpl(
-  publicClient: PublicClient,
-  opts: PrepareSetMetadataOptions,
-): Promise<PrepareResult> {
-  const name = normalize(opts.name)
-  const desired = normalizeDesired(opts.desired)
-
-  const validation = opts.schema ? validateMetadataSchema(desired, opts.schema) : null
-  if (validation && !validation.success) {
-    throw new MetadataWriteError('Validation failed', validation.errors)
-  }
-
-  const resolverAddress = opts.resolverAddress ?? (await resolveResolver(publicClient, name))
-
-  let existing: Record<string, string | null>
-  if (opts.existing) {
-    existing = opts.existing
-  } else {
-    const keys = Object.keys(desired).filter((k) => k !== 'address')
-    if (keys.length === 0) {
-      existing = {}
-    } else {
-      // TODO: re-implement strict per-key getEnsText read here.
-      existing = {} // await readTextRecordsStrict({ client: publicClient, name, keys })
-    }
-  }
-
-  const delta = computeDelta(
-    existing,
-    desired,
-    opts.ignoreKeys ? { ignoreKeys: opts.ignoreKeys } : undefined,
-  )
-  const calldata = await encodeDeltaCalldata(name, delta)
-
-  return {
-    name,
-    resolverAddress,
-    existing,
-    delta,
-    calldata,
-    to: resolverAddress,
-    validation,
-  }
-}
-
-async function estimateSetMetadataImpl(
-  publicClient: PublicClient,
-  opts: EstimateSetMetadataOptions,
-): Promise<EstimateResult> {
-  const prepared = await prepareSetMetadataImpl(publicClient, opts)
-
-  if (!prepared.calldata) {
-    const balance = await publicClient.getBalance({ address: opts.account })
-    return {
-      prepared,
-      gas: 0n,
-      maxFeePerGas: 0n,
-      costWei: 0n,
-      balance,
-    }
-  }
-
-  const [gas, fees, balance] = await Promise.all([
-    publicClient.estimateGas({
-      account: opts.account,
-      to: prepared.to,
-      data: prepared.calldata,
-    }),
-    publicClient.estimateFeesPerGas(),
-    publicClient.getBalance({ address: opts.account }),
-  ])
-
-  const maxFeePerGas = fees.maxFeePerGas ?? 0n
-  return {
-    prepared,
-    gas,
-    maxFeePerGas,
-    costWei: gas * maxFeePerGas,
-    balance,
-  }
-}
-
-async function setMetadataWithDeltaImpl(
-  walletClient: WalletClient,
-  publicClient: PublicClient,
-  opts: PrepareSetMetadataOptions,
-): Promise<SetMetadataResult> {
-  const prepared = await prepareSetMetadataImpl(publicClient, opts)
-  const { texts, coins } = deltaToRecords(prepared.delta)
-  if (texts.length === 0 && coins.length === 0) {
-    throw new MetadataWriteError('No records to write', [])
-  }
-
-  const { setRecords } = await import('@ensdomains/ensjs/wallet')
-  // biome-ignore lint/suspicious/noExplicitAny: ensjs wallet client type mismatch
-  const txHash = await setRecords(walletClient as any, {
-    name: prepared.name,
-    texts,
-    coins,
-    resolverAddress: prepared.resolverAddress,
-    account: walletClient.account!,
-  })
-
-  return { txHash, texts, coins }
-}
-
-/**
- * Single-chain metadata writer. The supplied `publicClient` and
- * `walletClient` are assumed to be on the same chain as the names being
- * written; the core does no chain detection. Use `multichainMetadataWriter`
- * from `./multichain` if you need a single object that dispatches across
- * chains and enforces the wallet-on-correct-chain guard.
- */
 export function metadataWriter(config: { publicClient: PublicClient }) {
   return (walletClient: WalletClient) => ({
-    setMetadata: (opts: SetMetadataOptions) =>
-      setMetadataImpl(walletClient, config.publicClient, opts),
-    applyDelta: (opts: ApplyDeltaOptions) =>
-      applyDeltaImpl(walletClient, config.publicClient, opts),
-    setMetadataWithDelta: (opts: PrepareSetMetadataOptions) =>
-      setMetadataWithDeltaImpl(walletClient, config.publicClient, opts),
-    prepareSetMetadata: (opts: PrepareSetMetadataOptions) =>
-      prepareSetMetadataImpl(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) =>
+      prepareSetMetadata(config.publicClient, opts),
+    setPreparedMetadata: (prepared: PreparedMetadata) =>
+      setPreparedMetadata(walletClient, prepared),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadataImpl(config.publicClient, opts),
+      estimateSetMetadata(config.publicClient, opts),
+    setMetadata: (opts: SetMetadataOptions) =>
+      setMetadata(walletClient, config.publicClient, opts),
   })
 }
 
-/** Estimate without a wallet client (useful for dry-run flows that don't yet have a signer). */
+/** Prepare / estimate without a wallet client (for dry-run flows). */
 export function metadataEstimator(config: { publicClient: PublicClient }) {
   return {
-    prepareSetMetadata: (opts: PrepareSetMetadataOptions) =>
-      prepareSetMetadataImpl(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) =>
+      prepareSetMetadata(config.publicClient, opts),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadataImpl(config.publicClient, opts),
+      estimateSetMetadata(config.publicClient, opts),
   }
 }
