@@ -14,9 +14,9 @@ Schemas themselves live on IPFS and are published from the sibling [`@ensmetadat
 pnpm add @ensmetadata/sdk viem @ensdomains/ensjs
 ```
 
-## Quick Start: Common Use Cases
+## Quick Start
 
-Three scenarios cover most usage. Each builds on a `reader` and `writer` created from your viem clients:
+Each example below uses a `reader` and `writer` built from your viem clients:
 
 ```ts
 import { metadataReader, metadataWriter } from '@ensmetadata/sdk'
@@ -25,139 +25,141 @@ const reader = metadataReader()(publicClient)
 const writer = metadataWriter({ publicClient })(walletClient)
 ```
 
-`metadataReader()` returns a function, so the pattern `metadataReader()(publicClient)` calls that returned function with `publicClient` to produce a reader instance bound to that client. The first call accepts SDK config (none here), the second binds the viem client. Every reader/writer/estimator factory follows the same shape. They can also be plugged into viem's `.extend()` if you prefer one client object:
+`metadataReader()` returns a function, so `metadataReader()(publicClient)` calls that returned function with `publicClient` to produce a reader bound to that client. The first call accepts SDK config (none here), the second binds the viem client. Every factory follows this shape and can also be plugged into viem's `.extend()` if you prefer one client object:
 
 ```ts
 const client = publicClient.extend(metadataReader())
 await client.getMetadata({ name: 'mynode.eth' })
 ```
 
-The SDK is single-chain: each factory is bound to one viem client, and the caller is responsible for pairing the right client with the name being read or written.
+### Read records
 
-### Reading existing records
-
-Resolve the schema first so the read is scoped to the records the schema names. Validation then confirms the live values conform to the schema's rules (required fields present, value patterns match, etc).
+Pass a name. In one call, the reader resolves the schema declared on the name, fetches it, and reads every key the schema names:
 
 ```ts
-import { metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
-
-const reader = metadataReader()(publicClient)
-
-// 1. Resolve the schema the name currently declares. `getSchema` reads the
-//    `schema` and `class` text records and fetches the referenced Schema.
-const { schema } = await reader.getSchema({ name: 'someone.eth' })
-if (!schema) throw new Error('No schema declared on this name')
-
-// 2. Read only the records named in the schema.
-const metadata = await reader.getMetadata({ name: 'someone.eth', schema })
-
-// 3. Validate the live values against the schema rules.
-const result = validateMetadataSchema(metadata.properties, schema)
+const metadata = await reader.getMetadata({ name: 'someone.eth' })
+// {
+//   name: 'someone.eth',
+//   properties: { description: '...', avatar: '...', class: 'Agent', schema: 'ipfs://bafy...' },
+//   schema: { ... }   // the resolved Schema object
+// }
 ```
 
-### Publish new records to a name you own
+`metadata.properties` carries the on-chain values for every key the schema declares (plus `class` and `schema` themselves when set), and `metadata.schema` is the resolved Schema object the reader fetched along the way.
 
-You decide which schema applies. Import a known schema, build the records from it (filling in your own values for the rest), validate, and publish the full set.
+Because the Schema rides back on the same response, validation is a local follow-up that needs no extra network calls:
 
 ```ts
-import { validateMetadataSchema } from '@ensmetadata/sdk'
+import { validateMetadata } from '@ensmetadata/sdk'
+
+const result = validateMetadata(metadata.properties, metadata.schema)
+if (!result.success) console.error(result.errors)
+```
+
+### Write records
+
+Pass a name and the records you want to set. In one call, the writer resolves the resolver, fetches the schema currently declared on the name, reads the existing state, computes the diff against your `desired`, validates the projected post-change state, and broadcasts only the changes:
+
+```ts
+await writer.setMetadata({
+  name: 'mynode.eth',
+  desired: { description: 'Hello world', avatar: 'ipfs://...' },
+})
+```
+
+This works as long as the name already declares a schema. For first-time publish to a fresh name, you will need to provide an already-published schema:
+
+```ts
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import latest from '@ensmetadata/schemas/latest'
 
 const agentSchema = SCHEMA_MAP.Agent
 
-// 1. Stage the records. `class` and the `schema` URI come from the bundled
-//    Agent schema; the rest are your own values.
-const records = {
-  class: agentSchema.title, // 'Agent'
-  schema: `ipfs://${latest.agent.cid}`, // IPFS URI of the published Agent schema
-  alias: 'My Agent',
-  description: 'A helpful AI agent',
-  avatar: 'ipfs://QmAvatar...',
-}
-
-// 2. Validate against the schema you're publishing under.
-const result = validateMetadataSchema(records, agentSchema)
-if (!result.success) {
-  console.error(result.errors)
-  return
-}
-
-// 3. Publish. `setMetadata` resolves the resolver, fetches the current
-//    state, diffs against `desired`, and broadcasts only the changes. On a
-//    fresh node the existing state is empty, so everything in `desired`
-//    gets written. Pass `schema` so the SDK skips reading the (still-unset)
-//    `schema` text record off chain.
 await writer.setMetadata({
   name: 'mynode.eth',
-  desired: records,
   schema: agentSchema,
+  desired: {
+    class: agentSchema.title,              // 'Agent'
+    schema: `ipfs://${latest.agent.cid}`,  // URI consumers will resolve
+    alias: 'My Agent',
+    description: 'A helpful AI agent',
+  },
 })
 ```
 
-The `schema` value in `records` is the IPFS URI consumers will fetch; `agentSchema` is the local Schema object you're validating against. These should match: the URI you write should resolve to the same schema you validated with.
+The `schema` option is the local Schema object the SDK validates against; the `schema` value inside `desired` is the IPFS URI written on-chain so consumers can discover it later. These should match: the URI you publish should resolve to the same schema you validated against.
 
-### Editing existing records
+### Edit records
 
-Resolve the schema the name currently declares so your update validates against the contract its consumers already expect, retrieve the records that schema knows about, copy and edit, validate, and publish only what changed.
+Read, mutate, write. `setMetadata` figures out what actually changed and broadcasts only those keys:
 
 ```ts
-import { metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
-
-const reader = metadataReader()(publicClient)
-
-// 1. Resolve the schema the name currently declares. `getSchema` reads the
-//    `schema` text record off ENS and fetches the Schema from IPFS.
-const { schema } = await reader.getSchema({ name: 'mynode.eth' })
-if (!schema) throw new Error('No schema declared on this name')
-
-// 2. Retrieve the records named in the schema.
-const metadata = await reader.getMetadata({
-  name: 'mynode.eth',
-  schema,
-})
-
-// 3. Change the data you want to edit
-metadata.properties.description = 'Updated description'
-
-// 4. Publish the changes.
-await writer.setMetadata({
-  name: 'mynode.eth',
-  desired: metadata.properties
-})
+const metadata = await reader.getMetadata({ name: 'mynode.eth' })
+const desired = { ...metadata.properties, description: 'Updated description' }
+await writer.setMetadata({ name: 'mynode.eth', desired })
 ```
 
-`setMetadata` does the following steps, which can be done individually using the primitives below if you want more control:
+The optimized version of this flow, which reuses the schema and existing state already in hand from `getMetadata` to skip redundant RPCs, is in [Reusing data across calls](#reusing-data-across-calls).
 
-1. If a resolver is not provided, look it up via the universal resolver.
-2. If a schema is not provided, look up the schema currently attached to the ENS name.
-3. If the current on-chain records are not provided, retrieve the current records.
-4. Compare the updated metadata provided to the existing on-chain records to calculate what we need to update.
-5. Preview what the on-chain records will look like after the changes are made, and validate the previewed state against the schema.
-6. Broadcast just the changes required to modify on-chain state.
+## How `setMetadata` works
+
+Every call to `setMetadata` walks six steps:
+
+1. Resolve the resolver address (universal resolver lookup) if not supplied.
+2. Look up the schema URI from the `schema` text record and fetch the Schema from IPFS if not supplied.
+3. Read the current on-chain records named in the schema if not supplied.
+4. Diff `desired` against the existing records to compute the minimal change set.
+5. Project the post-change state and validate it against the schema.
+6. Broadcast only the changed records.
+
+Steps 1–3 each hit the network and can be skipped by passing the corresponding value into `setMetadata`. Steps 4–6 are always performed locally.
+
+## Reusing data across calls
+
+`setMetadata`, `prepareSetMetadata`, and `estimateSetMetadata` all accept optional `resolver`, `schema`, and `existing`. When omitted the SDK reads them from the blockchain. When supplied, they're used as-is and the corresponding read is skipped:
+
+| Option | When omitted | When supplied |
+|---|---|---|
+| `resolver` | Resolved via the ENS universal resolver | Used as-is, no RPC call |
+| `schema` | Read from the `schema` text record, then fetched from IPFS | Used as-is, no read or fetch |
+| `existing` | Read via `getMetadata` using `schema` | Used as-is, no read |
+
+`getMetadata` returns exactly what `setMetadata` needs to skip steps 2 and 3:
+
+```ts
+const metadata = await reader.getMetadata({ name: 'mynode.eth' })
+const desired = { ...metadata.properties, description: 'Updated description' }
+await writer.setMetadata({
+  name: 'mynode.eth',
+  desired,
+  schema: metadata.schema!,       // skip schema text-record read + IPFS fetch
+  existing: metadata.properties,  // skip current-state read
+})
+```
 
 ## Primitives
 
-The sections below are the detailed reference for each building block the SDK exposes. The use cases above compose these primitives; reach for them directly when you need finer-grained control.
+The sections below are the detailed reference for each building block the SDK exposes. The Quick Start examples above compose these primitives; reach for them directly when you need finer-grained control.
 
 ### Reading
 
-`metadataReader()(client)` exposes two methods that target different read scopes.
+`metadataReader()(client)` exposes two methods:
 
 ```ts
-const { records, schema } = await reader.getSchema({ name: 'mynode.eth' })
-// records: { schema: string | null, class: string | null }
-// schema:  Schema | null   — the Schema object fetched from the `schema` URI
+const { name, properties, schema } = await reader.getSchema({ name: 'mynode.eth' })
+// properties: { schema?, class? }  — raw text records (only present when set)
+// schema:     Schema | null        — the Schema object fetched from the `schema` URI
 
-const metadata = await reader.getMetadata({ name: 'mynode.eth' })
-// { name, class, schema, properties }   — properties keyed by the read keys
+const { name, properties, schema } = await reader.getMetadata({ name: 'mynode.eth' })
+// properties: RecordSet            — keys declared by the resolved schema (only present when set)
+// schema:     Schema | null
 ```
 
-`getSchema` reads the `schema` and `class` text records, then (when `schema` is set) fetches the referenced Schema object. The raw text values are returned under `records`; the parsed Schema is returned under `schema`. If `class` is unset but the resolved Schema declares a `properties.class.default`, that default fills in.
+`getSchema` reads the `schema` and `class` text records, then (when `schema` is set) fetches the referenced Schema object. If `class` is unset but the resolved Schema declares a `properties.class.default`, that default fills in.
 
 `getMetadata` chooses which records to read based on the options you pass.
 
-Calling it with neither `schema` nor `keys` runs `getSchema` internally to discover the name's Schema, then reads the keys that Schema declares. The `schema` and `class` text records picked up along the way are reused in the result, so you get the full picture in one call when you don't yet know the schema up front.
+Calling it with neither `schema` nor `keys` runs `getSchema` internally to discover the name's Schema, then reads the keys that Schema declares. The `schema` and `class` text records and the resolved Schema object picked up along the way are reused in the result, so you get the full picture in one call when you don't yet know the schema up front.
 
 ```ts
 await reader.getMetadata({ name: 'mynode.eth' })
@@ -199,7 +201,7 @@ const prepared = await writer.prepareSetMetadata({
   name: 'mynode.eth',
   desired: { description: 'New' },
 })
-console.log(prepared.changePreview.changes)   // only the keys that will be written
+console.log(prepared.changePreview.changes)    // only the keys that will be written
 console.log(prepared.changePreview.validation) // result of validating the projected state
 ```
 
@@ -209,7 +211,7 @@ console.log(prepared.changePreview.validation) // result of validating the proje
 await writer.setPreparedMetadata(prepared)
 ```
 
-**`estimateSetMetadata`** prepares and returns gas, fee, and balance — no broadcast.
+**`estimateSetMetadata`** prepares and returns gas, fee, and balance, without broadcasting.
 
 ```ts
 const estimate = await writer.estimateSetMetadata({
@@ -220,38 +222,17 @@ const estimate = await writer.estimateSetMetadata({
 // { prepared, gas, maxFeePerGas, costWei, balance }
 ```
 
-#### Injecting values to skip redundant lookups
-
-All three of the methods that take `SetMetadataOptions` (`setMetadata`, `prepareSetMetadata`, `estimateSetMetadata`) accept optional `resolver`, `schema`, and `existing`. When omitted the SDK reads them; when supplied they're used as-is and the corresponding read is skipped.
-
-| Option | When omitted | When supplied |
-|---|---|---|
-| `resolver` | Resolved via the ENS universal resolver | Used as-is, no RPC call |
-| `schema` | Read from the `schema` text record, then fetched from IPFS | Used as-is, no read or fetch |
-| `existing` | Read via `getMetadata` using `schema` | Used as-is, no read |
-
-```ts
-// Re-use values you already have to skip up to three RPC roundtrips.
-await writer.setMetadata({
-  name: 'mynode.eth',
-  desired: { description: 'New' },
-  resolver: '0x...',     // skip the resolver lookup
-  schema,                // skip the schema text-record read + IPFS fetch
-  existing: snapshot,    // skip the current-state read
-})
-```
-
-This matters most when you've already called `getSchema` or `getMetadata` in the same flow: the values are already in hand, so passing them avoids hitting the same RPCs twice.
+All three option-taking methods (`setMetadata`, `prepareSetMetadata`, `estimateSetMetadata`) accept the same `resolver` / `schema` / `existing` injection options. See [Reusing data across calls](#reusing-data-across-calls).
 
 ### Validation
 
-`validateMetadataSchema` checks a record map against a schema. Schemas can come from `@ensmetadata/schemas`, from `fetchSchemaByUri`, or from your own registry.
+`validateMetadata` checks a record map against a schema. Schemas can come from `@ensmetadata/schemas`, from `fetchSchemaByUri`, or from your own registry.
 
 ```ts
-import { validateMetadataSchema } from '@ensmetadata/sdk'
+import { validateMetadata } from '@ensmetadata/sdk'
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 
-const result = validateMetadataSchema(
+const result = validateMetadata(
   { description: 'My agent', url: 'https://example.com' },
   SCHEMA_MAP.Agent,
 )
@@ -281,7 +262,7 @@ hasChanges(original, desired) // boolean
 
 ### Preparing and estimating
 
-To inspect or estimate gas before broadcasting, use `metadataEstimator` (no wallet client required) or the matching methods on `metadataWriter`. Both accept `SetMetadataOptions`, so the same `resolver` / `schema` / `existing` injection rules apply — see [Injecting values to skip redundant lookups](#injecting-values-to-skip-redundant-lookups).
+To inspect or estimate gas before broadcasting, use `metadataEstimator` (no wallet client required) or the matching methods on `metadataWriter`. Both accept `SetMetadataOptions`, so the same `resolver` / `schema` / `existing` injection rules apply. See [Reusing data across calls](#reusing-data-across-calls).
 
 ```ts
 import { metadataEstimator } from '@ensmetadata/sdk'
@@ -323,8 +304,8 @@ const schema = await fetchSchema('ipfs://Qm...', {
 
 | Method | Description |
 |---|---|
-| `getSchema({ name })` | Read the `schema` and `class` text records and fetch the referenced Schema. Returns `{ records, schema }` |
-| `getMetadata({ name, schema?, keys? })` | Read text records. With `schema` reads its declared keys; with `keys` reads exactly those; with neither auto-discovers the Schema first |
+| `getSchema({ name })` | Read the `schema` and `class` text records and fetch the referenced Schema. Returns `{ name, properties, schema }` |
+| `getMetadata({ name, schema?, keys? })` | Read text records. With `schema` reads its declared keys; with `keys` reads exactly those; with neither auto-discovers the Schema first. Returns `{ name, properties, schema }` |
 
 ### `metadataWriter({ publicClient })(walletClient)`
 
@@ -335,7 +316,7 @@ const schema = await fetchSchema('ipfs://Qm...', {
 | `setPreparedMetadata(prepared)` | Broadcast a `PreparedMetadata` produced by `prepareSetMetadata` |
 | `estimateSetMetadata({ name, desired, account, ... })` | `prepareSetMetadata` plus gas, fee, and balance |
 
-Any of `resolver`, `schema`, and `existing` can be injected on the option-taking methods to skip the matching on-chain lookup — see [Injecting values to skip redundant lookups](#injecting-values-to-skip-redundant-lookups).
+Any of `resolver`, `schema`, and `existing` can be injected on the option-taking methods to skip the matching on-chain lookup. See [Reusing data across calls](#reusing-data-across-calls).
 
 ### `metadataEstimator({ publicClient })`
 
@@ -349,7 +330,7 @@ Same `prepareSetMetadata` / `estimateSetMetadata` methods without requiring a wa
 | `fetchSchemaFromIpfs(uri, opts)` / `fetchSchemaFromHttps(uri, opts)` | Protocol-specific fetchers |
 | `fetchSchemaFromLocal(uri, resolver)` | Resolve a URI via a caller-provided resolver only |
 | `getSchemaKeys(schema)` | Return the property keys declared by a Schema, in order |
-| `validateMetadataSchema(data, schema)` | Validate data against a schema |
-| `validate(schema, data)` | Boolean wrapper around `validateMetadataSchema` |
+| `validateMetadata(data, schema)` | Validate data against a schema |
+| `validate(schema, data)` | Boolean wrapper around `validateMetadata` |
 | `computeDelta(original, desired)` | Compute `{ changes, deleted }` between two states |
 | `hasChanges(original, desired)` | Boolean check for differences |

@@ -14,7 +14,7 @@ export {
 } from './schema'
 
 // --- Validation + delta ---
-export { validateMetadataSchema, validate } from './schema'
+export { validateMetadata, validate } from './schema'
 export { computeDelta, hasChanges } from './delta'
 
 // --- Attestation primitives (sign / verify-claim, encoding, record keys) ---

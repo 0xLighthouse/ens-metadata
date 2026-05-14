@@ -2,4 +2,4 @@
 // re-export shim so any lingering deep imports don't break. Safe to delete
 // once you've confirmed no external callers import from
 // '@ensmetadata/sdk/validate' or '@ensmetadata/sdk/src/validate'.
-export { validate, validateMetadataSchema } from './schema'
+export { validate, validateMetadata } from './schema'

@@ -90,24 +90,19 @@ describe('viewCommand.run', () => {
   it('happy path: reads schema, fetches it, validates payload', async () => {
     const schemaUri = 'ipfs://QmSchema'
     getSchemaMock.mockResolvedValue({
-      schema: schemaUri,
-      class: 'Sample',
-      version: '1.0.0',
-      cid: null,
+      name: 'myagent.eth',
+      properties: { schema: schemaUri, class: 'Sample' },
+      schema: null,
     })
     fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: '0xAddr',
-      class: 'Sample',
-      schema: schemaUri,
       properties: {
         class: 'Sample',
         schema: schemaUri,
         description: 'hello',
-        avatar: null,
       },
+      schema: sampleSchema,
     })
 
     const out = await baseRun()
@@ -136,24 +131,18 @@ describe('viewCommand.run', () => {
   it('reports required-missing errors and omits the missing key from properties', async () => {
     const schemaUri = 'ipfs://QmSchema'
     getSchemaMock.mockResolvedValue({
-      schema: schemaUri,
-      class: 'Sample',
-      version: '1.0.0',
-      cid: null,
+      name: 'myagent.eth',
+      properties: { schema: schemaUri, class: 'Sample' },
+      schema: null,
     })
     fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: null,
-      class: 'Sample',
-      schema: schemaUri,
       properties: {
         class: 'Sample',
         schema: schemaUri,
-        description: null,
-        avatar: null,
       },
+      schema: sampleSchema,
     })
 
     const out = await baseRun()
@@ -176,26 +165,16 @@ describe('viewCommand.run', () => {
 
   it('returns matchedSchema=null and reads DEFAULT_KEYS when no schema URI is set', async () => {
     getSchemaMock.mockResolvedValue({
+      name: 'myagent.eth',
+      properties: {},
       schema: null,
-      class: null,
-      version: null,
-      cid: null,
     })
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: null,
-      class: null,
-      schema: null,
       properties: {
-        schema: null,
-        class: null,
-        schemaVersion: null,
-        schemaCid: null,
         description: 'default-keys read',
-        avatar: null,
-        url: null,
       },
+      schema: null,
     })
 
     const out = await baseRun()
@@ -210,27 +189,18 @@ describe('viewCommand.run', () => {
   it('degrades gracefully when schema fetch fails', async () => {
     const schemaUri = 'ipfs://QmBroken'
     getSchemaMock.mockResolvedValue({
-      schema: schemaUri,
-      class: null,
-      version: null,
-      cid: null,
+      name: 'myagent.eth',
+      properties: { schema: schemaUri },
+      schema: null,
     })
     fetchSchemaMock.mockRejectedValue(new Error('gateway down'))
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: null,
-      class: null,
-      schema: schemaUri,
       properties: {
         schema: schemaUri,
-        class: null,
-        schemaVersion: null,
-        schemaCid: null,
         description: 'still readable',
-        avatar: null,
-        url: null,
       },
+      schema: null,
     })
 
     const out = await baseRun()
@@ -251,24 +221,20 @@ describe('viewCommand.run', () => {
   it('drops pattern-matched keys from output (we never request them)', async () => {
     const schemaUri = 'ipfs://QmPattern'
     getSchemaMock.mockResolvedValue({
-      schema: schemaUri,
-      class: null,
-      version: null,
-      cid: null,
+      name: 'myagent.eth',
+      properties: { schema: schemaUri },
+      schema: null,
     })
     fetchSchemaMock.mockResolvedValue(patternSchema)
     // Schema-driven getMetadata only asks for static `properties` keys, so
     // pattern-matched keys aren't even returned by the mocked reader.
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: null,
-      class: 'Pattern',
-      schema: schemaUri,
       properties: {
         class: 'Pattern',
         schema: schemaUri,
       },
+      schema: patternSchema,
     })
 
     const out = await baseRun()
@@ -280,63 +246,25 @@ describe('viewCommand.run', () => {
     }
   })
 
-  it('throws when the name has no resolver set', async () => {
-    getSchemaMock.mockResolvedValue({
-      schema: null,
-      class: null,
-      version: null,
-      cid: null,
-    })
-    getMetadataMock.mockResolvedValue({
-      name: 'unset.eth',
-      resolver: null,
-      address: null,
-      class: null,
-      schema: null,
-      properties: {
-        schema: null,
-        class: null,
-        schemaVersion: null,
-        schemaCid: null,
-        description: null,
-        avatar: null,
-        url: null,
-      },
-    })
-
-    await expect(
-      viewCommand.run({
-        args: { name: 'unset.eth' },
-        options: {},
-        env: {},
-      }),
-    ).rejects.toThrow(/No resolver set for unset\.eth/)
-  })
-
   it('routes *.base.eth through the SDK with a basePublicClient', async () => {
     const schemaUri = 'ipfs://QmBaseSchema'
     getSchemaMock.mockResolvedValue({
-      schema: schemaUri,
-      class: 'Sample',
-      version: '1.0.0',
-      cid: null,
+      name: 'alice.base.eth',
+      properties: { schema: schemaUri, class: 'Sample' },
+      schema: null,
     })
     fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'alice.base.eth',
-      resolver: '0xL2Resolver',
-      address: '0xAddr',
-      class: 'Sample',
-      schema: schemaUri,
       properties: {
         class: 'Sample',
         schema: schemaUri,
         description: 'hello from base',
-        avatar: null,
       },
+      schema: sampleSchema,
     })
 
-    const out = await viewCommand.run({
+    await viewCommand.run({
       args: { name: 'alice.base.eth' },
       options: {},
       env: {},
@@ -345,23 +273,18 @@ describe('viewCommand.run', () => {
     expect(metadataReaderConfigMock).toHaveBeenCalledTimes(1)
     const cfg = metadataReaderConfigMock.mock.calls[0][0] as { basePublicClient?: unknown }
     expect(cfg.basePublicClient).toBeDefined()
-    expect(out.resolver).toBe('0xL2Resolver')
   })
 
   it('does not pass basePublicClient for mainnet names', async () => {
     getSchemaMock.mockResolvedValue({
+      name: 'myagent.eth',
+      properties: {},
       schema: null,
-      class: null,
-      version: null,
-      cid: null,
     })
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      resolver: '0xResolver',
-      address: null,
-      class: null,
-      schema: null,
       properties: { description: 'mainnet only' },
+      schema: null,
     })
 
     await viewCommand.run({ args: { name: 'myagent.eth' }, options: {}, env: {} })

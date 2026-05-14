@@ -176,7 +176,7 @@ export function getSchemaKeys(schema: Schema): { keys: string[] } {
  * union: on success the `data` is the validated record, on failure a list of
  * per-key errors.
  */
-export function validateMetadataSchema(data: unknown, schema: Schema): MetadataValidationResult {
+export function validateMetadata(data: unknown, schema: Schema): MetadataValidationResult {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return { success: false, errors: [{ key: '(root)', message: 'Expected an object' }] }
   }
@@ -202,10 +202,10 @@ export function validateMetadataSchema(data: unknown, schema: Schema): MetadataV
 }
 
 /**
- * Boolean wrapper around `validateMetadataSchema` for callers that only need
+ * Boolean wrapper around `validateMetadata` for callers that only need
  * to know whether the data conforms.
  */
 export function validate(schema: Schema, data: unknown): boolean {
-  return validateMetadataSchema(data, schema).success
+  return validateMetadata(data, schema).success
 }
 

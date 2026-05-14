@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
-import { validateMetadataSchema } from '@ensmetadata/sdk'
+import { validateMetadata } from '@ensmetadata/sdk'
 import { z } from 'zod'
 
 export const validateCommand = {
@@ -11,7 +11,7 @@ export const validateCommand = {
   options: z.object({}),
   run(c: { args: { file: string } }) {
     const raw: unknown = JSON.parse(readFileSync(c.args.file, 'utf8'))
-    const result = validateMetadataSchema(raw, SCHEMA_MAP.Agent)
+    const result = validateMetadata(raw, SCHEMA_MAP.Agent)
     if (result.success) {
       return {
         valid: true,

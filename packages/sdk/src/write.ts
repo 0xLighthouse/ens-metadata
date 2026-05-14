@@ -1,7 +1,7 @@
 import { zeroAddress, type PublicClient, type WalletClient } from 'viem'
 import { normalize } from 'viem/ens'
-import { getMetadataRecords, getSchemaRecords } from './read'
-import { validateMetadataSchema } from './schema'
+import { getMetadata, getSchema } from './read'
+import { validateMetadata } from './schema'
 import type {
   ChangePreview,
   EstimateResult,
@@ -70,7 +70,7 @@ export function applyDelta(existing: RecordSet, changes: RecordSet): RecordSet {
 
 async function broadcast(
   walletClient: WalletClient,
-  args: { name: string; records: RecordSet; resolverAddress: `0x${string}` },
+  args: { name: string; records: RecordSet; resolver: `0x${string}` },
 ): Promise<SetMetadataResult> {
   const texts = Object.entries(args.records).map(([key, value]) => ({ key, value }))
   if (texts.length === 0) throw new Error('No records to write')
@@ -81,7 +81,7 @@ async function broadcast(
     name: args.name,
     texts,
     coins: [],
-    resolverAddress: args.resolverAddress,
+    resolverAddress: args.resolver,
     account: walletClient.account!,
   })
   return { txHash, texts }
@@ -143,17 +143,17 @@ async function prepareSetMetadata(
   if (resolver === zeroAddress) throw new Error(`No resolver found for ${name}`)
 
   const schema =
-    opts.schema ?? (await getSchemaRecords(publicClient, { name })).schema
+    opts.schema ?? (await getSchema(publicClient, { name })).schema
   if (!schema) throw new Error(`No schema found for ${name}`)
 
   const existing: RecordSet =
-    opts.existing ?? (await getMetadataRecords(publicClient, { name, schema })).properties
+    opts.existing ?? (await getMetadata(publicClient, { name, schema })).properties
 
   const changes = computeDelta(opts.desired, existing, {
     ignoreMissing: opts.ignoreMissing ?? false,
   })
   const projected = applyDelta(existing, changes)
-  const validation = validateMetadataSchema(projected, schema)
+  const validation = validateMetadata(projected, schema)
 
   const changePreview: ChangePreview = {
     name,
@@ -176,7 +176,7 @@ async function setPreparedMetadata(
   return broadcast(walletClient, {
     name: prepared.name,
     records: prepared.changePreview.changes,
-    resolverAddress: prepared.resolver,
+    resolver: prepared.resolver,
   })
 }
 

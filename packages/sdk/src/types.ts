@@ -38,16 +38,13 @@ export interface GetMetadataOptions {
 
 export interface GetMetadataResult {
   name: string
-  class: string | null
-  schema: string | null
   properties: RecordSet
+  schema: Schema | null
 }
 
 export interface GetSchemaResult {
-  records: {
-    schema: string | null
-    class: string | null
-  }
+  name: string
+  properties: RecordSet
   schema: Schema | null
 }
 

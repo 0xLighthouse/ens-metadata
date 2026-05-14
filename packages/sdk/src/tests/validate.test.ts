@@ -1,6 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import { describe, expect, it } from 'vitest'
-import { validate, validateMetadataSchema } from '../schema'
+import { validate, validateMetadata } from '../schema'
 
 const testSchema: Schema = {
   $id: 'test',
@@ -20,9 +20,9 @@ const testSchema: Schema = {
   },
 }
 
-describe('validateMetadataSchema', () => {
+describe('validateMetadata', () => {
   it('returns success for valid data', () => {
-    const result = validateMetadataSchema(
+    const result = validateMetadata(
       { schema: 'ipfs://Qm...', class: 'Test', description: 'hello' },
       testSchema,
     )
@@ -33,7 +33,7 @@ describe('validateMetadataSchema', () => {
   })
 
   it('returns success with pattern properties', () => {
-    const result = validateMetadataSchema(
+    const result = validateMetadata(
       { schema: 'ipfs://Qm...', class: 'Test', 'x-custom': 'value' },
       testSchema,
     )
@@ -41,7 +41,7 @@ describe('validateMetadataSchema', () => {
   })
 
   it('fails on missing required fields', () => {
-    const result = validateMetadataSchema({ description: 'no schema or class' }, testSchema)
+    const result = validateMetadata({ description: 'no schema or class' }, testSchema)
     expect(result.success).toBe(false)
     if (!result.success) {
       const keys = result.errors.map((e) => e.key)
@@ -51,7 +51,7 @@ describe('validateMetadataSchema', () => {
   })
 
   it('fails on unknown fields', () => {
-    const result = validateMetadataSchema(
+    const result = validateMetadata(
       { schema: 'ipfs://Qm...', class: 'Test', bogus: 'field' },
       testSchema,
     )
@@ -62,14 +62,14 @@ describe('validateMetadataSchema', () => {
   })
 
   it('fails on non-object input', () => {
-    expect(validateMetadataSchema(null, testSchema).success).toBe(false)
-    expect(validateMetadataSchema('string', testSchema).success).toBe(false)
-    expect(validateMetadataSchema([], testSchema).success).toBe(false)
-    expect(validateMetadataSchema(42, testSchema).success).toBe(false)
+    expect(validateMetadata(null, testSchema).success).toBe(false)
+    expect(validateMetadata('string', testSchema).success).toBe(false)
+    expect(validateMetadata([], testSchema).success).toBe(false)
+    expect(validateMetadata(42, testSchema).success).toBe(false)
   })
 
   it('fails on empty required fields', () => {
-    const result = validateMetadataSchema({ schema: '', class: '' }, testSchema)
+    const result = validateMetadata({ schema: '', class: '' }, testSchema)
     expect(result.success).toBe(false)
   })
 })

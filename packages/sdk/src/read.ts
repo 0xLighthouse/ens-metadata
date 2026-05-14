@@ -79,47 +79,43 @@ export async function readTextRecords(opts: {
  *
  * The single read is strict: any RPC error or per-key timeout throws.
  */
-export async function getMetadataRecords(
+export async function getMetadata(
   client: PublicClient,
   opts: GetMetadataOptions,
 ): Promise<GetMetadataResult> {
   let schema: Schema | null = opts.schema ?? null
-  const preFetched: Record<string, string | null> = {}
+  const properties: RecordSet = {}
+  const alreadyRead = new Set<string>()
 
   if (!opts.schema && !opts.keys) {
-    const schemaResult = await getSchemaRecords(client, opts)
+    const schemaResult = await getSchema(client, opts)
     schema = schemaResult.schema
-    preFetched.schema = schemaResult.records.schema
-    preFetched.class = schemaResult.records.class
+    Object.assign(properties, schemaResult.properties)
+    for (const k of SCHEMA_KEYS) alreadyRead.add(k)
   }
 
   const keys = new Set<string>()
   if (schema) {
     for (const k of getSchemaKeys(schema).keys) keys.add(k)
-    if (!preFetched.schema) keys.add('schema')
+    keys.add('schema')
   }
   if (opts.keys) {
     for (const k of opts.keys) keys.add(k)
   }
-  for (const k of Object.keys(preFetched)) keys.delete(k)
+  for (const k of alreadyRead) keys.delete(k)
 
   const texts =
     keys.size > 0 ? await readTextRecords({ ...opts, client, keys: [...keys] }) : {}
 
   // State RecordSet convention: only keys with values on-chain appear.
-  const properties: RecordSet = {}
-  for (const [k, v] of Object.entries(preFetched)) {
-    if (v !== null) properties[k] = v
-  }
   for (const [k, v] of Object.entries(texts)) {
     if (v !== null) properties[k] = v
   }
 
   return {
     name: normalize(opts.name),
-    schema: properties.schema ?? null,
-    class: properties.class ?? null,
     properties,
+    schema,
   }
 }
 
@@ -128,13 +124,13 @@ export async function getMetadataRecords(
  * fetches the referenced Schema.
  *
  * Returns:
- *  - `records.schema` — raw `schema` text record (URI or null)
- *  - `records.class`  — raw `class` text record, with one fallback: if the
- *                        record is unset but the resolved Schema declares
- *                        `properties.class.default`, that default is used
- *  - `schema`         — the resolved Schema object, or null when no URI is set
+ *  - `properties.schema` — raw `schema` text record (URI), present only when set
+ *  - `properties.class`  — raw `class` text record, with one fallback: if the
+ *                          record is unset but the resolved Schema declares
+ *                          `properties.class.default`, that default is used
+ *  - `schema`            — the resolved Schema object, or null when no URI is set
  */
-export async function getSchemaRecords(
+export async function getSchema(
   client: PublicClient,
   opts: GetSchemaOptions,
 ): Promise<GetSchemaResult> {
@@ -151,8 +147,13 @@ export async function getSchemaRecords(
     }
   }
 
+  const properties: RecordSet = {}
+  if (schemaUri) properties.schema = schemaUri
+  if (classValue) properties.class = classValue
+
   return {
-    records: { schema: schemaUri, class: classValue },
+    name: normalize(opts.name),
+    properties,
     schema: resolvedSchema,
   }
 }
@@ -163,7 +164,7 @@ export async function getSchemaRecords(
  */
 export function metadataReader() {
   return (client: PublicClient) => ({
-    getSchema: (opts: GetSchemaOptions) => getSchemaRecords(client, opts),
-    getMetadata: (opts: GetMetadataOptions) => getMetadataRecords(client, opts),
+    getSchema: (opts: GetSchemaOptions) => getSchema(client, opts),
+    getMetadata: (opts: GetMetadataOptions) => getMetadata(client, opts),
   })
 }

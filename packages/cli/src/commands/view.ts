@@ -1,5 +1,5 @@
 import type { Schema } from '@ensmetadata/schemas/types'
-import { fetchSchema, metadataReader, validateMetadataSchema } from '@ensmetadata/sdk'
+import { fetchSchema, metadataReader, validateMetadata } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import {
@@ -50,7 +50,7 @@ function buildMatchedSchema(
   if (fetchError) return { uri, valid: false, error: fetchError }
   if (!schema) return { uri, valid: false, error: 'schema not loaded' }
 
-  const result = validateMetadataSchema(payload, schema)
+  const result = validateMetadata(payload, schema)
   if (result.success) {
     return { title: schema.title, version: schema.version, uri, valid: true }
   }
@@ -82,12 +82,13 @@ export const viewCommand = {
     const reader = client.extend(metadataReader(basePublicClient ? { basePublicClient } : {}))
 
     const schemaInfo = await reader.getSchema({ name: ensName })
+    const schemaUri = schemaInfo.properties.schema ?? null
 
     let schema: Schema | null = null
     let schemaError: string | null = null
-    if (schemaInfo.schema) {
+    if (schemaUri) {
       try {
-        schema = await fetchSchema(schemaInfo.schema, {
+        schema = await fetchSchema(schemaUri, {
           resolver: bundledSchemaResolver,
           ...(ipfsGateway ? { gateway: ipfsGateway } : {}),
         })
@@ -101,23 +102,13 @@ export const viewCommand = {
       ...(schema ? { schema } : {}),
     })
 
-    if (metadata.resolver === null) {
-      throw new Error(`No resolver set for ${ensName}`)
-    }
-
-    const payload: Record<string, string> = {}
-    for (const [k, v] of Object.entries(metadata.properties)) {
-      if (typeof v === 'string' && v.length > 0) payload[k] = v
-    }
-
-    const matchedSchema = buildMatchedSchema(schemaInfo.schema, schema, schemaError, payload)
+    const payload: Record<string, string> = { ...metadata.properties }
+    const matchedSchema = buildMatchedSchema(schemaUri, schema, schemaError, payload)
 
     return {
       name: metadata.name,
-      resolver: metadata.resolver,
-      address: metadata.address ?? null,
-      class: metadata.class ?? null,
-      schema: metadata.schema ?? null,
+      class: metadata.properties.class ?? null,
+      schema: metadata.properties.schema ?? null,
       matchedSchema,
       properties: payload,
     }
