@@ -1,44 +1,6 @@
-// --- Core (single-chain) ---
+// --- Core ---
 export { metadataReader } from './read'
 export { metadataWriter, metadataEstimator } from './write'
-
-// --- Routing primitives ---
-export {
-  chainForName,
-  MissingChainClientError,
-  type SupportedChain,
-  type ChainClients,
-  type ChainWalletClients,
-} from './multichain/routing'
-
-// --- Multichain wrappers ---
-export {
-  multichainMetadataReader,
-  multichainMetadataWriter,
-  multichainMetadataEstimator,
-  multichainAttestationVerifier,
-  verifyHandleAttestation,
-  verifyUidAttestation,
-  handleAttestationRecordKey,
-  uidAttestationRecordKey,
-  DEFAULT_ATTESTER_ENS,
-  type MultichainAttestationVerifierConfig,
-  type AttestationVerifierConfig,
-} from './multichain'
-
-// --- Chain helpers (Base) ---
-export {
-  isBasename,
-  getBaseResolverAddress,
-  getBaseRegistryOwner,
-  getOrCreateBasePublicClient,
-  BaseResolverError,
-  BASE_CHAIN_ID,
-  BASE_REGISTRY,
-} from './chains/base'
-
-// --- Low-level chain-agnostic primitives ---
-export { fetchTextRecordsDirect } from './multichain'
 
 // --- Schema fetch / resolve ---
 export {
@@ -55,7 +17,7 @@ export {
 export { validateMetadataSchema, validate } from './schema'
 export { computeDelta, hasChanges } from './delta'
 
-// --- Attestation primitives (sign / verify-claim, encoding) ---
+// --- Attestation primitives (sign / verify-claim, encoding, record keys) ---
 export {
   encodeHandlePayload,
   encodeUidPayload,
@@ -65,8 +27,11 @@ export {
   signUidClaim,
   verifyHandleClaim,
   verifyUidClaim,
+  handleAttestationRecordKey,
+  uidAttestationRecordKey,
   CLAIM_VERSION,
   ENVELOPE_TAG,
+  DEFAULT_ATTESTER_ENS,
 } from './attestation'
 
 // --- Public types ---
@@ -79,13 +44,10 @@ export type {
   MetadataDelta,
   ComputeDeltaOptions,
   SetMetadataOptions,
-  ModifyExistingMetadataOptions,
-  ApplyDeltaOptions,
   SetMetadataResult,
-  PrepareSetMetadataOptions,
-  ChangePreview as PrepareResult,
+  ChangePreview,
+  PreparedMetadata,
   EstimateSetMetadataOptions,
-  EstimateModifyExistingMetadataOptions,
   EstimateResult,
 } from './types'
 
@@ -99,7 +61,4 @@ export type {
   VerifyUidClaimOptions,
   VerifyClaimResult,
   VerifyFailureReason,
-  VerifyHandleAttestationOptions,
-  VerifyUidAttestationOptions,
-  VerifyResult,
 } from './attestation-types'

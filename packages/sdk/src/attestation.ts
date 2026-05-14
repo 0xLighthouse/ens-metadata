@@ -2,6 +2,7 @@ import { encode as dagCborEncode } from '@ipld/dag-cbor'
 import { Tagged, decode as cborgDecode, encode as cborgEncode } from 'cborg'
 import type { Address, Hex } from 'viem'
 import { bytesToHex, hexToBytes, isAddress, keccak256, recoverMessageAddress } from 'viem'
+import { normalize } from 'viem/ens'
 import type {
   Envelope,
   HandlePayloadFields,
@@ -16,6 +17,31 @@ import type {
 
 /** Current claim schema version. */
 export const CLAIM_VERSION = 2
+
+/**
+ * Default attester ENS name. Callers who haven't set their own trusted
+ * attester get this one. The address it resolves to is the signing key
+ * expected during verification; rotating this name's addr record retires
+ * the old signing key and invalidates every signature under it.
+ */
+export const DEFAULT_ATTESTER_ENS = 'atst.lighthousegov.eth'
+
+/**
+ * Build the parameterized text-record key for a handle attestation:
+ * `attestations[<platform>][<attester-ens>]`. The attester name is
+ * normalized via ENSIP-15 so writer and reader produce the same key.
+ */
+export function handleAttestationRecordKey(platform: string, attesterEns: string): string {
+  return `attestations[${platform}][${normalize(attesterEns)}]`
+}
+
+/**
+ * Build the parameterized text-record key for a uid attestation:
+ * `uid[<platform>][<attester-ens>]`.
+ */
+export function uidAttestationRecordKey(platform: string, attesterEns: string): string {
+  return `uid[${platform}][${normalize(attesterEns)}]`
+}
 
 /**
  * CBOR tag for envelopes: "atst" as big-endian uint32.

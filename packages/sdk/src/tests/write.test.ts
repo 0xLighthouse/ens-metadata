@@ -1,0 +1,541 @@
+import type { Schema } from '@ensmetadata/schemas/types'
+import type { PublicClient, WalletClient } from 'viem'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { setRecordsMock } = vi.hoisted(() => {
+  const mock = vi.fn() as ReturnType<typeof vi.fn> & {
+    makeFunctionData: ReturnType<typeof vi.fn>
+  }
+  mock.makeFunctionData = vi.fn(
+    (_wallet: unknown, args: { resolverAddress: `0x${string}` }) => ({
+      to: args.resolverAddress,
+      data: '0xfakedata' as `0x${string}`,
+    }),
+  )
+  return { setRecordsMock: mock }
+})
+
+vi.mock('@ensdomains/ensjs/wallet', () => ({
+  setRecords: setRecordsMock,
+}))
+
+import { applyDelta, computeDelta, metadataEstimator, metadataWriter } from '../write'
+
+const RESOLVER = '0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR' as `0x${string}`
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`
+const ACCOUNT = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' as `0x${string}`
+const TX_HASH =
+  '0xfeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeeffeedbeef' as `0x${string}`
+
+const baseSchema: Schema = {
+  $id: 'test',
+  source: 'test',
+  title: 'Test',
+  version: '1.0',
+  description: 'test schema',
+  type: 'object',
+  required: ['class'],
+  properties: {
+    class: { type: 'string', description: 'class' },
+    description: { type: 'string', description: 'desc' },
+    avatar: { type: 'string', description: 'avatar' },
+  },
+}
+
+function makePublicClient(overrides: Record<string, unknown> = {}): PublicClient {
+  return {
+    getEnsResolver: vi.fn(async () => RESOLVER),
+    getEnsText: vi.fn(async () => null),
+    estimateGas: vi.fn(async () => 50_000n),
+    estimateFeesPerGas: vi.fn(async () => ({ maxFeePerGas: 2_000_000_000n })),
+    getBalance: vi.fn(async () => 1_000_000_000_000_000_000n),
+    ...overrides,
+  } as unknown as PublicClient
+}
+
+function makeWallet(): WalletClient {
+  return {
+    account: { address: ACCOUNT },
+  } as unknown as WalletClient
+}
+
+beforeEach(() => {
+  setRecordsMock.mockReset()
+  setRecordsMock.mockResolvedValue(TX_HASH)
+  setRecordsMock.makeFunctionData.mockClear()
+})
+
+// --------------------------------------------------------------------------
+// Pure helpers
+// --------------------------------------------------------------------------
+
+describe('computeDelta', () => {
+  it('returns an empty changeset when desired matches existing', () => {
+    expect(computeDelta({ class: 'A' }, { class: 'A' })).toEqual({})
+  })
+
+  it('records a new key as a set', () => {
+    expect(computeDelta({ avatar: 'ipfs://x' }, {})).toEqual({ avatar: 'ipfs://x' })
+  })
+
+  it('records a changed value as a set', () => {
+    expect(computeDelta({ class: 'B' }, { class: 'A' })).toEqual({ class: 'B' })
+  })
+
+  it('only marks "" as a deletion when the key is currently set', () => {
+    expect(computeDelta({ description: '' }, { description: 'old' })).toEqual({
+      description: '',
+    })
+    // Key already absent on-chain — `""` is a no-op, not a deletion.
+    expect(computeDelta({ description: '' }, {})).toEqual({})
+  })
+
+  it('ignoreMissing=false (default) marks existing-but-unmentioned keys for deletion', () => {
+    expect(computeDelta({ class: 'A' }, { class: 'A', avatar: 'ipfs://x' })).toEqual({
+      avatar: '',
+    })
+  })
+
+  it('ignoreMissing=true leaves existing-but-unmentioned keys alone', () => {
+    expect(
+      computeDelta({ class: 'A' }, { class: 'A', avatar: 'ipfs://x' }, { ignoreMissing: true }),
+    ).toEqual({})
+  })
+})
+
+describe('applyDelta', () => {
+  it('overwrites with non-empty values', () => {
+    expect(applyDelta({ class: 'A' }, { class: 'B', avatar: 'x' })).toEqual({
+      class: 'B',
+      avatar: 'x',
+    })
+  })
+
+  it('removes keys whose change value is ""', () => {
+    expect(applyDelta({ class: 'A', avatar: 'x' }, { avatar: '' })).toEqual({ class: 'A' })
+  })
+
+  it('does not mutate the existing record set', () => {
+    const existing = { class: 'A' }
+    const result = applyDelta(existing, { avatar: 'x' })
+    expect(result).not.toBe(existing)
+    expect(existing).toEqual({ class: 'A' })
+  })
+
+  it('is a no-op for an empty changeset', () => {
+    expect(applyDelta({ class: 'A' }, {})).toEqual({ class: 'A' })
+  })
+})
+
+// --------------------------------------------------------------------------
+// prepareSetMetadata
+// --------------------------------------------------------------------------
+
+describe('prepareSetMetadata', () => {
+  it('throws when the resolved resolver is the zero address', async () => {
+    const client = makePublicClient({
+      getEnsResolver: vi.fn(async () => ZERO_ADDRESS),
+    })
+    const estimator = metadataEstimator({ publicClient: client })
+    await expect(
+      estimator.prepareSetMetadata({
+        name: 'alice.eth',
+        schema: baseSchema,
+        existing: {},
+        desired: { class: 'A' },
+      }),
+    ).rejects.toThrow(/No resolver found/)
+  })
+
+  it('throws when no schema is supplied and none can be resolved on-chain', async () => {
+    const client = makePublicClient({
+      // `schema` and `class` text records both unset.
+      getEnsText: vi.fn(async () => null),
+    })
+    const estimator = metadataEstimator({ publicClient: client })
+    await expect(
+      estimator.prepareSetMetadata({
+        name: 'alice.eth',
+        existing: {},
+        desired: { class: 'A' },
+      }),
+    ).rejects.toThrow(/No schema found/)
+  })
+
+  it('skips getEnsResolver when opts.resolver is supplied', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+    })
+    expect(client.getEnsResolver).not.toHaveBeenCalled()
+    expect(prepared.resolver).toBe(RESOLVER)
+  })
+
+  it('skips the existing-records read when opts.existing is supplied', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: { class: 'A' },
+      desired: { class: 'A', avatar: 'ipfs://x' },
+    })
+    expect(client.getEnsText).not.toHaveBeenCalled()
+  })
+
+  it('reads existing via the supplied schema (one getEnsText per declared key, plus `schema`)', async () => {
+    const reads: string[] = []
+    const client = makePublicClient({
+      getEnsText: vi.fn(async ({ key }: { key: string }) => {
+        reads.push(key)
+        return key === 'class' ? 'A' : null
+      }),
+    })
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      desired: { class: 'A', avatar: 'ipfs://x' },
+    })
+    expect([...reads].sort()).toEqual(['avatar', 'class', 'description', 'schema'])
+    expect(prepared.changePreview.existing).toEqual({ class: 'A' })
+    // class is unchanged, only avatar is a set.
+    expect(prepared.changePreview.changes).toEqual({ avatar: 'ipfs://x' })
+  })
+
+  it('produces changes that match computeDelta(desired, existing) with ignoreMissing=false', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: { class: 'A', avatar: 'ipfs://old' },
+      desired: { class: 'A' },
+    })
+    expect(prepared.changePreview.changes).toEqual({ avatar: '' })
+  })
+
+  it('ignoreMissing=true preserves on-chain keys absent from desired', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: { class: 'A', avatar: 'ipfs://old' },
+      desired: { class: 'A' },
+      ignoreMissing: true,
+    })
+    expect(prepared.changePreview.changes).toEqual({})
+  })
+
+  it('returns validation.success=false without throwing when projected state is invalid', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      // No `class` set anywhere → projected state violates `required: ['class']`.
+      desired: { description: 'no class set' },
+    })
+    expect(prepared.changePreview.validation?.success).toBe(false)
+  })
+
+  it('validates the projected (post-applyDelta) state, not desired alone', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      // `class` is already on-chain; `desired` only adds `avatar`.
+      // Desired alone would fail (missing `class`), but the projection is fine.
+      existing: { class: 'A' },
+      desired: { avatar: 'ipfs://x' },
+      ignoreMissing: true,
+    })
+    expect(prepared.changePreview.validation?.success).toBe(true)
+  })
+
+  it('normalizes the supplied name', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'Alice.ETH',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+    })
+    expect(prepared.name).toBe('alice.eth')
+    expect(prepared.changePreview.name).toBe('alice.eth')
+  })
+})
+
+// --------------------------------------------------------------------------
+// estimateSetMetadata
+// --------------------------------------------------------------------------
+
+describe('estimateSetMetadata', () => {
+  it('short-circuits to zero gas/fee/cost when the changeset is empty', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const est = await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: { class: 'A' },
+      desired: { class: 'A' },
+      account: ACCOUNT,
+    })
+    expect(est.gas).toBe(0n)
+    expect(est.maxFeePerGas).toBe(0n)
+    expect(est.costWei).toBe(0n)
+    expect(est.balance).toBe(1_000_000_000_000_000_000n)
+    expect(client.estimateGas).not.toHaveBeenCalled()
+    expect(client.estimateFeesPerGas).not.toHaveBeenCalled()
+    expect(client.getBalance).toHaveBeenCalledOnce()
+    expect(setRecordsMock.makeFunctionData).not.toHaveBeenCalled()
+  })
+
+  it('returns gas / maxFeePerGas / costWei / balance derived from the public client', async () => {
+    const client = makePublicClient({
+      estimateGas: vi.fn(async () => 100_000n),
+      estimateFeesPerGas: vi.fn(async () => ({ maxFeePerGas: 3_000_000_000n })),
+      getBalance: vi.fn(async () => 5n * 10n ** 18n),
+    })
+    const estimator = metadataEstimator({ publicClient: client })
+    const est = await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+      account: ACCOUNT,
+    })
+    expect(est.gas).toBe(100_000n)
+    expect(est.maxFeePerGas).toBe(3_000_000_000n)
+    expect(est.costWei).toBe(100_000n * 3_000_000_000n)
+    expect(est.balance).toBe(5n * 10n ** 18n)
+  })
+
+  it('treats a missing maxFeePerGas (e.g. legacy chains) as 0n', async () => {
+    const client = makePublicClient({
+      estimateFeesPerGas: vi.fn(async () => ({})),
+    })
+    const estimator = metadataEstimator({ publicClient: client })
+    const est = await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+      account: ACCOUNT,
+    })
+    expect(est.maxFeePerGas).toBe(0n)
+    expect(est.costWei).toBe(0n)
+  })
+
+  it('encodes calldata via setRecords.makeFunctionData against the resolved resolver', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A', avatar: 'ipfs://x' },
+      account: ACCOUNT,
+    })
+    expect(setRecordsMock.makeFunctionData).toHaveBeenCalledOnce()
+    const [, args] = setRecordsMock.makeFunctionData.mock.calls[0] as [
+      unknown,
+      {
+        name: string
+        resolverAddress: `0x${string}`
+        texts: { key: string; value: string }[]
+        coins: unknown[]
+      },
+    ]
+    expect(args.name).toBe('alice.eth')
+    expect(args.resolverAddress).toBe(RESOLVER)
+    expect(args.coins).toEqual([])
+    expect(args.texts).toEqual(
+      expect.arrayContaining([
+        { key: 'class', value: 'A' },
+        { key: 'avatar', value: 'ipfs://x' },
+      ]),
+    )
+  })
+
+  it('forwards `account` to estimateGas and getBalance', async () => {
+    const estimateGas = vi.fn(async (_args: { account: string; to: string }) => 80_000n)
+    const getBalance = vi.fn(async (_args: { address: string }) => 1n)
+    const client = makePublicClient({ estimateGas, getBalance })
+    const estimator = metadataEstimator({ publicClient: client })
+    await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+      account: ACCOUNT,
+    })
+    expect(estimateGas.mock.calls[0][0].account).toBe(ACCOUNT)
+    expect(estimateGas.mock.calls[0][0].to).toBe(RESOLVER)
+    expect(getBalance.mock.calls[0][0].address).toBe(ACCOUNT)
+  })
+
+  it('attaches the full PreparedMetadata under `prepared`', async () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const est = await estimator.estimateSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+      account: ACCOUNT,
+    })
+    expect(est.prepared.name).toBe('alice.eth')
+    expect(est.prepared.resolver).toBe(RESOLVER)
+    expect(est.prepared.schema).toBe(baseSchema)
+    expect(est.prepared.changePreview.changes).toEqual({ class: 'A' })
+  })
+})
+
+// --------------------------------------------------------------------------
+// setPreparedMetadata
+// --------------------------------------------------------------------------
+
+describe('setPreparedMetadata', () => {
+  it('throws when the prepared changeset is empty (no records to write)', async () => {
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: { class: 'A' },
+      desired: { class: 'A' },
+    })
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    await expect(writer.setPreparedMetadata(prepared)).rejects.toThrow(/No records to write/)
+    expect(setRecordsMock).not.toHaveBeenCalled()
+  })
+
+  it('calls setRecords with the normalized name, texts, resolverAddress, account, and coins=[]', async () => {
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'Alice.ETH',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A', avatar: 'ipfs://x' },
+    })
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    const result = await writer.setPreparedMetadata(prepared)
+
+    expect(setRecordsMock).toHaveBeenCalledOnce()
+    const [walletArg, args] = setRecordsMock.mock.calls[0] as [
+      unknown,
+      {
+        name: string
+        texts: { key: string; value: string }[]
+        coins: unknown[]
+        resolverAddress: `0x${string}`
+        account: { address: `0x${string}` }
+      },
+    ]
+    expect(walletArg).toBe(wallet)
+    expect(args.name).toBe('alice.eth')
+    expect(args.resolverAddress).toBe(RESOLVER)
+    expect(args.coins).toEqual([])
+    expect(args.account).toEqual({ address: ACCOUNT })
+    expect(args.texts).toEqual(
+      expect.arrayContaining([
+        { key: 'class', value: 'A' },
+        { key: 'avatar', value: 'ipfs://x' },
+      ]),
+    )
+
+    expect(result.txHash).toBe(TX_HASH)
+    expect(result.texts).toEqual(args.texts)
+  })
+})
+
+// --------------------------------------------------------------------------
+// setMetadata (prepare + broadcast in one call)
+// --------------------------------------------------------------------------
+
+describe('setMetadata', () => {
+  it('wires prepareSetMetadata → setPreparedMetadata in a single call', async () => {
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    const result = await writer.setMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+    })
+    expect(setRecordsMock).toHaveBeenCalledOnce()
+    expect(result.txHash).toBe(TX_HASH)
+  })
+
+  it('propagates the prepare-stage "No resolver found" error without calling setRecords', async () => {
+    const client = makePublicClient({
+      getEnsResolver: vi.fn(async () => ZERO_ADDRESS),
+    })
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    await expect(
+      writer.setMetadata({
+        name: 'alice.eth',
+        schema: baseSchema,
+        existing: {},
+        desired: { class: 'A' },
+      }),
+    ).rejects.toThrow(/No resolver found/)
+    expect(setRecordsMock).not.toHaveBeenCalled()
+  })
+})
+
+// --------------------------------------------------------------------------
+// Factory shapes
+// --------------------------------------------------------------------------
+
+describe('factory shapes', () => {
+  it('metadataWriter exposes prepareSetMetadata, setPreparedMetadata, estimateSetMetadata, setMetadata', () => {
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    expect(typeof writer.prepareSetMetadata).toBe('function')
+    expect(typeof writer.setPreparedMetadata).toBe('function')
+    expect(typeof writer.estimateSetMetadata).toBe('function')
+    expect(typeof writer.setMetadata).toBe('function')
+  })
+
+  it('metadataEstimator exposes prepareSetMetadata and estimateSetMetadata only', () => {
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    expect(typeof estimator.prepareSetMetadata).toBe('function')
+    expect(typeof estimator.estimateSetMetadata).toBe('function')
+    expect('setMetadata' in estimator).toBe(false)
+    expect('setPreparedMetadata' in estimator).toBe(false)
+  })
+})

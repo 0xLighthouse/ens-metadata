@@ -32,7 +32,7 @@ const client = publicClient.extend(metadataReader())
 await client.getMetadata({ name: 'mynode.eth' })
 ```
 
-For apps that want a single object that dispatches across chains (e.g. mainnet + Base for Basenames), use the multichain wrapper instead — see the [Multichain](#multichain-mainnet--base) section below.
+The SDK is single-chain: each factory is bound to one viem client, and the caller is responsible for pairing the right client with the name being read or written.
 
 ### Reading existing records
 
@@ -111,23 +111,19 @@ const reader = metadataReader()(publicClient)
 const { schema } = await reader.getSchema({ name: 'mynode.eth' })
 if (!schema) throw new Error('No schema declared on this name')
 
-// 2. Retrieve only the records named in the schema. Passing `schema` here
-//    narrows the read to the keys the schema knows about.
+// 2. Retrieve the records named in the schema.
 const metadata = await reader.getMetadata({
   name: 'mynode.eth',
   schema,
 })
 
-// 3. Build the desired state by copying and editing.
-const desired = { ...metadata.properties, description: 'Updated description' }
+// 3. Change the data you want to edit
+metadata.properties.description = 'Updated description'
 
-// 4. Publish the changes. Re-use the `schema` and `existing` we already
-//    read so the writer doesn't fetch them again.
+// 4. Publish the changes.
 await writer.setMetadata({
   name: 'mynode.eth',
-  desired,
-  schema,
-  existing: metadata.properties,
+  desired: metadata.properties
 })
 ```
 
@@ -247,69 +243,6 @@ await writer.setMetadata({
 
 This matters most when you've already called `getSchema` or `getMetadata` in the same flow: the values are already in hand, so passing them avoids hitting the same RPCs twice.
 
-### Multichain (mainnet + Base)
-
-Most apps that handle both `*.eth` and `*.base.eth` names should use the multichain wrappers. They take a typed map of viem clients and dispatch each call to the right chain based on the input name.
-
-```ts
-import { createPublicClient, http } from 'viem'
-import { base, mainnet } from 'viem/chains'
-import {
-  multichainAttestationVerifier,
-  multichainMetadataReader,
-  multichainMetadataWriter,
-} from '@ensmetadata/sdk'
-
-const publicClients = {
-  mainnet: createPublicClient({ chain: mainnet, transport: http() }),
-  base: createPublicClient({ chain: base, transport: http() }),
-}
-
-// Reads — alice.eth lands on mainnet; alice.base.eth lands on Base.
-const reader = multichainMetadataReader(publicClients)
-await reader.getMetadata({ name: 'alice.base.eth' })
-
-// Writes — pass per-chain wallet clients alongside the public clients. The
-// wrapper enforces that the Base wallet is on chain 8453 before signing.
-const writer = multichainMetadataWriter({
-  publicClients,
-  walletClients: { mainnet: mainnetWallet, base: baseWallet },
-})
-await writer.setMetadata({ name: 'alice.base.eth', desired: { description: 'On Base' } })
-
-// Attestation verification — subject reads dispatch to the right chain;
-// the attester ENS is always resolved on mainnet.
-const verifier = multichainAttestationVerifier({ publicClients })
-await verifier.verifyHandleAttestation({ name: 'alice.base.eth', platform: 'com.x' })
-```
-
-When a name routes to a chain whose client isn't in the map, the wrapper throws `MissingChainClientError`. When a write routes to Base but the wallet isn't on chain 8453, the wrapper throws an `Error` whose message includes `must be connected to Base`; drive `wallet_switchEthereumChain` from your UI before retrying.
-
-The 2LD `base.eth` itself is treated as a mainnet name (it's owned on L1 by Coinbase). Custom attester ENS names ending in `.base.eth` are not yet supported — the default attester is a mainnet ENS.
-
-#### Single-chain alternative
-
-If you'd rather pair a single core factory with the right client yourself, that works too:
-
-```ts
-import { metadataReader } from '@ensmetadata/sdk'
-
-const reader = metadataReader()(basePublicClient)
-await reader.getMetadata({ name: 'alice.base.eth' })
-```
-
-This is the lower-level escape hatch. The core factories assume the client matches the name; you take on the chain-routing responsibility.
-
-#### Adding a new chain
-
-Each supported chain lives under `src/chains/<chain>.ts` with its own constants, ABIs, errors, and name-detection helper (`isBasename` for Base). To add Arbitrum, OP, or another chain:
-
-1. Create `src/chains/<chain>.ts` with the chain's helpers.
-2. Add the chain to the `SupportedChain` union in `src/routing.ts` and a new branch in `chainForName`.
-3. Extend `multichainMetadataReader` / `multichainMetadataWriter` with a dispatch case for the new chain.
-
-No core factory changes are required — the core stays single-chain. The integration is purely additive at the wrapper level.
-
 ### Validation
 
 `validateMetadataSchema` checks a record map against a schema. Schemas can come from `@ensmetadata/schemas`, from `fetchSchemaByUri`, or from your own registry.
@@ -386,14 +319,14 @@ const schema = await fetchSchema('ipfs://Qm...', {
 
 ## API reference
 
-### `metadataReader()` (core, single-chain)
+### `metadataReader()(client)`
 
 | Method | Description |
 |---|---|
 | `getSchema({ name })` | Read the `schema` and `class` text records and fetch the referenced Schema. Returns `{ records, schema }` |
 | `getMetadata({ name, schema?, keys? })` | Read text records. With `schema` reads its declared keys; with `keys` reads exactly those; with neither auto-discovers the Schema first |
 
-### `metadataWriter({ publicClient })(walletClient)` (core, single-chain)
+### `metadataWriter({ publicClient })(walletClient)`
 
 | Method | Description |
 |---|---|
@@ -404,34 +337,9 @@ const schema = await fetchSchema('ipfs://Qm...', {
 
 Any of `resolver`, `schema`, and `existing` can be injected on the option-taking methods to skip the matching on-chain lookup — see [Injecting values to skip redundant lookups](#injecting-values-to-skip-redundant-lookups).
 
-### `metadataEstimator({ publicClient })` (core, single-chain)
+### `metadataEstimator({ publicClient })`
 
 Same `prepareSetMetadata` / `estimateSetMetadata` methods without requiring a wallet client.
-
-### `multichainMetadataReader({ mainnet, base? })`
-
-Same surface as `metadataReader()(client)`, but dispatches each call to the right chain via `chainForName(opts.name)`.
-
-### `multichainMetadataWriter({ publicClients, walletClients })`
-
-Same surface as `metadataWriter({ publicClient })(walletClient)`. Enforces that the wallet for the dispatched chain is connected to that chain (currently checked for Base — wrong chain throws an `Error` whose message includes `must be connected to Base`).
-
-### `multichainMetadataEstimator({ publicClients })`
-
-Multichain prepare/estimate. No wallet client required.
-
-### `multichainAttestationVerifier({ publicClients, maxAge? })`
-
-Multichain-only attestation verifier. Subject reads dispatch via `chainForName`; attester ENS resolution always uses `publicClients.mainnet`. There is no single-chain form — verification is inherently cross-chain.
-
-### Routing primitives
-
-| Symbol | Description |
-|---|---|
-| `chainForName(name)` | Returns `'base'` for strict subdomains of `base.eth`, `'mainnet'` otherwise |
-| `MissingChainClientError` | Thrown by the multichain wrappers when a name routes to a chain whose client isn't in the map |
-| `SupportedChain` | Union of chain identifiers the wrapper layer dispatches over |
-| `ChainClients` / `ChainWalletClients` | Typed maps shaping the wrapper config |
 
 ### Standalone functions
 

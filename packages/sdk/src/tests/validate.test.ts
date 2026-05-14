@@ -4,10 +4,10 @@ import { validate, validateMetadataSchema } from '../schema'
 
 const testSchema: Schema = {
   $id: 'test',
-  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  source: 'test',
   title: 'Test',
-  class: 'Test',
   version: '1.0',
+  description: 'Validation test schema',
   type: 'object',
   required: ['schema', 'class'],
   properties: {
@@ -16,7 +16,7 @@ const testSchema: Schema = {
     description: { type: 'string', description: 'Description' },
   },
   patternProperties: {
-    '^x-': { type: 'string' },
+    '^x-': { type: 'string', description: 'Custom x- prefixed attribute' },
   },
 }
 
