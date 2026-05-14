@@ -2,13 +2,7 @@ import type { Schema } from '@ensmetadata/schemas/types'
 import { fetchSchema, metadataReader, validateMetadata } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
-import {
-  baseClientForName,
-  clientFromContext,
-  globalEnv,
-  globalOptions,
-  validateName,
-} from '../lib/context.js'
+import { globalEnv, globalOptions, publicClientForName, validateName } from '../lib/context.js'
 
 const viewOptions = globalOptions.extend({
   ipfsGateway: z
@@ -77,11 +71,11 @@ export const viewCommand = {
   }) {
     const ensName = validateName(c.args.name)
     const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
-    const { client } = clientFromContext(c, 'mainnet')
-    const basePublicClient = baseClientForName(c, ensName)
-    const reader = client.extend(metadataReader(basePublicClient ? { basePublicClient } : {}))
+    const { client, chain } = publicClientForName(c, ensName)
+    const reader = metadataReader()(client)
+    const registryOpt = chain.ensRegistry ? { registry: chain.ensRegistry } : {}
 
-    const schemaInfo = await reader.getSchema({ name: ensName })
+    const schemaInfo = await reader.getSchema({ name: ensName, ...registryOpt })
     const schemaUri = schemaInfo.properties.schema ?? null
 
     let schema: Schema | null = null
@@ -100,6 +94,7 @@ export const viewCommand = {
     const metadata = await reader.getMetadata({
       name: ensName,
       ...(schema ? { schema } : {}),
+      ...registryOpt,
     })
 
     const payload: Record<string, string> = { ...metadata.properties }

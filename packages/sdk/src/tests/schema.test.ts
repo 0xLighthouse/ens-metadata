@@ -189,7 +189,9 @@ describe('fetchSchemaFromLocal', () => {
   })
 
   it('forwards any URI scheme verbatim', async () => {
-    const resolver = vi.fn(async (uri: string) => (uri.startsWith('https://') ? sampleSchema : null))
+    const resolver = vi.fn(async (uri: string) =>
+      uri.startsWith('https://') ? sampleSchema : null,
+    )
     const httpsResult = await fetchSchemaFromLocal('https://example.com/schema.json', resolver)
     expect(httpsResult).toBe(sampleSchema)
     const otherResult = await fetchSchemaFromLocal('weird://thing', resolver)

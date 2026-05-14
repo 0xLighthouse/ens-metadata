@@ -208,4 +208,3 @@ export function validateMetadata(data: unknown, schema: Schema): MetadataValidat
 export function validate(schema: Schema, data: unknown): boolean {
   return validateMetadata(data, schema).success
 }
-

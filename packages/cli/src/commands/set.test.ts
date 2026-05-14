@@ -1,9 +1,10 @@
 import { computeDelta } from '@ensmetadata/sdk'
 import type { PublicClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ChainConfig } from '../lib/chains.js'
 
 const getOwnerMock = vi.fn()
-const getBaseRegistryOwnerMock = vi.fn()
+const readContractMock = vi.fn()
 
 /**
  * Mock ensjs's `getOwner` (used for mainnet manager lookup). The dynamic
@@ -13,17 +14,34 @@ vi.mock('@ensdomains/ensjs/public', () => ({
   getOwner: (client: unknown, opts: { name: string }) => getOwnerMock(client, opts),
 }))
 
-vi.mock('@ensmetadata/sdk', async () => {
-  const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
-  return {
-    ...actual,
-    getBaseRegistryOwner: (client: unknown, name: string) => getBaseRegistryOwnerMock(client, name),
-  }
-})
-
 import { buildPayloadDiff, filterPayloadEntries, readEnsManager, setCommand } from './set.js'
 
 const STUB_CLIENT = {} as unknown as PublicClient
+
+const MAINNET_CHAIN: ChainConfig = {
+  id: 1,
+  name: 'mainnet',
+  // biome-ignore lint/suspicious/noExplicitAny: stub
+  viemChain: {} as any,
+  rpcDefaults: [],
+  explorerTxBase: 'https://etherscan.io/tx/',
+}
+
+const BASE_CHAIN: ChainConfig = {
+  id: 8453,
+  name: 'base',
+  // biome-ignore lint/suspicious/noExplicitAny: stub
+  viemChain: {} as any,
+  rpcDefaults: [],
+  explorerTxBase: 'https://basescan.org/tx/',
+  ensRegistry: '0xb94704422c2a1e396835a571837aa5ae53285a95',
+  l2Resolver: '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD',
+}
+
+const baseClientWithReadContract = (result: unknown): PublicClient =>
+  ({
+    readContract: (...args: unknown[]) => readContractMock(...args).then(() => result),
+  }) as unknown as PublicClient
 
 describe('filterPayloadEntries', () => {
   it('drops empty-string values by default', () => {
@@ -51,50 +69,50 @@ describe('filterPayloadEntries', () => {
 describe('readEnsManager (on-chain)', () => {
   beforeEach(() => {
     getOwnerMock.mockReset()
-    getBaseRegistryOwnerMock.mockReset()
+    readContractMock.mockReset()
   })
 
   it('resolves mainnet names via ensjs getOwner', async () => {
     getOwnerMock.mockResolvedValue({ owner: '0x1111111111111111111111111111111111111111' })
-    const owner = await readEnsManager('myagent.eth', STUB_CLIENT)
+    const owner = await readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT)
     expect(owner).toBe('0x1111111111111111111111111111111111111111')
     expect(getOwnerMock).toHaveBeenCalledWith(STUB_CLIENT, { name: 'myagent.eth' })
-    expect(getBaseRegistryOwnerMock).not.toHaveBeenCalled()
+    expect(readContractMock).not.toHaveBeenCalled()
   })
 
-  it('resolves Basenames via the SDK getBaseRegistryOwner', async () => {
-    getBaseRegistryOwnerMock.mockResolvedValue('0x2222222222222222222222222222222222222222')
-    const owner = await readEnsManager('alice.base.eth', STUB_CLIENT, STUB_CLIENT)
+  it('resolves Basenames via the Base registry contract', async () => {
+    readContractMock.mockResolvedValue(undefined)
+    const writeClient = baseClientWithReadContract('0x2222222222222222222222222222222222222222')
+    const owner = await readEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient)
     expect(owner).toBe('0x2222222222222222222222222222222222222222')
-    expect(getBaseRegistryOwnerMock).toHaveBeenCalledWith(STUB_CLIENT, 'alice.base.eth')
+    expect(readContractMock).toHaveBeenCalledTimes(1)
+    expect(readContractMock.mock.calls[0][0]).toMatchObject({
+      address: BASE_CHAIN.ensRegistry,
+      functionName: 'owner',
+    })
     expect(getOwnerMock).not.toHaveBeenCalled()
   })
 
-  it('hard-fails when the Base registry returns null (zero owner)', async () => {
-    getBaseRegistryOwnerMock.mockResolvedValue(null)
-    await expect(readEnsManager('alice.base.eth', STUB_CLIENT, STUB_CLIENT)).rejects.toThrow(
-      /Could not determine the manager of alice\.base\.eth on Base/,
-    )
-  })
-
-  it('hard-fails when no Base public client is supplied for a Basename', async () => {
-    await expect(readEnsManager('alice.base.eth', STUB_CLIENT)).rejects.toThrow(
-      /requires a Base public client/,
-    )
+  it('hard-fails when the Base registry returns the zero address', async () => {
+    readContractMock.mockResolvedValue(undefined)
+    const writeClient = baseClientWithReadContract('0x0000000000000000000000000000000000000000')
+    await expect(
+      readEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient),
+    ).rejects.toThrow(/Could not determine the manager of alice\.base\.eth on base/)
   })
 
   it('hard-fails when ensjs returns no owner for a mainnet name', async () => {
     getOwnerMock.mockResolvedValue({ owner: undefined })
-    await expect(readEnsManager('myagent.eth', STUB_CLIENT)).rejects.toThrow(
-      /Could not determine the manager of myagent\.eth on mainnet/,
-    )
+    await expect(
+      readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
+    ).rejects.toThrow(/Could not determine the manager of myagent\.eth on mainnet/)
   })
 
   it('hard-fails when ensjs returns a non-address owner', async () => {
     getOwnerMock.mockResolvedValue({ owner: 'not-an-address' })
-    await expect(readEnsManager('myagent.eth', STUB_CLIENT)).rejects.toThrow(
-      /Could not determine the manager of myagent\.eth on mainnet/,
-    )
+    await expect(
+      readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
+    ).rejects.toThrow(/Could not determine the manager of myagent\.eth on mainnet/)
   })
 })
 

@@ -6,12 +6,10 @@ const { setRecordsMock } = vi.hoisted(() => {
   const mock = vi.fn() as ReturnType<typeof vi.fn> & {
     makeFunctionData: ReturnType<typeof vi.fn>
   }
-  mock.makeFunctionData = vi.fn(
-    (_wallet: unknown, args: { resolverAddress: `0x${string}` }) => ({
-      to: args.resolverAddress,
-      data: '0xfakedata' as `0x${string}`,
-    }),
-  )
+  mock.makeFunctionData = vi.fn((_wallet: unknown, args: { resolverAddress: `0x${string}` }) => ({
+    to: args.resolverAddress,
+    data: '0xfakedata' as `0x${string}`,
+  }))
   return { setRecordsMock: mock }
 })
 
@@ -279,6 +277,92 @@ describe('prepareSetMetadata', () => {
     })
     expect(prepared.name).toBe('alice.eth')
     expect(prepared.changePreview.name).toBe('alice.eth')
+  })
+
+  // ─── Registry-direct cascade (no Universal Resolver) ─────────────────────
+
+  it('resolves the resolver via registry.resolver(node) when opts.registry is supplied', async () => {
+    const REGISTRY = '0xb94704422c2a1e396835a571837aa5ae53285a95' as `0x${string}`
+    const L2_RESOLVER = '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD' as `0x${string}`
+    const readContract = vi.fn(async (args: { functionName: string }) => {
+      if (args.functionName === 'resolver') return L2_RESOLVER
+      if (args.functionName === 'text') return ''
+      throw new Error(`unexpected: ${args.functionName}`)
+    })
+    const client = makePublicClient({ readContract })
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+    })
+    expect(prepared.resolver).toBe(L2_RESOLVER)
+    expect(client.getEnsResolver).not.toHaveBeenCalled()
+    expect(readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ address: REGISTRY, functionName: 'resolver' }),
+    )
+  })
+
+  it('throws when registry.resolver(node) returns the zero address', async () => {
+    const REGISTRY = '0xb94704422c2a1e396835a571837aa5ae53285a95' as `0x${string}`
+    const readContract = vi.fn(async () => ZERO_ADDRESS)
+    const client = makePublicClient({ readContract })
+    const estimator = metadataEstimator({ publicClient: client })
+    await expect(
+      estimator.prepareSetMetadata({
+        name: 'unregistered.base.eth',
+        registry: REGISTRY,
+        schema: baseSchema,
+        existing: {},
+        desired: { class: 'A' },
+      }),
+    ).rejects.toThrow(/No resolver found/)
+  })
+
+  it('opts.resolver wins over opts.registry (registry lookup is skipped)', async () => {
+    const REGISTRY = '0xb94704422c2a1e396835a571837aa5ae53285a95' as `0x${string}`
+    const readContract = vi.fn(async () => ZERO_ADDRESS)
+    const client = makePublicClient({ readContract })
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.base.eth',
+      resolver: RESOLVER,
+      registry: REGISTRY,
+      schema: baseSchema,
+      existing: {},
+      desired: { class: 'A' },
+    })
+    expect(prepared.resolver).toBe(RESOLVER)
+    expect(readContract).not.toHaveBeenCalled()
+    expect(client.getEnsResolver).not.toHaveBeenCalled()
+  })
+
+  it('threads registry through to the existing-records read', async () => {
+    const REGISTRY = '0xb94704422c2a1e396835a571837aa5ae53285a95' as `0x${string}`
+    const L2_RESOLVER = '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD' as `0x${string}`
+    const readContract = vi.fn(async (args: { functionName: string; args: readonly unknown[] }) => {
+      if (args.functionName === 'resolver') return L2_RESOLVER
+      if (args.functionName === 'text') {
+        const key = args.args[1] as string
+        return key === 'class' ? 'Existing' : ''
+      }
+      throw new Error(`unexpected: ${args.functionName}`)
+    })
+    const client = makePublicClient({ readContract })
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      schema: baseSchema,
+      desired: { class: 'New' },
+      // No `existing` supplied → the SDK reads it on chain. Must use the
+      // direct path, not getEnsText.
+    })
+    expect(client.getEnsText).not.toHaveBeenCalled()
+    expect(prepared.changePreview.existing).toEqual({ class: 'Existing' })
+    expect(prepared.changePreview.changes).toEqual({ class: 'New' })
   })
 })
 

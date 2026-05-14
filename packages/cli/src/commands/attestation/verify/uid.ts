@@ -1,16 +1,15 @@
-import { addEnsContracts } from '@ensdomains/ensjs'
-import { DEFAULT_ATTESTER_ENS, isBasename, verifyUidAttestation } from '@ensmetadata/sdk'
-import { type PublicClient, createPublicClient } from 'viem'
-import { mainnet } from 'viem/chains'
+import { DEFAULT_ATTESTER_ENS } from '@ensmetadata/sdk'
 import { z } from 'zod'
+import { chainForName } from '../../../lib/chain-for-name.js'
+import { MAINNET_CHAIN } from '../../../lib/chains.js'
 import {
-  baseClientForName,
-  buildFallbackTransport,
   globalEnv,
   globalOptions,
-  resolveRpcUrl,
+  publicClientForChain,
+  publicClientForName,
   validateName,
 } from '../../../lib/context.js'
+import { verifyUidAttestation } from '../../../lib/verify-attestation.js'
 
 const verifyUidOptions = globalOptions.extend({
   attester: z
@@ -40,24 +39,23 @@ export const verifyUidCommand = {
     env: z.infer<typeof globalEnv>
   }) {
     const ensName = validateName(c.args.name)
-    if (isBasename(c.options.attester)) {
+    if (chainForName(c.options.attester).id !== 1) {
       throw new Error(
-        '--attester must be a mainnet ENS name. Custom attesters on Base are not yet supported.',
+        '--attester must be a mainnet ENS name. Attesters on other chains are not yet supported.',
       )
     }
-    const rpcUrl = resolveRpcUrl(mainnet.id, c.options, c.env as Record<string, string | undefined>)
-    const transport = buildFallbackTransport(mainnet.id, rpcUrl, mainnet.rpcUrls.default.http)
-    const client = createPublicClient({
-      chain: addEnsContracts(mainnet),
-      transport,
-    }) as unknown as PublicClient
-    const basePublicClient = baseClientForName(c, ensName)
+    const { client: subjectClient, chain } = publicClientForName(c, ensName)
+    const attesterClient =
+      chain.id === MAINNET_CHAIN.id
+        ? subjectClient
+        : publicClientForChain(c, MAINNET_CHAIN, { applyRpcFlag: false })
 
     return verifyUidAttestation(
-      client,
+      subjectClient,
       {
+        attesterClient,
+        ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
         ...(c.options.maxAge !== undefined ? { maxAge: c.options.maxAge } : {}),
-        ...(basePublicClient ? { basePublicClient } : {}),
       },
       {
         name: ensName,

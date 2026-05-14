@@ -1,8 +1,10 @@
 import type { PublicClient } from 'viem'
 import { describe, expect, it } from 'vitest'
-import { baseClientForName, basePublicClientFromContext, resolveRpcUrl } from './context.js'
+import { getChainByName } from './chains.js'
+import { publicClientForChain, publicClientForName, resolveRpcUrl } from './context.js'
 
 const BASE_CHAIN_ID = 8453
+const MAINNET_CHAIN_ID = 1
 
 /**
  * Inspect the URLs configured on a viem fallback transport. Returns them in
@@ -42,71 +44,59 @@ describe('resolveRpcUrl (chain 8453)', () => {
   })
 })
 
-describe('basePublicClientFromContext', () => {
-  it('returns a PublicClient on chain 8453', () => {
-    const client = basePublicClientFromContext({ options: {}, env: {} })
+describe('publicClientForChain', () => {
+  const baseChain = getChainByName('base')
+
+  it('returns a PublicClient on chain 8453 for the Base config', () => {
+    const client = publicClientForChain({ options: {}, env: {} }, baseChain)
     expect(client.chain?.id).toBe(BASE_CHAIN_ID)
   })
 
   it('honours RPC_URL_8453', () => {
-    const client = basePublicClientFromContext({
-      options: {},
-      env: { RPC_URL_8453: 'https://base.env' },
-    })
+    const client = publicClientForChain(
+      { options: {}, env: { RPC_URL_8453: 'https://base.env' } },
+      baseChain,
+    )
     expect(transportUrls(client)[0]).toBe('https://base.env')
   })
 
-  it('falls through to ETH_RPC_URL when RPC_URL_8453 is unset', () => {
-    const client = basePublicClientFromContext({
-      options: {},
-      env: { ETH_RPC_URL: 'https://generic.env' },
-    })
-    expect(transportUrls(client)[0]).toBe('https://generic.env')
+  it('applies --rpc by default', () => {
+    const client = publicClientForChain({ options: { rpc: 'https://flag' }, env: {} }, baseChain)
+    expect(transportUrls(client)[0]).toBe('https://flag')
   })
 
-  it('applies --rpc when useFlagOverride: true', () => {
-    const client = basePublicClientFromContext(
-      { options: { rpc: 'https://flag.example' }, env: {} },
-      { useFlagOverride: true },
+  it('ignores --rpc when applyRpcFlag: false', () => {
+    const client = publicClientForChain(
+      { options: { rpc: 'https://flag' }, env: { RPC_URL_8453: 'https://base.env' } },
+      baseChain,
+      { applyRpcFlag: false },
     )
-    expect(transportUrls(client)[0]).toBe('https://flag.example')
-  })
-
-  it('ignores --rpc by default (the flag belongs to the subject chain)', () => {
-    const client = basePublicClientFromContext({
-      options: { rpc: 'https://flag.example' },
-      env: { RPC_URL_8453: 'https://base.env' },
-    })
     const urls = transportUrls(client)
-    expect(urls).not.toContain('https://flag.example')
+    expect(urls).not.toContain('https://flag')
     expect(urls[0]).toBe('https://base.env')
   })
 })
 
-describe('baseClientForName', () => {
+describe('publicClientForName', () => {
   const ctx = { options: {}, env: {} }
 
-  it('returns a Base client for *.base.eth', () => {
-    const client = baseClientForName(ctx, 'alice.base.eth')
-    expect(client).toBeDefined()
-    expect(client?.chain?.id).toBe(BASE_CHAIN_ID)
+  it('returns a mainnet client for mainnet names', () => {
+    const { client, chain } = publicClientForName(ctx, 'alice.eth')
+    expect(client.chain?.id).toBe(MAINNET_CHAIN_ID)
+    expect(chain.name).toBe('mainnet')
   })
 
-  it('returns undefined for mainnet names', () => {
-    expect(baseClientForName(ctx, 'alice.eth')).toBeUndefined()
+  it('returns a Base client for *.base.eth (direct L2 reads)', () => {
+    const { client, chain } = publicClientForName(ctx, 'alice.base.eth')
+    expect(client.chain?.id).toBe(BASE_CHAIN_ID)
+    expect(chain.name).toBe('base')
   })
 
-  it('returns undefined for the base.eth 2LD itself', () => {
-    expect(baseClientForName(ctx, 'base.eth')).toBeUndefined()
-  })
-
-  it('threads --rpc through when the subject is a Basename', () => {
-    const client = baseClientForName(
+  it('threads --rpc through to the read client', () => {
+    const { client } = publicClientForName(
       { options: { rpc: 'https://flag.example' }, env: {} },
-      'alice.base.eth',
+      'alice.eth',
     )
-    expect(client).toBeDefined()
-    if (!client) throw new Error('expected a client')
     expect(transportUrls(client)[0]).toBe('https://flag.example')
   })
 })

@@ -1,18 +1,33 @@
 /**
- * Shared CLI context: option/env schemas, client factory, name normalization.
+ * Shared CLI context: option/env schemas, client factories, name normalization.
  *
- * Patterns adapted from gskril/ens-cli — same shape (globalOptions, globalEnv,
- * clientFromContext, validateName) so commands sourced from there drop in
- * with minimal adaptation.
+ * Two parallel chain dispatch paths live in this file:
+ *
+ *   - ENS commands (view/set/attestation verify) auto-select their chain
+ *     from the subject name via `lib/chain-for-name.ts` + `lib/chains.ts`.
+ *     They use `publicClientForChain` / `publicClientForName` /
+ *     `walletClientForChain`.
+ *
+ *   - ERC-8004 agent commands take an explicit `--chain` flag and dispatch
+ *     through `lib/registry.ts`. They use `clientFromContext` and
+ *     `chainAwareOptions`.
+ *
+ * Both share the same RPC precedence and fallback transport helpers.
  */
-import { isBasename } from '@ensmetadata/sdk'
-import { http, type PublicClient, createPublicClient, fallback } from 'viem'
-import { base } from 'viem/chains'
+import {
+  http,
+  type Account,
+  type PublicClient,
+  type WalletClient,
+  createPublicClient,
+  createWalletClient,
+  fallback,
+} from 'viem'
 import { normalize } from 'viem/ens'
 import { z } from 'zod'
+import { chainForName } from './chain-for-name.js'
+import type { ChainConfig } from './chains.js'
 import { SUPPORTED_CHAINS, resolveChain } from './registry.js'
-
-export { base }
 
 // ─── Option schemas ─────────────────────────────────────────────────────────
 
@@ -29,8 +44,9 @@ export const globalOptions = z.object({
 })
 
 /**
- * For commands that operate on a specific chain (registry/*) — extends
- * globalOptions with `--chain`. Replaces the older `--chain-name` flag.
+ * For ERC-8004 agent commands that operate on a specific chain — extends
+ * globalOptions with `--chain`. Not used by ENS commands (those auto-pick
+ * the chain from the subject name).
  */
 export const chainAwareOptions = globalOptions.extend({
   chain: z
@@ -83,25 +99,7 @@ export function resolveRpcUrl(
   return undefined
 }
 
-// ─── Public RPC fallbacks ───────────────────────────────────────────────────
-
-/**
- * Curated supplemental RPCs per chain. Used after the user's `--rpc`/env
- * value (if any) and before viem's built-in chain defaults. Covers the
- * common case where viem's default (e.g. Cloudflare for mainnet) is too
- * rate-limited for batched universal-resolver reads.
- */
-const SUPPLEMENTAL_RPCS: Record<number, string[]> = {
-  1: ['https://ethereum-rpc.publicnode.com', 'https://1rpc.io/eth'],
-  11155111: ['https://1rpc.io/sepolia', 'https://ethereum-sepolia-rpc.publicnode.com'],
-  // Viem's default Base RPC (`https://mainnet.base.org`) rate-limits the
-  // back-to-back resolver lookups in `view`/`set`. These fallbacks make the
-  // common case work without forcing every user to set RPC_URL_8453.
-  8453: ['https://base-rpc.publicnode.com', 'https://1rpc.io/base'],
-  84532: ['https://base-sepolia-rpc.publicnode.com'],
-}
-
-// ─── Context type + client factory ──────────────────────────────────────────
+// ─── Context type + transport helpers ───────────────────────────────────────
 
 export type Context = {
   options: { rpc?: string; chain?: string; universalResolver?: string }
@@ -109,26 +107,89 @@ export type Context = {
 }
 
 /**
- * Build a fallback transport stack: user-supplied RPC → supplemental
- * curated URLs → chain's viem defaults. Suitable for both PublicClient
+ * Build a fallback transport stack: user-supplied RPC → chain's curated
+ * defaults → viem's built-in defaults. Suitable for both PublicClient
  * and WalletClient.
  */
 export function buildFallbackTransport(
-  chainId: number,
-  rpcUrl?: string,
-  defaultRpcs?: readonly string[],
+  rpcUrl: string | undefined,
+  curatedDefaults: readonly string[],
+  viemDefaults: readonly string[] = [],
 ) {
-  const supplemental = SUPPLEMENTAL_RPCS[chainId] ?? []
   return fallback([
     ...(rpcUrl ? [http(rpcUrl)] : []),
-    ...supplemental.map((url) => http(url)),
-    ...(defaultRpcs ?? []).map((url) => http(url)),
+    ...curatedDefaults.map((url) => http(url)),
+    ...viemDefaults.map((url) => http(url)),
   ])
 }
+
+// ─── ENS-aware chain dispatch (uses lib/chains.ts) ──────────────────────────
+
+/**
+ * Build a viem PublicClient for `chain`. RPC URL resolves via
+ * `resolveRpcUrl(chain.id, ...)` so each chain reads its own env override
+ * (`RPC_URL_<id>`) and falls back to the chain's curated defaults.
+ *
+ * When `applyRpcFlag` is `false`, the `--rpc` flag is ignored — useful
+ * when a single command touches multiple chains and the flag should only
+ * bind to the primary one.
+ */
+export function publicClientForChain(
+  c: Context,
+  chain: ChainConfig,
+  opts: { applyRpcFlag?: boolean } = {},
+): PublicClient {
+  const flagOptions = opts.applyRpcFlag === false ? {} : c.options
+  const rpc = resolveRpcUrl(chain.id, flagOptions, c.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport(
+    rpc,
+    chain.rpcDefaults,
+    chain.viemChain.rpcUrls.default.http,
+  )
+  return createPublicClient({ chain: chain.viemChain, transport }) as PublicClient
+}
+
+/**
+ * Build a PublicClient for the chain that hosts `name`'s resolver. With
+ * direct registry reads in the SDK, the same chain serves both reads
+ * and writes — no read/write split needed.
+ */
+export function publicClientForName(
+  c: Context,
+  name: string,
+): { client: PublicClient; chain: ChainConfig } {
+  const chain = chainForName(name)
+  return { client: publicClientForChain(c, chain), chain }
+}
+
+/**
+ * Build a WalletClient on `chain` for `account`. `--rpc` binds to this
+ * client by default.
+ */
+export function walletClientForChain(
+  c: Context,
+  chain: ChainConfig,
+  account: Account,
+  opts: { applyRpcFlag?: boolean } = {},
+): WalletClient {
+  const flagOptions = opts.applyRpcFlag === false ? {} : c.options
+  const rpc = resolveRpcUrl(chain.id, flagOptions, c.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport(
+    rpc,
+    chain.rpcDefaults,
+    chain.viemChain.rpcUrls.default.http,
+  )
+  return createWalletClient({ account, chain: chain.viemChain, transport })
+}
+
+// ─── ERC-8004 chain dispatch (uses lib/registry.ts) ─────────────────────────
 
 /**
  * Build a viem PublicClient from the merged context, preferring the user's
  * RPC, falling through curated supplementals, then viem's built-in defaults.
+ *
+ * Used by ERC-8004 agent commands that take an explicit `--chain` flag.
+ * ENS commands should use `publicClientForName` instead.
  */
 export function clientFromContext(
   c: Context,
@@ -140,39 +201,9 @@ export function clientFromContext(
 } {
   const { chain, registryAddress } = resolveChain(chainName ?? c.options.chain ?? 'mainnet')
   const rpc = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(chain.id, rpc, chain.rpcUrls.default.http)
+  const transport = buildFallbackTransport(rpc, [], chain.rpcUrls.default.http)
   const client = createPublicClient({ chain, transport })
   return { client, chain, registryAddress }
-}
-
-/**
- * Build a viem PublicClient connected to Base (chain 8453). Uses the same env
- * precedence as the mainnet client (`RPC_URL_8453` → `ETH_RPC_URL` → viem
- * defaults). `--rpc` is honoured only when `useFlagOverride: true`, so
- * Basename-bound commands can flow the flag through while mainnet-bound
- * commands keep `--rpc` bound to mainnet.
- */
-export function basePublicClientFromContext(
-  c: Context,
-  opts?: { useFlagOverride?: boolean },
-): PublicClient {
-  const useFlag = opts?.useFlagOverride === true
-  const flagOptions = useFlag ? c.options : {}
-  const rpc = resolveRpcUrl(base.id, flagOptions, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(base.id, rpc, base.rpcUrls.default.http)
-  return createPublicClient({ chain: base, transport })
-}
-
-/**
- * Convenience: returns a Base PublicClient when `name` is a Basename, else
- * `undefined`. The caller threads the result into SDK factories (which treat
- * `undefined` as "this name lives on mainnet, no Base reads needed"). When
- * the name is a Basename, `--rpc` is bound to the Base client because the
- * Base chain is the subject of the command.
- */
-export function baseClientForName(c: Context, name: string): PublicClient | undefined {
-  if (!isBasename(name)) return undefined
-  return basePublicClientFromContext(c, { useFlagOverride: true })
 }
 
 // ─── Name normalization ─────────────────────────────────────────────────────

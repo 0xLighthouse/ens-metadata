@@ -90,7 +90,7 @@ export async function executeRegistryCall(
   }
 
   const rpcUrl = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(chain.id, rpcUrl, chain.rpcUrls.default.http)
+  const transport = buildFallbackTransport(rpcUrl, [], chain.rpcUrls.default.http)
   const walletClient = createWalletClient({ account, chain, transport })
   await validateCost(publicClient, { account: account.address, to: registryAddress, data })
 

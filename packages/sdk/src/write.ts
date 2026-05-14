@@ -1,6 +1,6 @@
-import { zeroAddress, type PublicClient, type WalletClient } from 'viem'
+import { type PublicClient, type WalletClient, zeroAddress } from 'viem'
 import { normalize } from 'viem/ens'
-import { getMetadata, getSchema } from './read'
+import { getMetadata, getResolverFromRegistry, getSchema } from './read'
 import { validateMetadata } from './schema'
 import type {
   ChangePreview,
@@ -129,6 +129,28 @@ async function gasEstimate(
 // --- Public functions ---
 
 /**
+ * Resolver lookup cascade:
+ *  1. `opts.resolver` provided → use it.
+ *  2. `opts.registry` provided → direct `registry.resolver(node)` read.
+ *  3. Neither → viem `publicClient.getEnsResolver({ name })` (UR-based).
+ */
+async function resolveResolverAddress(
+  publicClient: PublicClient,
+  opts: SetMetadataOptions,
+  name: string,
+): Promise<`0x${string}`> {
+  if (opts.resolver) return opts.resolver
+  if (opts.registry) {
+    const addr = await getResolverFromRegistry(publicClient, opts.registry, name)
+    if (!addr) throw new Error(`No resolver found for ${name}`)
+    return addr
+  }
+  const addr = (await publicClient.getEnsResolver({ name })) as `0x${string}`
+  if (addr === zeroAddress) throw new Error(`No resolver found for ${name}`)
+  return addr
+}
+
+/**
  * Read whatever isn't supplied, diff `desired` against `existing`, and return
  * a `PreparedMetadata` bundle ready for `setPreparedMetadata` or
  * `estimateSetMetadata`. Throws if the name has no resolver or no schema.
@@ -138,16 +160,16 @@ async function prepareSetMetadata(
   opts: SetMetadataOptions,
 ): Promise<PreparedMetadata> {
   const name = normalize(opts.name)
+  const registry = opts.registry
+  const subOpts = registry ? { registry } : {}
 
-  const resolver = opts.resolver ?? (await publicClient.getEnsResolver({ name })) as `0x${string}`
-  if (resolver === zeroAddress) throw new Error(`No resolver found for ${name}`)
+  const resolver = await resolveResolverAddress(publicClient, opts, name)
 
-  const schema =
-    opts.schema ?? (await getSchema(publicClient, { name })).schema
+  const schema = opts.schema ?? (await getSchema(publicClient, { name, ...subOpts })).schema
   if (!schema) throw new Error(`No schema found for ${name}`)
 
   const existing: RecordSet =
-    opts.existing ?? (await getMetadata(publicClient, { name, schema })).properties
+    opts.existing ?? (await getMetadata(publicClient, { name, schema, ...subOpts })).properties
 
   const changes = computeDelta(opts.desired, existing, {
     ignoreMissing: opts.ignoreMissing ?? false,
@@ -213,22 +235,19 @@ async function setMetadata(
 
 export function metadataWriter(config: { publicClient: PublicClient }) {
   return (walletClient: WalletClient) => ({
-    prepareSetMetadata: (opts: SetMetadataOptions) =>
-      prepareSetMetadata(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) => prepareSetMetadata(config.publicClient, opts),
     setPreparedMetadata: (prepared: PreparedMetadata) =>
       setPreparedMetadata(walletClient, prepared),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
       estimateSetMetadata(config.publicClient, opts),
-    setMetadata: (opts: SetMetadataOptions) =>
-      setMetadata(walletClient, config.publicClient, opts),
+    setMetadata: (opts: SetMetadataOptions) => setMetadata(walletClient, config.publicClient, opts),
   })
 }
 
 /** Prepare / estimate without a wallet client (for dry-run flows). */
 export function metadataEstimator(config: { publicClient: PublicClient }) {
   return {
-    prepareSetMetadata: (opts: SetMetadataOptions) =>
-      prepareSetMetadata(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) => prepareSetMetadata(config.publicClient, opts),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
       estimateSetMetadata(config.publicClient, opts),
   }

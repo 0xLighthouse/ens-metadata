@@ -1,6 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
-import type { PublicClient } from 'viem'
-import { normalize } from 'viem/ens'
+import { type Address, type PublicClient, zeroAddress } from 'viem'
+import { namehash, normalize } from 'viem/ens'
 import { fetchSchema, getSchemaKeys } from './schema'
 import type {
   GetMetadataOptions,
@@ -24,16 +24,91 @@ declare function clearTimeout(handle: unknown): void
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timerId: unknown
   const timer = new Promise<never>((_, reject) => {
-    timerId = setTimeout(
-      () => reject(new Error(`Timed out reading '${label}' after ${ms}ms`)),
-      ms,
-    )
+    timerId = setTimeout(() => reject(new Error(`Timed out reading '${label}' after ${ms}ms`)), ms)
   })
   return Promise.race([promise, timer]).finally(() => clearTimeout(timerId))
 }
 
+// ─── Direct registry → resolver → text reads ────────────────────────────────
+
+const REGISTRY_RESOLVER_ABI = [
+  {
+    type: 'function',
+    name: 'resolver',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const
+
+const RESOLVER_TEXT_ABI = [
+  {
+    type: 'function',
+    name: 'text',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'key', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'string' }],
+  },
+] as const
+
+/**
+ * Look up `registry.resolver(namehash(name))`. Returns `null` for the zero
+ * address (which means "no resolver set" on most ENS-compatible registries).
+ */
+export async function getResolverFromRegistry(
+  client: PublicClient,
+  registry: Address,
+  name: string,
+): Promise<Address | null> {
+  const node = namehash(normalize(name))
+  const addr = (await client.readContract({
+    address: registry,
+    abi: REGISTRY_RESOLVER_ABI,
+    functionName: 'resolver',
+    args: [node],
+  })) as Address
+  return addr === zeroAddress ? null : addr
+}
+
+async function directReadTextRecords(
+  client: PublicClient,
+  registry: Address,
+  name: string,
+  keys: string[],
+  timeoutMs: number,
+): Promise<Record<string, string | null>> {
+  const resolverAddr = await getResolverFromRegistry(client, registry, name)
+  if (!resolverAddr) {
+    return Object.fromEntries(keys.map((k) => [k, null]))
+  }
+  const node = namehash(name)
+  const entries = await Promise.all(
+    keys.map(async (key) => {
+      const value = await withTimeout<string>(
+        client.readContract({
+          address: resolverAddr,
+          abi: RESOLVER_TEXT_ABI,
+          functionName: 'text',
+          args: [node, key],
+        }) as Promise<string>,
+        timeoutMs,
+        key,
+      )
+      return [key, nonEmpty(value)] as const
+    }),
+  )
+  return Object.fromEntries(entries)
+}
+
+// ─── Public reads ───────────────────────────────────────────────────────────
 
 // Strict read: RPC errors and timeouts propagate; empty strings normalise to null.
+// When `registry` is supplied, reads go directly through the registry + resolver
+// pair (no Universal Resolver). Otherwise we delegate to viem's `getEnsText`,
+// which routes through the chain's UniversalResolver.
 export async function readTextRecords(opts: {
   client: PublicClient
   name: string
@@ -43,16 +118,21 @@ export async function readTextRecords(opts: {
   gatewayUrls?: string[]
   strict?: boolean
   universalResolverAddress?: string
+  registry?: Address
   timeoutMs?: number
 }): Promise<Record<string, string | null>> {
-  const { client, name, keys, timeoutMs, ...textOptions } = opts
+  const { client, name, keys, timeoutMs, registry, ...textOptions } = opts
   const normalizedName = normalize(name)
   const ms = timeoutMs ?? 10_000
+
+  if (registry) {
+    return directReadTextRecords(client, registry, normalizedName, keys, ms)
+  }
 
   const entries = await Promise.all(
     keys.map(async (key) => {
       const value = await withTimeout<string | null>(
-        // biome-ignore lint/suspicious/noExplicitAny: ensjs extends PublicClient with getEnsText
+        // biome-ignore lint/suspicious/noExplicitAny: viem extends PublicClient with getEnsText
         (client as any).getEnsText({ name: normalizedName, key, ...textOptions }),
         ms,
         key,
@@ -104,8 +184,7 @@ export async function getMetadata(
   }
   for (const k of alreadyRead) keys.delete(k)
 
-  const texts =
-    keys.size > 0 ? await readTextRecords({ ...opts, client, keys: [...keys] }) : {}
+  const texts = keys.size > 0 ? await readTextRecords({ ...opts, client, keys: [...keys] }) : {}
 
   // State RecordSet convention: only keys with values on-chain appear.
   for (const [k, v] of Object.entries(texts)) {
@@ -159,8 +238,10 @@ export async function getSchema(
 }
 
 /**
- * The factory is intentionally argument-free so it composes cleanly with 
- * `viem.PublicClient.extend()`.
+ * The factory is intentionally argument-free so it composes cleanly with
+ * `viem.PublicClient.extend()`. Pass `registry` per call (on
+ * {@link GetSchemaOptions} / {@link GetMetadataOptions}) to use direct
+ * registry+resolver reads instead of a Universal Resolver.
  */
 export function metadataReader() {
   return (client: PublicClient) => ({

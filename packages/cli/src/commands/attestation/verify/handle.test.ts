@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const verifyHandleAttestationMock = vi.fn()
+const publicClientForNameMock = vi.fn()
 
-vi.mock('@ensmetadata/sdk', async () => {
-  const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
+vi.mock('../../../lib/verify-attestation.js', () => ({
+  verifyHandleAttestation: (client: unknown, config: unknown, opts: unknown) =>
+    verifyHandleAttestationMock(client, config, opts),
+}))
+
+vi.mock('../../../lib/context.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('../../../lib/context.js')>('../../../lib/context.js')
   return {
     ...actual,
-    verifyHandleAttestation: (client: unknown, config: unknown, opts: unknown) =>
-      verifyHandleAttestationMock(client, config, opts),
+    publicClientForName: (...args: unknown[]) => {
+      publicClientForNameMock(...args)
+      return { client: { chain: { id: 1 } }, chain: { id: 1, name: 'mainnet' } }
+    },
   }
 })
 
@@ -27,30 +36,26 @@ describe('verifyHandleCommand.run', () => {
   beforeEach(() => {
     verifyHandleAttestationMock.mockReset()
     verifyHandleAttestationMock.mockResolvedValue({ valid: true })
+    publicClientForNameMock.mockReset()
   })
 
-  it('does not pass basePublicClient for mainnet names', async () => {
+  it('builds a mainnet client for mainnet names', async () => {
     await baseRun('myagent.eth')
     expect(verifyHandleAttestationMock).toHaveBeenCalledTimes(1)
-    const config = verifyHandleAttestationMock.mock.calls[0][1] as {
-      basePublicClient?: unknown
-    }
-    expect(config.basePublicClient).toBeUndefined()
+    expect(publicClientForNameMock).toHaveBeenCalledTimes(1)
+    expect(publicClientForNameMock.mock.calls[0][1]).toBe('myagent.eth')
   })
 
-  it('passes basePublicClient for *.base.eth', async () => {
+  it('builds a mainnet client for *.base.eth too (CCIP-Read handles L2 lookup)', async () => {
     await baseRun('alice.base.eth')
     expect(verifyHandleAttestationMock).toHaveBeenCalledTimes(1)
-    const config = verifyHandleAttestationMock.mock.calls[0][1] as {
-      basePublicClient?: { chain?: { id?: number } }
-    }
-    expect(config.basePublicClient).toBeDefined()
-    expect(config.basePublicClient?.chain?.id).toBe(8453)
+    expect(publicClientForNameMock).toHaveBeenCalledTimes(1)
+    expect(publicClientForNameMock.mock.calls[0][1]).toBe('alice.base.eth')
   })
 
   it('rejects --attester values that end in .base.eth', async () => {
     await expect(baseRun('alice.eth', { attester: 'foo.base.eth' })).rejects.toThrow(
-      /Custom attesters on Base are not yet supported/,
+      /Attesters on other chains are not yet supported/,
     )
     expect(verifyHandleAttestationMock).not.toHaveBeenCalled()
   })

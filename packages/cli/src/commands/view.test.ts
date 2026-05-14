@@ -4,19 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const getSchemaMock = vi.fn()
 const getMetadataMock = vi.fn()
 const fetchSchemaMock = vi.fn()
-const metadataReaderConfigMock = vi.fn()
+const publicClientForNameMock = vi.fn()
 
 vi.mock('@ensmetadata/sdk', async () => {
   const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
   return {
     ...actual,
-    metadataReader: (config?: unknown) => {
-      metadataReaderConfigMock(config)
-      return () => ({
-        getSchema: (opts: unknown) => getSchemaMock(opts),
-        getMetadata: (opts: unknown) => getMetadataMock(opts),
-      })
-    },
+    metadataReader: () => () => ({
+      getSchema: (opts: unknown) => getSchemaMock(opts),
+      getMetadata: (opts: unknown) => getMetadataMock(opts),
+    }),
     fetchSchema: (uri: string, opts?: unknown) => fetchSchemaMock(uri, opts),
   }
 })
@@ -25,12 +22,14 @@ vi.mock('../lib/context.js', async () => {
   const actual = await vi.importActual<typeof import('../lib/context.js')>('../lib/context.js')
   return {
     ...actual,
-    clientFromContext: () => ({
-      // The SDK boundary is mocked, so a stub client is sufficient.
-      client: { extend: (fn: (c: unknown) => unknown) => fn({}) },
-      chain: { id: 1 },
-      registryAddress: '0x0000000000000000000000000000000000000000',
-    }),
+    publicClientForName: (...args: unknown[]) => {
+      publicClientForNameMock(...args)
+      return {
+        // The SDK boundary is mocked, so a stub client is sufficient.
+        client: {},
+        chain: { id: 1, name: 'mainnet' },
+      }
+    },
   }
 })
 
@@ -72,9 +71,9 @@ const patternSchema: Schema = {
   },
 }
 
-const baseRun = () =>
+const baseRun = (name = 'myagent.eth') =>
   viewCommand.run({
-    args: { name: 'myagent.eth' },
+    args: { name },
     options: {},
     env: {},
   })
@@ -84,7 +83,7 @@ describe('viewCommand.run', () => {
     getSchemaMock.mockReset()
     getMetadataMock.mockReset()
     fetchSchemaMock.mockReset()
-    metadataReaderConfigMock.mockReset()
+    publicClientForNameMock.mockReset()
   })
 
   it('happy path: reads schema, fetches it, validates payload', async () => {
@@ -246,7 +245,7 @@ describe('viewCommand.run', () => {
     }
   })
 
-  it('routes *.base.eth through the SDK with a basePublicClient', async () => {
+  it('uses a mainnet client for *.base.eth (CCIP-Read handles L2 lookup)', async () => {
     const schemaUri = 'ipfs://QmBaseSchema'
     getSchemaMock.mockResolvedValue({
       name: 'alice.base.eth',
@@ -264,18 +263,13 @@ describe('viewCommand.run', () => {
       schema: sampleSchema,
     })
 
-    await viewCommand.run({
-      args: { name: 'alice.base.eth' },
-      options: {},
-      env: {},
-    })
+    await baseRun('alice.base.eth')
 
-    expect(metadataReaderConfigMock).toHaveBeenCalledTimes(1)
-    const cfg = metadataReaderConfigMock.mock.calls[0][0] as { basePublicClient?: unknown }
-    expect(cfg.basePublicClient).toBeDefined()
+    expect(publicClientForNameMock).toHaveBeenCalledTimes(1)
+    expect(publicClientForNameMock.mock.calls[0][1]).toBe('alice.base.eth')
   })
 
-  it('does not pass basePublicClient for mainnet names', async () => {
+  it('uses a mainnet client for mainnet names', async () => {
     getSchemaMock.mockResolvedValue({
       name: 'myagent.eth',
       properties: {},
@@ -287,10 +281,9 @@ describe('viewCommand.run', () => {
       schema: null,
     })
 
-    await viewCommand.run({ args: { name: 'myagent.eth' }, options: {}, env: {} })
+    await baseRun()
 
-    expect(metadataReaderConfigMock).toHaveBeenCalledTimes(1)
-    const cfg = metadataReaderConfigMock.mock.calls[0][0] as { basePublicClient?: unknown }
-    expect(cfg.basePublicClient).toBeUndefined()
+    expect(publicClientForNameMock).toHaveBeenCalledTimes(1)
+    expect(publicClientForNameMock.mock.calls[0][1]).toBe('myagent.eth')
   })
 })

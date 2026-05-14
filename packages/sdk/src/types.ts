@@ -1,4 +1,5 @@
 import type { Schema } from '@ensmetadata/schemas/types'
+import type { Address } from 'viem'
 
 /**
  * A map of ENS text records keyed by name.
@@ -23,6 +24,13 @@ export interface GetSchemaOptions {
   gatewayUrls?: string[]
   strict?: boolean
   universalResolverAddress?: string
+  /**
+   * ENS registry address used for direct `registry.resolver(node)` →
+   * `resolver.text(node, key)` reads. Bypasses viem's `getEnsText`
+   * (which routes through a Universal Resolver). Required for chains
+   * without a UniversalResolver (e.g. Basenames on Base).
+   */
+  registry?: Address
 }
 
 export interface GetMetadataOptions {
@@ -34,6 +42,10 @@ export interface GetMetadataOptions {
   gatewayUrls?: string[]
   strict?: boolean
   universalResolverAddress?: string
+  /**
+   * See {@link GetSchemaOptions.registry}.
+   */
+  registry?: Address
 }
 
 export interface GetMetadataResult {
@@ -71,7 +83,19 @@ export interface ComputeDeltaOptions {
 export interface SetMetadataOptions {
   name: string
   schema?: Schema
+  /**
+   * Resolver to publish to. When set, the SDK skips its own resolver
+   * lookup entirely (neither `registry` nor a Universal Resolver are
+   * consulted).
+   */
   resolver?: `0x${string}`
+  /**
+   * ENS registry address used to look up `resolver(node)` directly,
+   * bypassing viem's UR-based `getEnsResolver`. Ignored when `resolver`
+   * is supplied. Required for writes to chains without a Universal
+   * Resolver (e.g. Basenames on Base).
+   */
+  registry?: Address
   ignoreMissing?: boolean
   desired: RecordSet
   existing?: RecordSet
