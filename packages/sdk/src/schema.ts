@@ -5,7 +5,12 @@ import type { MetadataValidationError, MetadataValidationResult } from './types'
 // Constants
 // --------------------------------------------------------------------------
 
-export const DEFAULT_IPFS_GATEWAY = 'https://ipfs.io'
+/**
+ * Default IPFS gateway prefix. Treated as a URL prefix: the SDK appends the
+ * CID (and any sub-path inside the ipfs:// URI) directly. Include any path
+ * segment that should appear before the CID, e.g. `/ipfs`.
+ */
+export const DEFAULT_IPFS_GATEWAY = 'https://ipfs.io/ipfs'
 const DEFAULT_TIMEOUT_MS = 15_000
 
 // --------------------------------------------------------------------------
@@ -93,10 +98,14 @@ export async function fetchSchemaFromHttps(
 /**
  * Fetch a Schema from an `ipfs://<cid>[/path]` URI via an IPFS HTTP gateway.
  * Throws if the URI does not use the ipfs scheme.
+ *
+ * `ipfsGateway` is treated as a URL prefix: the CID (and any sub-path inside
+ * the ipfs:// URI) is appended directly with a single `/` separator. Include
+ * any path segment that should appear before the CID in the prefix itself.
  */
 export async function fetchSchemaFromIpfs(
   uri: string,
-  opts: { gateway?: string; timeoutMs?: number } = {},
+  opts: { ipfsGateway?: string; timeoutMs?: number } = {},
 ): Promise<Schema> {
   const trimmed = uri.trim()
   if (!trimmed.startsWith('ipfs://')) {
@@ -106,8 +115,8 @@ export async function fetchSchemaFromIpfs(
   if (!location) {
     throw new Error(`Invalid IPFS URI: "${uri}". Missing CID.`)
   }
-  const origin = (opts.gateway ?? DEFAULT_IPFS_GATEWAY).replace(/\/+$/, '')
-  const url = `${origin}/ipfs/${location}`
+  const prefix = (opts.ipfsGateway ?? DEFAULT_IPFS_GATEWAY).replace(/\/+$/, '')
+  const url = `${prefix}/${location}`
   return fetchJsonAsSchema(url, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 }
 
@@ -132,7 +141,7 @@ export async function fetchSchemaFromLocal(
  */
 export async function fetchSchema(
   uri: string,
-  opts: { resolver?: SchemaResolver; gateway?: string; timeoutMs?: number } = {},
+  opts: { resolver?: SchemaResolver; ipfsGateway?: string; timeoutMs?: number } = {},
 ): Promise<Schema> {
   if (opts.resolver) {
     const local = await fetchSchemaFromLocal(uri, opts.resolver)
@@ -140,7 +149,10 @@ export async function fetchSchema(
   }
   const trimmed = uri.trim()
   if (trimmed.startsWith('ipfs://')) {
-    return fetchSchemaFromIpfs(trimmed, { gateway: opts.gateway, timeoutMs: opts.timeoutMs })
+    return fetchSchemaFromIpfs(trimmed, {
+      ipfsGateway: opts.ipfsGateway,
+      timeoutMs: opts.timeoutMs,
+    })
   }
   if (trimmed.startsWith('https://')) {
     return fetchSchemaFromHttps(trimmed, { timeoutMs: opts.timeoutMs })

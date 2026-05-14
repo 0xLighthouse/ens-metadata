@@ -1,5 +1,5 @@
 import type { Schema } from '@ensmetadata/schemas/types'
-import { fetchSchema, metadataReader, validateMetadata } from '@ensmetadata/sdk'
+import { metadataReader, validateMetadata } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import { globalEnv, globalOptions, publicClientForName, validateName } from '../lib/context.js'
@@ -17,46 +17,6 @@ const viewEnv = globalEnv.extend({
   IPFS_GATEWAY: z.string().optional().describe('IPFS gateway origin (e.g. https://ipfs.io)'),
 })
 
-type MatchedSchema =
-  | { title: string; version: string; uri: string; valid: true }
-  | {
-      title: string
-      version: string
-      uri: string
-      valid: false
-      errors: { key: string; message: string }[]
-    }
-  | { uri: string; valid: false; error: string }
-
-/**
- * Build the validation outcome for the schema URI declared on the name.
- * Returns `null` when no URI is declared. The schema document is fetched
- * upstream so a fetch failure can degrade gracefully without losing the
- * rest of the metadata read.
- */
-function buildMatchedSchema(
-  uri: string | null,
-  schema: Schema | null,
-  fetchError: string | null,
-  payload: Record<string, string>,
-): MatchedSchema | null {
-  if (!uri) return null
-  if (fetchError) return { uri, valid: false, error: fetchError }
-  if (!schema) return { uri, valid: false, error: 'schema not loaded' }
-
-  const result = validateMetadata(payload, schema)
-  if (result.success) {
-    return { title: schema.title, version: schema.version, uri, valid: true }
-  }
-  return {
-    title: schema.title,
-    version: schema.version,
-    uri,
-    valid: false,
-    errors: result.errors.map(({ key, message }) => ({ key, message })),
-  }
-}
-
 export const viewCommand = {
   description: 'View ENS node metadata',
   args: z.object({
@@ -72,40 +32,36 @@ export const viewCommand = {
     const ensName = validateName(c.args.name)
     const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
     const { client, chain } = publicClientForName(c, ensName)
-    const reader = metadataReader()(client)
-    const registryOpt = chain.ensRegistry ? { registry: chain.ensRegistry } : {}
-
-    const schemaInfo = await reader.getSchema({ name: ensName, ...registryOpt })
-    const schemaUri = schemaInfo.properties.schema ?? null
-
-    let schema: Schema | null = null
-    let schemaError: string | null = null
-    if (schemaUri) {
-      try {
-        schema = await fetchSchema(schemaUri, {
-          resolver: bundledSchemaResolver,
-          ...(ipfsGateway ? { gateway: ipfsGateway } : {}),
-        })
-      } catch (err) {
-        schemaError = err instanceof Error ? err.message : String(err)
-      }
-    }
+    const reader = metadataReader({ schemaResolver: bundledSchemaResolver })(client)
 
     const metadata = await reader.getMetadata({
       name: ensName,
-      ...(schema ? { schema } : {}),
-      ...registryOpt,
+      ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
+      ...(ipfsGateway ? { ipfsGateway } : {}),
     })
 
-    const payload: Record<string, string> = { ...metadata.properties }
-    const matchedSchema = buildMatchedSchema(schemaUri, schema, schemaError, payload)
+    if (!metadata.schema) {
+      throw new Error(
+        `No schema is set on ${ensName}. Cannot read metadata without a schema record.`,
+      )
+    }
+
+    const properties: Record<string, string> = { ...metadata.properties }
+    const schemaUri = properties.schema ?? null
+
+    const result = validateMetadata(properties, metadata.schema)
+    const validation = result.success ? { passed: true } : { passed: false, errors: result.errors.map(({ key, message }) => `${key}: ${message}`) }
 
     return {
       name: metadata.name,
-      class: metadata.properties.class ?? null,
-      schema: metadata.properties.schema ?? null,
-      matchedSchema,
-      properties: payload,
+      class: properties.class ?? null,
+      schemaDetails: {
+        title: metadata.schema.title,
+        version: metadata.schema.version,
+        uri: schemaUri,
+      },
+      validation,
+      properties,
     }
   },
 }

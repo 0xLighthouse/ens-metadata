@@ -1,7 +1,7 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import { type Address, type PublicClient, zeroAddress } from 'viem'
 import { namehash, normalize } from 'viem/ens'
-import { fetchSchema, getSchemaKeys } from './schema'
+import { type SchemaResolver, fetchSchema, getSchemaKeys } from './schema'
 import type {
   GetMetadataOptions,
   GetMetadataResult,
@@ -220,7 +220,10 @@ export async function getSchema(
 
   let resolvedSchema: Schema | null = null
   if (schemaUri) {
-    resolvedSchema = await fetchSchema(schemaUri)
+    resolvedSchema = await fetchSchema(schemaUri, {
+      ipfsGateway: opts.ipfsGateway,
+      resolver: opts.schemaResolver,
+    })
     if (!classValue) {
       classValue = nonEmpty(resolvedSchema.properties?.class?.default)
     }
@@ -238,14 +241,29 @@ export async function getSchema(
 }
 
 /**
- * The factory is intentionally argument-free so it composes cleanly with
- * `viem.PublicClient.extend()`. Pass `registry` per call (on
- * {@link GetSchemaOptions} / {@link GetMetadataOptions}) to use direct
- * registry+resolver reads instead of a Universal Resolver.
+ * The factory composes cleanly with `viem.PublicClient.extend()`. Pass
+ * `registry` per call (on {@link GetSchemaOptions} / {@link GetMetadataOptions})
+ * to use direct registry+resolver reads instead of a Universal Resolver.
+ *
+ * Optional `ipfsGateway` and `schemaResolver` configure defaults for every
+ * call made through the returned reader; per-call options take precedence.
  */
-export function metadataReader() {
+export function metadataReader(
+  config: { ipfsGateway?: string; schemaResolver?: SchemaResolver } = {},
+) {
+  const { ipfsGateway: defaultIpfsGateway, schemaResolver: defaultSchemaResolver } = config
   return (client: PublicClient) => ({
-    getSchema: (opts: GetSchemaOptions) => getSchema(client, opts),
-    getMetadata: (opts: GetMetadataOptions) => getMetadata(client, opts),
+    getSchema: (opts: GetSchemaOptions) =>
+      getSchema(client, {
+        ...opts,
+        ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+        schemaResolver: opts.schemaResolver ?? defaultSchemaResolver,
+      }),
+    getMetadata: (opts: GetMetadataOptions) =>
+      getMetadata(client, {
+        ...opts,
+        ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+        schemaResolver: opts.schemaResolver ?? defaultSchemaResolver,
+      }),
   })
 }

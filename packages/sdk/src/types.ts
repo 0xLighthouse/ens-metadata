@@ -1,5 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import type { Address } from 'viem'
+import type { SchemaResolver } from './schema'
 
 /**
  * A map of ENS text records keyed by name.
@@ -31,6 +32,22 @@ export interface GetSchemaOptions {
    * without a UniversalResolver (e.g. Basenames on Base).
    */
   registry?: Address
+  /**
+   * IPFS gateway URL prefix used when the resolved `schema` text record is an
+   * `ipfs://` URI. The CID is appended directly with a single `/` separator,
+   * so the prefix should include any path segment that must appear before the
+   * CID (e.g. `https://my-gw.example/ipfs`). Overrides any default set on the
+   * `metadataReader` / `metadataWriter` factory. Falls back to
+   * `DEFAULT_IPFS_GATEWAY` when unset everywhere.
+   */
+  ipfsGateway?: string
+  /**
+   * Optional resolver consulted before the IPFS / HTTPS fetchers. Lets a caller
+   * short-circuit schema retrieval (e.g. by serving schemas bundled in the
+   * package). When the resolver returns `null`, fetching falls through to the
+   * normal protocol fetchers.
+   */
+  schemaResolver?: SchemaResolver
 }
 
 export interface GetMetadataOptions {
@@ -46,6 +63,14 @@ export interface GetMetadataOptions {
    * See {@link GetSchemaOptions.registry}.
    */
   registry?: Address
+  /**
+   * See {@link GetSchemaOptions.ipfsGateway}.
+   */
+  ipfsGateway?: string
+  /**
+   * See {@link GetSchemaOptions.schemaResolver}.
+   */
+  schemaResolver?: SchemaResolver
 }
 
 export interface GetMetadataResult {
@@ -99,6 +124,12 @@ export interface SetMetadataOptions {
   ignoreMissing?: boolean
   desired: RecordSet
   existing?: RecordSet
+  /**
+   * See {@link GetSchemaOptions.ipfsGateway}. Used when the writer needs to
+   * resolve the name's `schema` URI to validate / diff records (i.e. when
+   * `schema` and `existing` are not both supplied).
+   */
+  ipfsGateway?: string
 }
 
 export interface SetMetadataResult {

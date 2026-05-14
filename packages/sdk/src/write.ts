@@ -161,7 +161,10 @@ async function prepareSetMetadata(
 ): Promise<PreparedMetadata> {
   const name = normalize(opts.name)
   const registry = opts.registry
-  const subOpts = registry ? { registry } : {}
+  const subOpts: { registry?: typeof registry; ipfsGateway?: string } = {
+    ...(registry ? { registry } : {}),
+    ...(opts.ipfsGateway ? { ipfsGateway: opts.ipfsGateway } : {}),
+  }
 
   const resolver = await resolveResolverAddress(publicClient, opts, name)
 
@@ -233,22 +236,40 @@ async function setMetadata(
 
 // --- Factories ---
 
-export function metadataWriter(config: { publicClient: PublicClient }) {
+/**
+ * `ipfsGateway`, when set on the factory config, becomes the default IPFS
+ * gateway prefix for every call routed through the writer. Per-call
+ * `opts.ipfsGateway` takes precedence.
+ */
+export function metadataWriter(config: { publicClient: PublicClient; ipfsGateway?: string }) {
+  const defaultIpfsGateway = config.ipfsGateway
+  const withDefaults = <T extends { ipfsGateway?: string }>(opts: T): T => ({
+    ...opts,
+    ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+  })
   return (walletClient: WalletClient) => ({
-    prepareSetMetadata: (opts: SetMetadataOptions) => prepareSetMetadata(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) =>
+      prepareSetMetadata(config.publicClient, withDefaults(opts)),
     setPreparedMetadata: (prepared: PreparedMetadata) =>
       setPreparedMetadata(walletClient, prepared),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadata(config.publicClient, opts),
-    setMetadata: (opts: SetMetadataOptions) => setMetadata(walletClient, config.publicClient, opts),
+      estimateSetMetadata(config.publicClient, withDefaults(opts)),
+    setMetadata: (opts: SetMetadataOptions) =>
+      setMetadata(walletClient, config.publicClient, withDefaults(opts)),
   })
 }
 
 /** Prepare / estimate without a wallet client (for dry-run flows). */
-export function metadataEstimator(config: { publicClient: PublicClient }) {
+export function metadataEstimator(config: { publicClient: PublicClient; ipfsGateway?: string }) {
+  const defaultIpfsGateway = config.ipfsGateway
+  const withDefaults = <T extends { ipfsGateway?: string }>(opts: T): T => ({
+    ...opts,
+    ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+  })
   return {
-    prepareSetMetadata: (opts: SetMetadataOptions) => prepareSetMetadata(config.publicClient, opts),
+    prepareSetMetadata: (opts: SetMetadataOptions) =>
+      prepareSetMetadata(config.publicClient, withDefaults(opts)),
     estimateSetMetadata: (opts: EstimateSetMetadataOptions) =>
-      estimateSetMetadata(config.publicClient, opts),
+      estimateSetMetadata(config.publicClient, withDefaults(opts)),
   }
 }

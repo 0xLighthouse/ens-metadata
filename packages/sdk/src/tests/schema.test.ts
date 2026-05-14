@@ -91,22 +91,42 @@ describe('fetchSchemaFromIpfs', () => {
     globalThis.fetch = realFetch
   })
 
-  it('fetches a bare-CID ipfs URI through the default gateway', async () => {
+  it('fetches a bare-CID ipfs URI through a /ipfs-prefixed gateway', async () => {
     fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
-    const result = await fetchSchemaFromIpfs('ipfs://QmDirect', { gateway: 'https://gw.test' })
+    const result = await fetchSchemaFromIpfs('ipfs://QmDirect', {
+      ipfsGateway: 'https://gw.test/ipfs',
+    })
     expect(result.title).toBe('Sample')
     expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/ipfs/QmDirect')
+  })
+
+  it('treats the gateway as a literal URL prefix (no /ipfs segment added)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
+    await fetchSchemaFromIpfs('ipfs://QmDirect', { ipfsGateway: 'https://gw.test' })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/QmDirect')
   })
 
   it('appends a directory sub-path to the gateway URL', async () => {
     fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
     await fetchSchemaFromIpfs(
       'ipfs://bafybeighgfsdllcwlb7uvga5foqonx52vnoryede72jo6k2a4rtj5naq3i/schemas/agent-schema-v1.json',
-      { gateway: 'https://gw.test' },
+      { ipfsGateway: 'https://gw.test/ipfs' },
     )
     expect(fetchSpy.mock.calls[0][0]).toBe(
       'https://gw.test/ipfs/bafybeighgfsdllcwlb7uvga5foqonx52vnoryede72jo6k2a4rtj5naq3i/schemas/agent-schema-v1.json',
     )
+  })
+
+  it('falls back to the default gateway (https://ipfs.io/ipfs)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
+    await fetchSchemaFromIpfs('ipfs://QmDefault')
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://ipfs.io/ipfs/QmDefault')
+  })
+
+  it('strips trailing slashes from the gateway prefix', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
+    await fetchSchemaFromIpfs('ipfs://QmTrail', { ipfsGateway: 'https://gw.test/ipfs/' })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/ipfs/QmTrail')
   })
 
   it('rejects non-ipfs URIs', async () => {
@@ -224,7 +244,7 @@ describe('fetchSchema (dispatcher)', () => {
     fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
     const result = await fetchSchema('ipfs://QmMiss', {
       resolver: async () => null,
-      gateway: 'https://example-gateway.test',
+      ipfsGateway: 'https://example-gateway.test/ipfs',
     })
     expect(result.title).toBe('Sample')
     expect(fetchSpy.mock.calls[0][0]).toBe('https://example-gateway.test/ipfs/QmMiss')

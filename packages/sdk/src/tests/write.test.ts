@@ -1,6 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import type { PublicClient, WalletClient } from 'viem'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { setRecordsMock } = vi.hoisted(() => {
   const mock = vi.fn() as ReturnType<typeof vi.fn> & {
@@ -621,5 +621,99 @@ describe('factory shapes', () => {
     expect(typeof estimator.estimateSetMetadata).toBe('function')
     expect('setMetadata' in estimator).toBe(false)
     expect('setPreparedMetadata' in estimator).toBe(false)
+  })
+})
+
+// --------------------------------------------------------------------------
+// ipfsGateway plumbing through prepareSetMetadata → getSchema → fetchSchema
+// --------------------------------------------------------------------------
+
+describe('prepareSetMetadata → fetchSchema ipfsGateway forwarding', () => {
+  const fetchSpy = vi.fn()
+  const realFetch = globalThis.fetch
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  function makeIpfsBackedClient(): PublicClient {
+    // getEnsText returns the schema URI for `schema`, a class for `class`,
+    // and null for any other read. That lets prepareSetMetadata's nested
+    // getSchema → fetchSchema resolve the (mocked) schema over IPFS, and the
+    // subsequent getMetadata read returns empty for the rest.
+    const getEnsText = vi.fn(async ({ key }: { key: string }) => {
+      if (key === 'schema') return 'ipfs://QmWriteCid'
+      if (key === 'class') return 'Agent'
+      return null
+    })
+    return makePublicClient({ getEnsText })
+  }
+
+  beforeEach(() => {
+    fetchSpy.mockReset()
+    fetchSpy.mockResolvedValue(jsonResponse(baseSchema))
+    globalThis.fetch = fetchSpy as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('forwards per-call ipfsGateway from SetMetadataOptions into fetchSchema', async () => {
+    const client = makeIpfsBackedClient()
+    const writer = metadataWriter({ publicClient: client })(makeWallet())
+    await writer.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      desired: { class: 'Agent' },
+      ipfsGateway: 'https://gw.test/ipfs',
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/ipfs/QmWriteCid')
+  })
+
+  it('falls back to the factory-level ipfsGateway when no per-call value is set', async () => {
+    const client = makeIpfsBackedClient()
+    const writer = metadataWriter({
+      publicClient: client,
+      ipfsGateway: 'https://factory.test/ipfs',
+    })(makeWallet())
+    await writer.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      desired: { class: 'Agent' },
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://factory.test/ipfs/QmWriteCid')
+  })
+
+  it('per-call ipfsGateway overrides the factory-level default', async () => {
+    const client = makeIpfsBackedClient()
+    const writer = metadataWriter({
+      publicClient: client,
+      ipfsGateway: 'https://factory.test/ipfs',
+    })(makeWallet())
+    await writer.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      desired: { class: 'Agent' },
+      ipfsGateway: 'https://percall.test/ipfs',
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://percall.test/ipfs/QmWriteCid')
+  })
+
+  it('metadataEstimator threads its factory-level ipfsGateway too', async () => {
+    const client = makeIpfsBackedClient()
+    const estimator = metadataEstimator({
+      publicClient: client,
+      ipfsGateway: 'https://factory.test/ipfs',
+    })
+    await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      desired: { class: 'Agent' },
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://factory.test/ipfs/QmWriteCid')
   })
 })

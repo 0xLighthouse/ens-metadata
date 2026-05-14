@@ -1,20 +1,20 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const getSchemaMock = vi.fn()
 const getMetadataMock = vi.fn()
-const fetchSchemaMock = vi.fn()
+const metadataReaderConfigMock = vi.fn()
 const publicClientForNameMock = vi.fn()
 
 vi.mock('@ensmetadata/sdk', async () => {
   const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
   return {
     ...actual,
-    metadataReader: () => () => ({
-      getSchema: (opts: unknown) => getSchemaMock(opts),
-      getMetadata: (opts: unknown) => getMetadataMock(opts),
-    }),
-    fetchSchema: (uri: string, opts?: unknown) => fetchSchemaMock(uri, opts),
+    metadataReader: (config?: unknown) => {
+      metadataReaderConfigMock(config)
+      return () => ({
+        getMetadata: (opts: unknown) => getMetadataMock(opts),
+      })
+    },
   }
 })
 
@@ -37,6 +37,7 @@ vi.mock('../lib/bundled-schemas.js', () => ({
   bundledSchemaResolver: vi.fn(async () => null),
 }))
 
+import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import { viewCommand } from './view.js'
 
 const sampleSchema: Schema = {
@@ -55,22 +56,6 @@ const sampleSchema: Schema = {
   required: ['class', 'description'],
 }
 
-const patternSchema: Schema = {
-  $id: 'pattern',
-  source: 'test',
-  title: 'Pattern',
-  version: '1.0.0',
-  description: 'schema with pattern properties',
-  type: 'object',
-  properties: {
-    class: { type: 'string', description: 'class id' },
-    schema: { type: 'string', description: 'schema URI' },
-  },
-  patternProperties: {
-    '^agent-endpoint(\\[[^\\]]+\\])?$': { type: 'string', description: 'endpoint' },
-  },
-}
-
 const baseRun = (name = 'myagent.eth') =>
   viewCommand.run({
     args: { name },
@@ -80,20 +65,13 @@ const baseRun = (name = 'myagent.eth') =>
 
 describe('viewCommand.run', () => {
   beforeEach(() => {
-    getSchemaMock.mockReset()
     getMetadataMock.mockReset()
-    fetchSchemaMock.mockReset()
+    metadataReaderConfigMock.mockReset()
     publicClientForNameMock.mockReset()
   })
 
-  it('happy path: reads schema, fetches it, validates payload', async () => {
+  it('happy path: validates returned properties against the returned schema', async () => {
     const schemaUri = 'ipfs://QmSchema'
-    getSchemaMock.mockResolvedValue({
-      name: 'myagent.eth',
-      properties: { schema: schemaUri, class: 'Sample' },
-      schema: null,
-    })
-    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       properties: {
@@ -106,35 +84,30 @@ describe('viewCommand.run', () => {
 
     const out = await baseRun()
 
-    expect(getSchemaMock).toHaveBeenCalledTimes(1)
-    expect(getSchemaMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
-    expect(fetchSchemaMock).toHaveBeenCalledTimes(1)
-    const [calledUri, calledOpts] = fetchSchemaMock.mock.calls[0]
-    expect(calledUri).toBe(schemaUri)
-    expect(calledOpts).toMatchObject({ resolver: expect.any(Function) })
     expect(getMetadataMock).toHaveBeenCalledTimes(1)
-    expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth', schema: sampleSchema })
-    expect(out.matchedSchema).toEqual({
-      title: 'Sample',
-      version: '1.0.0',
-      uri: schemaUri,
-      valid: true,
+    expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
+    expect(metadataReaderConfigMock).toHaveBeenCalledWith({
+      schemaResolver: bundledSchemaResolver,
     })
-    expect(out.properties).toEqual({
+    expect(out).toEqual({
+      name: 'myagent.eth',
       class: 'Sample',
-      schema: schemaUri,
-      description: 'hello',
+      schema: {
+        title: 'Sample',
+        version: '1.0.0',
+        uri: schemaUri,
+      },
+      validation: { passed: true },
+      properties: {
+        class: 'Sample',
+        schema: schemaUri,
+        description: 'hello',
+      },
     })
   })
 
-  it('reports required-missing errors and omits the missing key from properties', async () => {
+  it('reports required-missing errors when the returned properties violate the schema', async () => {
     const schemaUri = 'ipfs://QmSchema'
-    getSchemaMock.mockResolvedValue({
-      name: 'myagent.eth',
-      properties: { schema: schemaUri, class: 'Sample' },
-      schema: null,
-    })
-    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       properties: {
@@ -147,27 +120,37 @@ describe('viewCommand.run', () => {
     const out = await baseRun()
 
     expect(out.properties).toEqual({ class: 'Sample', schema: schemaUri })
-    expect(out.matchedSchema).toMatchObject({
+    expect(out.schema).toEqual({
       title: 'Sample',
       version: '1.0.0',
       uri: schemaUri,
-      valid: false,
     })
-    if (out.matchedSchema && 'errors' in out.matchedSchema) {
-      expect(out.matchedSchema.errors).toEqual([
-        { key: 'description', message: 'Required field "description" is missing' },
-      ])
-    } else {
-      throw new Error('expected validation errors on matchedSchema')
-    }
+    expect(out.validation).toEqual({
+      passed: false,
+      errors: ['description: Required field "description" is missing'],
+    })
   })
 
-  it('returns matchedSchema=null and reads DEFAULT_KEYS when no schema URI is set', async () => {
-    getSchemaMock.mockResolvedValue({
+  it('flattens each per-key validation error into a single "{key}: {message}" string', async () => {
+    const schemaUri = 'ipfs://QmSchema'
+    getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      properties: {},
-      schema: null,
+      properties: { schema: schemaUri },
+      schema: sampleSchema,
     })
+
+    const out = await baseRun()
+
+    expect(out.validation).toEqual({
+      passed: false,
+      errors: [
+        'class: Required field "class" is missing',
+        'description: Required field "description" is missing',
+      ],
+    })
+  })
+
+  it('errors out when the SDK cannot resolve a schema for the name', async () => {
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
       properties: {
@@ -176,88 +159,58 @@ describe('viewCommand.run', () => {
       schema: null,
     })
 
-    const out = await baseRun()
-
-    expect(fetchSchemaMock).not.toHaveBeenCalled()
-    // Called without `schema` so getMetadata falls back to DEFAULT_KEYS.
-    expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
-    expect(out.matchedSchema).toBeNull()
-    expect(out.properties).toEqual({ description: 'default-keys read' })
+    await expect(baseRun()).rejects.toThrow(/No schema is set on myagent\.eth/)
   })
 
-  it('degrades gracefully when schema fetch fails', async () => {
-    const schemaUri = 'ipfs://QmBroken'
-    getSchemaMock.mockResolvedValue({
-      name: 'myagent.eth',
-      properties: { schema: schemaUri },
-      schema: null,
-    })
-    fetchSchemaMock.mockRejectedValue(new Error('gateway down'))
+  it('propagates errors from getMetadata (no fallback when schema fetch fails)', async () => {
+    getMetadataMock.mockRejectedValue(new Error('gateway down'))
+    await expect(baseRun()).rejects.toThrow('gateway down')
+  })
+
+  it('forwards ipfsGateway from --ipfs-gateway option', async () => {
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      properties: {
-        schema: schemaUri,
-        description: 'still readable',
-      },
-      schema: null,
+      properties: { class: 'Sample', description: 'x' },
+      schema: sampleSchema,
     })
 
-    const out = await baseRun()
-
-    // Schema fetch failed → getMetadata called WITHOUT opts.schema (DEFAULT_KEYS).
-    expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth' })
-    expect(out.matchedSchema).toEqual({
-      uri: schemaUri,
-      valid: false,
-      error: 'gateway down',
+    await viewCommand.run({
+      args: { name: 'myagent.eth' },
+      options: { ipfsGateway: 'https://gw.test/ipfs' },
+      env: {},
     })
-    expect(out.properties).toEqual({
-      schema: schemaUri,
-      description: 'still readable',
+
+    expect(getMetadataMock).toHaveBeenCalledWith({
+      name: 'myagent.eth',
+      ipfsGateway: 'https://gw.test/ipfs',
     })
   })
 
-  it('drops pattern-matched keys from output (we never request them)', async () => {
-    const schemaUri = 'ipfs://QmPattern'
-    getSchemaMock.mockResolvedValue({
-      name: 'myagent.eth',
-      properties: { schema: schemaUri },
-      schema: null,
-    })
-    fetchSchemaMock.mockResolvedValue(patternSchema)
-    // Schema-driven getMetadata only asks for static `properties` keys, so
-    // pattern-matched keys aren't even returned by the mocked reader.
+  it('forwards ipfsGateway from IPFS_GATEWAY env when the option is unset', async () => {
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      properties: {
-        class: 'Pattern',
-        schema: schemaUri,
-      },
-      schema: patternSchema,
+      properties: { class: 'Sample', description: 'x' },
+      schema: sampleSchema,
     })
 
-    const out = await baseRun()
+    await viewCommand.run({
+      args: { name: 'myagent.eth' },
+      options: {},
+      env: { IPFS_GATEWAY: 'https://env.test/ipfs' },
+    })
 
-    expect(getMetadataMock).toHaveBeenCalledWith({ name: 'myagent.eth', schema: patternSchema })
-    expect(Object.keys(out.properties).sort()).toEqual(['class', 'schema'])
-    for (const key of Object.keys(out.properties)) {
-      expect(key.startsWith('agent-endpoint')).toBe(false)
-    }
+    expect(getMetadataMock).toHaveBeenCalledWith({
+      name: 'myagent.eth',
+      ipfsGateway: 'https://env.test/ipfs',
+    })
   })
 
   it('uses a mainnet client for *.base.eth (CCIP-Read handles L2 lookup)', async () => {
-    const schemaUri = 'ipfs://QmBaseSchema'
-    getSchemaMock.mockResolvedValue({
-      name: 'alice.base.eth',
-      properties: { schema: schemaUri, class: 'Sample' },
-      schema: null,
-    })
-    fetchSchemaMock.mockResolvedValue(sampleSchema)
     getMetadataMock.mockResolvedValue({
       name: 'alice.base.eth',
       properties: {
         class: 'Sample',
-        schema: schemaUri,
+        schema: 'ipfs://QmBaseSchema',
         description: 'hello from base',
       },
       schema: sampleSchema,
@@ -270,15 +223,10 @@ describe('viewCommand.run', () => {
   })
 
   it('uses a mainnet client for mainnet names', async () => {
-    getSchemaMock.mockResolvedValue({
-      name: 'myagent.eth',
-      properties: {},
-      schema: null,
-    })
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
-      properties: { description: 'mainnet only' },
-      schema: null,
+      properties: { class: 'Sample', description: 'mainnet only' },
+      schema: sampleSchema,
     })
 
     await baseRun()

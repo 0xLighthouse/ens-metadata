@@ -1,6 +1,6 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import type { PublicClient } from 'viem'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getMetadata, getSchema, metadataReader, readTextRecords } from '../read'
 
 const REGISTRY = '0xb94704422c2a1e396835a571837aa5ae53285a95' as `0x${string}`
@@ -164,5 +164,156 @@ describe('metadataReader factory', () => {
     })
     expect(getEnsText).not.toHaveBeenCalled()
     expect(readContract).toHaveBeenCalled()
+  })
+})
+
+// --------------------------------------------------------------------------
+// ipfsGateway plumbing
+// --------------------------------------------------------------------------
+
+describe('getSchema → fetchSchema ipfsGateway forwarding', () => {
+  const fetchSpy = vi.fn()
+  const realFetch = globalThis.fetch
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  function makeIpfsClient() {
+    return makeDirectReadClient({
+      text: { schema: 'ipfs://QmSchemaCid', class: 'Agent' },
+    }).client
+  }
+
+  beforeEach(() => {
+    fetchSpy.mockReset()
+    fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
+    globalThis.fetch = fetchSpy as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('uses the per-call ipfsGateway when supplied', async () => {
+    const client = makeIpfsClient()
+    await getSchema(client, {
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      ipfsGateway: 'https://gw.test/ipfs',
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://gw.test/ipfs/QmSchemaCid')
+  })
+
+  it('falls back to the factory-level ipfsGateway when no per-call value is set', async () => {
+    const client = makeIpfsClient()
+    const reader = metadataReader({ ipfsGateway: 'https://factory.test/ipfs' })(
+      client as PublicClient,
+    )
+    await reader.getSchema({ name: 'alice.base.eth', registry: REGISTRY })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://factory.test/ipfs/QmSchemaCid')
+  })
+
+  it('per-call ipfsGateway overrides the factory-level default', async () => {
+    const client = makeIpfsClient()
+    const reader = metadataReader({ ipfsGateway: 'https://factory.test/ipfs' })(
+      client as PublicClient,
+    )
+    await reader.getSchema({
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      ipfsGateway: 'https://percall.test/ipfs',
+    })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://percall.test/ipfs/QmSchemaCid')
+  })
+
+  it('falls back to DEFAULT_IPFS_GATEWAY when neither factory nor per-call is set', async () => {
+    const client = makeIpfsClient()
+    await getSchema(client, { name: 'alice.base.eth', registry: REGISTRY })
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://ipfs.io/ipfs/QmSchemaCid')
+  })
+})
+
+// --------------------------------------------------------------------------
+// schemaResolver plumbing
+// --------------------------------------------------------------------------
+
+describe('getSchema → fetchSchema schemaResolver forwarding', () => {
+  const fetchSpy = vi.fn()
+  const realFetch = globalThis.fetch
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  function makeIpfsClient() {
+    return makeDirectReadClient({
+      text: { schema: 'ipfs://QmSchemaCid', class: 'Agent' },
+    }).client
+  }
+
+  beforeEach(() => {
+    fetchSpy.mockReset()
+    fetchSpy.mockResolvedValue(jsonResponse(sampleSchema))
+    globalThis.fetch = fetchSpy as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('short-circuits the gateway when the per-call resolver returns a schema', async () => {
+    const client = makeIpfsClient()
+    const resolver = vi.fn(async (_uri: string) => sampleSchema)
+    const result = await getSchema(client, {
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      schemaResolver: resolver,
+    })
+    expect(resolver).toHaveBeenCalledWith('ipfs://QmSchemaCid')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.schema).toBe(sampleSchema)
+  })
+
+  it('falls through to the gateway when the resolver returns null', async () => {
+    const client = makeIpfsClient()
+    const resolver = vi.fn(async (_uri: string) => null)
+    await getSchema(client, {
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      schemaResolver: resolver,
+    })
+    expect(resolver).toHaveBeenCalledWith('ipfs://QmSchemaCid')
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://ipfs.io/ipfs/QmSchemaCid')
+  })
+
+  it('uses the factory-level schemaResolver when no per-call resolver is set', async () => {
+    const client = makeIpfsClient()
+    const resolver = vi.fn(async (_uri: string) => sampleSchema)
+    const reader = metadataReader({ schemaResolver: resolver })(client as PublicClient)
+    await reader.getSchema({ name: 'alice.base.eth', registry: REGISTRY })
+    expect(resolver).toHaveBeenCalledWith('ipfs://QmSchemaCid')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('per-call schemaResolver overrides the factory-level default', async () => {
+    const client = makeIpfsClient()
+    const factoryResolver = vi.fn(async (_uri: string) => sampleSchema)
+    const perCallResolver = vi.fn(async (_uri: string) => sampleSchema)
+    const reader = metadataReader({ schemaResolver: factoryResolver })(client as PublicClient)
+    await reader.getSchema({
+      name: 'alice.base.eth',
+      registry: REGISTRY,
+      schemaResolver: perCallResolver,
+    })
+    expect(perCallResolver).toHaveBeenCalledWith('ipfs://QmSchemaCid')
+    expect(factoryResolver).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
