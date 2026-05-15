@@ -1,7 +1,7 @@
 import { type PublicClient, type WalletClient, zeroAddress } from 'viem'
 import { normalize } from 'viem/ens'
 import { getMetadata, getResolverFromRegistry, getSchema } from './read'
-import { validateMetadata } from './schema'
+import { type SchemaResolver, validateMetadata } from './schema'
 import type {
   ChangePreview,
   EstimateResult,
@@ -161,9 +161,14 @@ async function prepareSetMetadata(
 ): Promise<PreparedMetadata> {
   const name = normalize(opts.name)
   const registry = opts.registry
-  const subOpts: { registry?: typeof registry; ipfsGateway?: string } = {
+  const subOpts: {
+    registry?: typeof registry
+    ipfsGateway?: string
+    schemaResolver?: SchemaResolver
+  } = {
     ...(registry ? { registry } : {}),
     ...(opts.ipfsGateway ? { ipfsGateway: opts.ipfsGateway } : {}),
+    ...(opts.schemaResolver ? { schemaResolver: opts.schemaResolver } : {}),
   }
 
   const resolver = await resolveResolverAddress(publicClient, opts, name)
@@ -237,15 +242,23 @@ async function setMetadata(
 // --- Factories ---
 
 /**
- * `ipfsGateway`, when set on the factory config, becomes the default IPFS
- * gateway prefix for every call routed through the writer. Per-call
- * `opts.ipfsGateway` takes precedence.
+ * `ipfsGateway` and `schemaResolver`, when set on the factory config, become
+ * the defaults for every call routed through the writer. Per-call options
+ * take precedence.
  */
-export function metadataWriter(config: { publicClient: PublicClient; ipfsGateway?: string }) {
+export function metadataWriter(config: {
+  publicClient: PublicClient
+  ipfsGateway?: string
+  schemaResolver?: SchemaResolver
+}) {
   const defaultIpfsGateway = config.ipfsGateway
-  const withDefaults = <T extends { ipfsGateway?: string }>(opts: T): T => ({
+  const defaultSchemaResolver = config.schemaResolver
+  const withDefaults = <T extends { ipfsGateway?: string; schemaResolver?: SchemaResolver }>(
+    opts: T,
+  ): T => ({
     ...opts,
     ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+    schemaResolver: opts.schemaResolver ?? defaultSchemaResolver,
   })
   return (walletClient: WalletClient) => ({
     prepareSetMetadata: (opts: SetMetadataOptions) =>
@@ -260,11 +273,19 @@ export function metadataWriter(config: { publicClient: PublicClient; ipfsGateway
 }
 
 /** Prepare / estimate without a wallet client (for dry-run flows). */
-export function metadataEstimator(config: { publicClient: PublicClient; ipfsGateway?: string }) {
+export function metadataEstimator(config: {
+  publicClient: PublicClient
+  ipfsGateway?: string
+  schemaResolver?: SchemaResolver
+}) {
   const defaultIpfsGateway = config.ipfsGateway
-  const withDefaults = <T extends { ipfsGateway?: string }>(opts: T): T => ({
+  const defaultSchemaResolver = config.schemaResolver
+  const withDefaults = <T extends { ipfsGateway?: string; schemaResolver?: SchemaResolver }>(
+    opts: T,
+  ): T => ({
     ...opts,
     ipfsGateway: opts.ipfsGateway ?? defaultIpfsGateway,
+    schemaResolver: opts.schemaResolver ?? defaultSchemaResolver,
   })
   return {
     prepareSetMetadata: (opts: SetMetadataOptions) =>

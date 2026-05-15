@@ -17,15 +17,15 @@ export const unsetWalletCommand = {
   }),
   options: unsetWalletOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { agentId: string }
     options: z.infer<typeof unsetWalletOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    const tokenId = BigInt(c.args.agentId)
-    return executeRegistryCall(c, {
-      privateKey: c.options.privateKey,
-      broadcast: c.options.broadcast,
+    const tokenId = BigInt(ctx.args.agentId)
+    return executeRegistryCall(ctx, {
+      privateKey: ctx.options.privateKey,
+      broadcast: ctx.options.broadcast,
       functionName: 'unsetAgentWallet',
       contractArgs: [tokenId],
       extraDetails: { agentId: tokenId.toString() },

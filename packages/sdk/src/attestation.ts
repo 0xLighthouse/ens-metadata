@@ -219,13 +219,6 @@ export async function signUidClaim(
 }
 
 // --- Verify ---
-
-function checkMaxAge(issuedAt: number, maxAge: number | undefined): boolean {
-  if (maxAge === undefined) return true
-  const now = Math.floor(Date.now() / 1000)
-  return now - issuedAt <= maxAge
-}
-
 async function recoverAndCheck(
   payload: Uint8Array,
   sig: Hex,
@@ -257,9 +250,6 @@ export async function verifyHandleClaim(
   if (envelope.version !== CLAIM_VERSION) {
     return { valid: false, reason: 'unsupported-version' }
   }
-  if (!checkMaxAge(envelope.issuedAt, options.maxAge)) {
-    return { valid: false, reason: 'stale' }
-  }
 
   let payload: Uint8Array
   try {
@@ -287,9 +277,6 @@ export async function verifyUidClaim(
 ): Promise<VerifyClaimResult> {
   if (envelope.version !== CLAIM_VERSION) {
     return { valid: false, reason: 'unsupported-version' }
-  }
-  if (!checkMaxAge(envelope.issuedAt, options.maxAge)) {
-    return { valid: false, reason: 'stale' }
   }
 
   let payload: Uint8Array

@@ -17,17 +17,17 @@ export const registerCommand = {
   }),
   options: registerOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { agentUri: string }
     options: z.infer<typeof registerOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    return executeRegistryCall(c, {
-      privateKey: c.options.privateKey,
-      broadcast: c.options.broadcast,
+    return executeRegistryCall(ctx, {
+      privateKey: ctx.options.privateKey,
+      broadcast: ctx.options.broadcast,
       functionName: 'register',
-      contractArgs: [c.args.agentUri],
-      extraDetails: { agentUri: c.args.agentUri },
+      contractArgs: [ctx.args.agentUri],
+      extraDetails: { agentUri: ctx.args.agentUri },
     })
   },
 }

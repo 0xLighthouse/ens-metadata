@@ -18,18 +18,18 @@ export const setUriCommand = {
   }),
   options: setUriOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { agentId: string; newUri: string }
     options: z.infer<typeof setUriOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    const tokenId = BigInt(c.args.agentId)
-    return executeRegistryCall(c, {
-      privateKey: c.options.privateKey,
-      broadcast: c.options.broadcast,
+    const tokenId = BigInt(ctx.args.agentId)
+    return executeRegistryCall(ctx, {
+      privateKey: ctx.options.privateKey,
+      broadcast: ctx.options.broadcast,
       functionName: 'setAgentURI',
-      contractArgs: [tokenId, c.args.newUri],
-      extraDetails: { agentId: tokenId.toString(), newUri: c.args.newUri },
+      contractArgs: [tokenId, ctx.args.newUri],
+      extraDetails: { agentId: tokenId.toString(), newUri: ctx.args.newUri },
     })
   },
 }

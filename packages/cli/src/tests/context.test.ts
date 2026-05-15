@@ -1,7 +1,7 @@
 import type { PublicClient } from 'viem'
 import { describe, expect, it } from 'vitest'
-import { getChainByName } from './chains.js'
-import { publicClientForChain, publicClientForName, resolveRpcUrl } from './context.js'
+import { getChainByName } from '../lib/chains.js'
+import { publicClientForChain, publicClientForName, resolveRpcUrl } from '../lib/context.js'
 
 const BASE_CHAIN_ID = 8453
 const MAINNET_CHAIN_ID = 1
@@ -63,17 +63,6 @@ describe('publicClientForChain', () => {
   it('applies --rpc by default', () => {
     const client = publicClientForChain({ options: { rpc: 'https://flag' }, env: {} }, baseChain)
     expect(transportUrls(client)[0]).toBe('https://flag')
-  })
-
-  it('ignores --rpc when applyRpcFlag: false', () => {
-    const client = publicClientForChain(
-      { options: { rpc: 'https://flag' }, env: { RPC_URL_8453: 'https://base.env' } },
-      baseChain,
-      { applyRpcFlag: false },
-    )
-    const urls = transportUrls(client)
-    expect(urls).not.toContain('https://flag')
-    expect(urls[0]).toBe('https://base.env')
   })
 })
 

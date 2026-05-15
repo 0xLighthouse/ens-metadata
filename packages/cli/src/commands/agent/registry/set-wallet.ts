@@ -41,15 +41,15 @@ export const setWalletCommand = {
   }),
   options: setWalletOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { agentId: string; walletAddress: string }
     options: z.infer<typeof setWalletOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    const { privateKey, broadcast, deadline: deadlineOpt, signature: signatureOpt } = c.options
-    const { agentId, walletAddress } = c.args
+    const { privateKey, broadcast, deadline: deadlineOpt, signature: signatureOpt } = ctx.options
+    const { agentId, walletAddress } = ctx.args
 
-    const { client: publicClient, chain, registryAddress } = clientFromContext(c)
+    const { client: publicClient, chain, registryAddress } = clientFromContext(ctx)
     const account = privateKeyToAccount(privateKey as `0x${string}`)
     const tokenId = BigInt(agentId)
     const chainId = await publicClient.getChainId()
@@ -64,8 +64,8 @@ export const setWalletCommand = {
     let finalDeadline: bigint
     let finalSignature: `0x${string}`
 
-    const rpcUrl = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
-    const transport = buildFallbackTransport(rpcUrl, [], chain.rpcUrls.default.http)
+    const rpcUrl = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+    const transport = buildFallbackTransport({ rpcUrl, viemDefaults: chain.rpcUrls.default.http })
 
     if (signatureOpt && deadlineOpt) {
       finalDeadline = BigInt(deadlineOpt)
@@ -136,7 +136,7 @@ export const setWalletCommand = {
 
       return {
         dryRun: true,
-        chain: c.options.chain,
+        chain: ctx.options.chain,
         registry: registryAddress,
         function: 'setAgentWallet',
         agentId: tokenId.toString(),
@@ -193,7 +193,7 @@ export const setWalletCommand = {
 
     return {
       broadcast: true,
-      chain: c.options.chain,
+      chain: ctx.options.chain,
       registry: registryAddress,
       function: 'setAgentWallet',
       agentId: tokenId.toString(),

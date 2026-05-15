@@ -1,18 +1,12 @@
 /**
  * Shared CLI context: option/env schemas, client factories, name normalization.
- *
- * Two parallel chain dispatch paths live in this file:
- *
+ * *
  *   - ENS commands (view/set/attestation verify) auto-select their chain
  *     from the subject name via `lib/chain-for-name.ts` + `lib/chains.ts`.
  *     They use `publicClientForChain` / `publicClientForName` /
- *     `walletClientForChain`.
+ *     `walletClientForChain`. Each command touches a single chain;
+ *     `--rpc` always binds to that chain.
  *
- *   - ERC-8004 agent commands take an explicit `--chain` flag and dispatch
- *     through `lib/registry.ts`. They use `clientFromContext` and
- *     `chainAwareOptions`.
- *
- * Both share the same RPC precedence and fallback transport helpers.
  */
 import {
   http,
@@ -80,7 +74,7 @@ export const globalEnv = z.object({
  *
  * Precedence:
  *   1. `--rpc <url>` flag
- *   2. `RPC_URL_<chainId>` (per-chain — declared common ones via c.env;
+ *   2. `RPC_URL_<chainId>` (per-chain — declared common ones via ctx.env;
  *      others fall through to process.env)
  *   3. `MAINNET_RPC_URL` (chainId 1 only)
  *   4. `ETH_RPC_URL` (any chain)
@@ -109,13 +103,15 @@ export type Context = {
 /**
  * Build a fallback transport stack: user-supplied RPC → chain's curated
  * defaults → viem's built-in defaults. Suitable for both PublicClient
- * and WalletClient.
+ * and WalletClient. All fields are optional — omitted tiers contribute
+ * nothing to the fallback chain.
  */
-export function buildFallbackTransport(
-  rpcUrl: string | undefined,
-  curatedDefaults: readonly string[],
-  viemDefaults: readonly string[] = [],
-) {
+export function buildFallbackTransport(opts: {
+  rpcUrl?: string
+  curatedDefaults?: readonly string[]
+  viemDefaults?: readonly string[]
+}) {
+  const { rpcUrl, curatedDefaults = [], viemDefaults = [] } = opts
   return fallback([
     ...(rpcUrl ? [http(rpcUrl)] : []),
     ...curatedDefaults.map((url) => http(url)),
@@ -129,23 +125,14 @@ export function buildFallbackTransport(
  * Build a viem PublicClient for `chain`. RPC URL resolves via
  * `resolveRpcUrl(chain.id, ...)` so each chain reads its own env override
  * (`RPC_URL_<id>`) and falls back to the chain's curated defaults.
- *
- * When `applyRpcFlag` is `false`, the `--rpc` flag is ignored — useful
- * when a single command touches multiple chains and the flag should only
- * bind to the primary one.
  */
-export function publicClientForChain(
-  c: Context,
-  chain: ChainConfig,
-  opts: { applyRpcFlag?: boolean } = {},
-): PublicClient {
-  const flagOptions = opts.applyRpcFlag === false ? {} : c.options
-  const rpc = resolveRpcUrl(chain.id, flagOptions, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(
-    rpc,
-    chain.rpcDefaults,
-    chain.viemChain.rpcUrls.default.http,
-  )
+export function publicClientForChain(ctx: Context, chain: ChainConfig): PublicClient {
+  const rpc = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport({
+    rpcUrl: rpc,
+    curatedDefaults: chain.rpcDefaults,
+    viemDefaults: chain.viemChain.rpcUrls.default.http,
+  })
   return createPublicClient({ chain: chain.viemChain, transport }) as PublicClient
 }
 
@@ -155,30 +142,27 @@ export function publicClientForChain(
  * and writes — no read/write split needed.
  */
 export function publicClientForName(
-  c: Context,
+  ctx: Context,
   name: string,
 ): { client: PublicClient; chain: ChainConfig } {
   const chain = chainForName(name)
-  return { client: publicClientForChain(c, chain), chain }
+  return { client: publicClientForChain(ctx, chain), chain }
 }
 
 /**
- * Build a WalletClient on `chain` for `account`. `--rpc` binds to this
- * client by default.
+ * Build a WalletClient on `chain` for `account`. `--rpc` binds to this client.
  */
 export function walletClientForChain(
-  c: Context,
+  ctx: Context,
   chain: ChainConfig,
   account: Account,
-  opts: { applyRpcFlag?: boolean } = {},
 ): WalletClient {
-  const flagOptions = opts.applyRpcFlag === false ? {} : c.options
-  const rpc = resolveRpcUrl(chain.id, flagOptions, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(
-    rpc,
-    chain.rpcDefaults,
-    chain.viemChain.rpcUrls.default.http,
-  )
+  const rpc = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport({
+    rpcUrl: rpc,
+    curatedDefaults: chain.rpcDefaults,
+    viemDefaults: chain.viemChain.rpcUrls.default.http,
+  })
   return createWalletClient({ account, chain: chain.viemChain, transport })
 }
 
@@ -192,16 +176,16 @@ export function walletClientForChain(
  * ENS commands should use `publicClientForName` instead.
  */
 export function clientFromContext(
-  c: Context,
+  ctx: Context,
   chainName?: string,
 ): {
   client: PublicClient
   chain: ReturnType<typeof resolveChain>['chain']
   registryAddress: ReturnType<typeof resolveChain>['registryAddress']
 } {
-  const { chain, registryAddress } = resolveChain(chainName ?? c.options.chain ?? 'mainnet')
-  const rpc = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(rpc, [], chain.rpcUrls.default.http)
+  const { chain, registryAddress } = resolveChain(chainName ?? ctx.options.chain ?? 'mainnet')
+  const rpc = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport({ rpcUrl: rpc, viemDefaults: chain.rpcUrls.default.http })
   const client = createPublicClient({ chain, transport })
   return { client, chain, registryAddress }
 }

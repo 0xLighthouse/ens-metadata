@@ -47,11 +47,11 @@ export type RegistryBroadcastResult = {
  * alongside the human-readable summary.
  */
 export async function executeRegistryCall(
-  c: Context,
+  ctx: Context,
   params: RegistryCallParams,
 ): Promise<RegistryDryRunResult | RegistryBroadcastResult> {
   const { privateKey, broadcast, functionName, contractArgs, extraDetails } = params
-  const { client: publicClient, chain, registryAddress } = clientFromContext(c)
+  const { client: publicClient, chain, registryAddress } = clientFromContext(ctx)
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   const data = encodeFunctionData({
     abi: IdentityRegistryABI,
@@ -75,7 +75,7 @@ export async function executeRegistryCall(
 
     return {
       dryRun: true,
-      chain: c.options.chain ?? 'mainnet',
+      chain: ctx.options.chain ?? 'mainnet',
       registry: registryAddress,
       function: functionName,
       signer: account.address,
@@ -89,8 +89,8 @@ export async function executeRegistryCall(
     }
   }
 
-  const rpcUrl = resolveRpcUrl(chain.id, c.options, c.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport(rpcUrl, [], chain.rpcUrls.default.http)
+  const rpcUrl = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+  const transport = buildFallbackTransport({ rpcUrl, viemDefaults: chain.rpcUrls.default.http })
   const walletClient = createWalletClient({ account, chain, transport })
   await validateCost(publicClient, { account: account.address, to: registryAddress, data })
 
@@ -107,7 +107,7 @@ export async function executeRegistryCall(
 
   return {
     broadcast: true,
-    chain: c.options.chain ?? 'mainnet',
+    chain: ctx.options.chain ?? 'mainnet',
     registry: registryAddress,
     function: functionName,
     txHash,

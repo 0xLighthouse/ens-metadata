@@ -75,8 +75,8 @@ export const templateCommand = {
   }),
   options: templateOptions,
   format: 'json' as const,
-  async run(c: { args: { type: string }; options: z.infer<typeof templateOptions> }) {
-    const { schema, registryId } = resolveSchemaRef(c.args.type)
+  async run(ctx: { args: { type: string }; options: z.infer<typeof templateOptions> }) {
+    const { schema, registryId } = resolveSchemaRef(ctx.args.type)
 
     const registry = await getPublishedRegistry()
     const published = registry.schemas[registryId]
@@ -84,7 +84,7 @@ export const templateCommand = {
       throw new Error(`No published versions found for schema type "${registryId}".`)
     }
 
-    const version = c.options.version ?? published.latest
+    const version = ctx.options.version ?? published.latest
     const entry = published.published[version]
     if (!entry) {
       const available = Object.keys(published.published).sort().join(', ')

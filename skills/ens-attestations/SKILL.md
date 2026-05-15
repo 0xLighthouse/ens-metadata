@@ -57,7 +57,7 @@ import { verifyUidAttestation } from '@ensmetadata/sdk'
 export async function checkTelegram(ensName: string, knownTelegramUid: string) {
   const result = await verifyUidAttestation(
     client,
-    { maxAge: 90 * 24 * 60 * 60 }, // optional staleness threshold
+    {},
     {
       name: ensName,
       platform: 'org.telegram',
@@ -83,9 +83,11 @@ import { verifyHandleAttestation } from '@ensmetadata/sdk'
 
 const result = await verifyHandleAttestation(
   client,
-  { maxAge: 90 * 24 * 60 * 60 },
+  {},
   { name: 'alice.eth', platform: 'com.x', attester: TRUSTED_ATTESTER },
 )
+// `result.issuedAt` is the unix-seconds timestamp the attester signed at —
+// apply your own freshness threshold against it if you need one.
 // result.handle is the handle that was attested (also the current value of
 // the plain `com.x` text record — they must match for verification to pass).
 ```
@@ -100,7 +102,8 @@ Both `verifyHandleAttestation` and `verifyUidAttestation`:
 4. Read auxiliary context: for a handle attestation, read the plain `<platform>` text record; for a uid attestation, the raw uid you passed.
 5. Reconstruct the canonical DAG-CBOR payload from those values plus the envelope timestamp.
 6. `keccak256(payload)`, `ecrecover` against the signature, compare to the attester's resolved address.
-7. Apply freshness threshold if configured.
+
+Freshness is not enforced by the SDK — `result.issuedAt` is returned so callers can apply their own threshold.
 
 ### Failure reasons
 
@@ -112,7 +115,6 @@ Both `verifyHandleAttestation` and `verifyUidAttestation`:
 | `attester-not-resolved` | The attester ENS name has no current `addr` record — nothing under that name is verifiable until the ENS is fixed. | Inspect your `attester` option; if it's correct, the attester's operator has not pointed the name at a signing key. |
 | `owner-not-resolved` | The subject ENS name has no owner — unregistered, expired, or an RPC failure. | Confirm the name is still registered; retry on RPC errors. |
 | `bad-signature` | Reconstructed payload doesn't match the signature — could be wrong owner (name transferred), wrong handle/uid supplied, a rotated key, or a different attester entirely. | Check you passed the right attester name; confirm the user hasn't transferred the name. |
-| `stale` | `now - issuedAt > maxAge`. | Only fires if you set `maxAge`. Ask the user to re-issue. |
 
 `result.recovered` (when present) holds the address ecrecover returned; if it's a valid-looking address but not your trusted attester, a different attester signed this or the payload reconstruction was wrong.
 

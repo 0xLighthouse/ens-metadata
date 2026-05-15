@@ -130,6 +130,11 @@ export interface SetMetadataOptions {
    * `schema` and `existing` are not both supplied).
    */
   ipfsGateway?: string
+  /**
+   * See {@link GetSchemaOptions.schemaResolver}. Consulted when the writer
+   * fetches the name's schema itself (i.e. `schema` is not pre-supplied).
+   */
+  schemaResolver?: SchemaResolver
 }
 
 export interface SetMetadataResult {

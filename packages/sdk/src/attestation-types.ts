@@ -100,7 +100,6 @@ export interface SignClaimWalletClient {
  */
 export type VerifyFailureReason =
   | 'missing'
-  | 'stale'
   | 'bad-signature'
   | 'unsupported-version'
   | 'decode-error'
@@ -122,8 +121,6 @@ interface BaseVerifyClaimOptions {
    * owner. Required: v2 can't verify without it because `addr` is signed.
    */
   owner: Address
-  /** Max age in seconds. If `now - issuedAt > maxAge`, claim is stale. */
-  maxAge?: number
   /** The ENS name the attestation is bound to. */
   name: string
   /** The platform namespace (e.g. "com.x"). */

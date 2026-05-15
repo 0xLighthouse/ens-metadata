@@ -37,8 +37,8 @@ vi.mock('../lib/bundled-schemas.js', () => ({
   bundledSchemaResolver: vi.fn(async () => null),
 }))
 
+import { viewCommand } from '../commands/view.js'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
-import { viewCommand } from './view.js'
 
 const sampleSchema: Schema = {
   $id: 'sample',
@@ -92,7 +92,7 @@ describe('viewCommand.run', () => {
     expect(out).toEqual({
       name: 'myagent.eth',
       class: 'Sample',
-      schema: {
+      schemaDetails: {
         title: 'Sample',
         version: '1.0.0',
         uri: schemaUri,
@@ -120,7 +120,7 @@ describe('viewCommand.run', () => {
     const out = await baseRun()
 
     expect(out.properties).toEqual({ class: 'Sample', schema: schemaUri })
-    expect(out.schema).toEqual({
+    expect(out.schemaDetails).toEqual({
       title: 'Sample',
       version: '1.0.0',
       uri: schemaUri,

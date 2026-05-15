@@ -1,11 +1,9 @@
 import { DEFAULT_ATTESTER_ENS } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { chainForName } from '../../../lib/chain-for-name.js'
-import { MAINNET_CHAIN } from '../../../lib/chains.js'
 import {
   globalEnv,
   globalOptions,
-  publicClientForChain,
   publicClientForName,
   validateName,
 } from '../../../lib/context.js'
@@ -32,35 +30,45 @@ export const verifyHandleCommand = {
   }),
   options: verifyHandleOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { name: string; platform: string }
     options: z.infer<typeof verifyHandleOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    const ensName = validateName(c.args.name)
-    if (chainForName(c.options.attester).id !== 1) {
+    const ensName = validateName(ctx.args.name)
+    const { client, chain } = publicClientForName(ctx, ensName)
+    if (chainForName(ctx.options.attester).id !== chain.id) {
       throw new Error(
-        '--attester must be a mainnet ENS name. Attesters on other chains are not yet supported.',
+        `--attester must be an ENS name on the same chain as the subject (${chain.name}).`,
       )
     }
-    const { client: subjectClient, chain } = publicClientForName(c, ensName)
-    const attesterClient =
-      chain.id === MAINNET_CHAIN.id
-        ? subjectClient
-        : publicClientForChain(c, MAINNET_CHAIN, { applyRpcFlag: false })
 
-    return verifyHandleAttestation(
-      subjectClient,
+    const result = await verifyHandleAttestation(
+      client,
       {
-        attesterClient,
         ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
-        ...(c.options.maxAge !== undefined ? { maxAge: c.options.maxAge } : {}),
       },
       {
         name: ensName,
-        platform: c.args.platform,
-        attester: c.options.attester,
+        platform: ctx.args.platform,
+        attester: ctx.options.attester,
       },
     )
+
+    const maxAge = ctx.options.maxAge
+    if (result.valid && maxAge !== undefined) {
+      const now = Math.floor(Date.now() / 1000)
+      if (now - result.issuedAt > maxAge) {
+        return {
+          valid: false as const,
+          reason: 'stale' as const,
+          handle: result.handle,
+          issuedAt: result.issuedAt,
+          attester: result.attester,
+          attesterAddress: result.attesterAddress,
+        }
+      }
+    }
+    return result
   },
 }

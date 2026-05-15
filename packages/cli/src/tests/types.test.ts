@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SCHEMA_8004_V2 } from './types.js'
+import { SCHEMA_8004_V2 } from '../types.js'
 
 const BASE = {
   type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',

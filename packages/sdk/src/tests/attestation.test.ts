@@ -302,33 +302,6 @@ describe('verifyHandleClaim — trust & freshness', () => {
     expect(result.recovered?.toLowerCase()).toBe(STRANGER_ADDR.toLowerCase())
   })
 
-  it('rejects a stale claim when maxAge is set', async () => {
-    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    const stale = Math.floor(Date.now() / 1000) - 7200
-    const fields: HandlePayloadFields = {
-      platform: 'com.x',
-      handle: 'vitalik',
-      name: 'alice.eth',
-      issuedAt: stale,
-      addr: WALLET_ADDR,
-    }
-    const hash = keccak256(encodeHandlePayload(fields))
-    const sig = await attester.signMessage({
-      account: privateKeyToAccount(ATTESTER_PRIVATE_KEY),
-      message: { raw: hash },
-    })
-    const envelope: Envelope = { version: CLAIM_VERSION, issuedAt: stale, sig }
-    const result = await verifyHandleClaim(envelope, { ...base, maxAge: 3600 })
-    expect(result.valid).toBe(false)
-    expect(result.reason).toBe('stale')
-  })
-
-  it('accepts a fresh claim when maxAge is set', async () => {
-    const attester = makeWalletClient(ATTESTER_PRIVATE_KEY)
-    const envelope = await signHandleClaim(makeHandleInput(), attester)
-    const result = await verifyHandleClaim(envelope, { ...base, maxAge: 3600 })
-    expect(result.valid).toBe(true)
-  })
 })
 
 // ------------------------------------------------------------------

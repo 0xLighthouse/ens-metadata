@@ -66,13 +66,13 @@ Subnames of `base.eth` (for example `alice.base.eth`) live on Base (chain 8453) 
 
 When operating on a Basename:
 
-- The command builds a Base public client in addition to the mainnet client. The Base RPC follows `RPC_URL_8453` → `ETH_RPC_URL` → public defaults.
-- `--rpc <url>` is bound to **the chain the subject name lives on**. For `view alice.base.eth` and `attestation verify * alice.base.eth`, `--rpc` overrides the Base client. Mainnet calls (used incidentally to resolve the attester ENS in `attestation verify`) take their RPC from `RPC_URL_1` / `MAINNET_RPC_URL` / `ETH_RPC_URL`.
+- The command builds a single Base public client. The Base RPC follows `RPC_URL_8453` → `ETH_RPC_URL` → public defaults.
+- `--rpc <url>` is bound to **the chain the subject name lives on**. For `view alice.base.eth` and `attestation verify * alice.base.eth`, `--rpc` overrides the Base client.
 - For `set alice.base.eth ...`, the wallet client's chain is auto-selected as Base; no manual chain flag is needed.
 
 The 2LD `base.eth` itself is treated as mainnet (consistent with the SDK).
 
-Custom attesters whose ENS names end in `.base.eth` are not yet supported by `attestation verify handle/uid`; pass a mainnet attester or use the default `atst.lighthousegov.eth`.
+`attestation verify handle/uid` is single-chain: `--attester` must be an ENS name on the same chain as the subject. For a `*.base.eth` subject, supply a `*.base.eth` attester; the default `atst.lighthousegov.eth` only works for mainnet subjects.
 
 ### Pinata (IPFS publishing)
 
@@ -507,7 +507,7 @@ Output shape matches the other registry write commands, with `function: "unsetAg
 
 Verify EIP-712 attestation envelopes that have been written into ENS text records by an attester. Read-only; no signing key needed.
 
-For `*.base.eth` subjects, the CLI reads the attestation text record from the Base L2 resolver and reads the owner from the Base registry; the attester ENS is still resolved on mainnet. See [Basenames](#basenames-baseeth). Custom `--attester` values that end in `.base.eth` are rejected — pass a mainnet attester or omit the flag to use the default.
+Single-chain: the subject and the attester must live on the same chain. For `*.base.eth` subjects, the CLI reads the attestation record, owner, and attester ENS all from Base — and `--attester` must end in `.base.eth`. For mainnet subjects, `--attester` must be a mainnet ENS (the default `atst.lighthousegov.eth` qualifies). See [Basenames](#basenames-baseeth).
 
 #### `attestation verify handle <name> <platform>`
 
@@ -558,7 +558,7 @@ Claim-level failures (the envelope was decoded but rejected):
 }
 ```
 
-Other claim-level reasons include `expired`, `name-mismatch`, and `too-old` (when `--max-age` is set). The exact list lives in [`@ensmetadata/sdk`](https://www.npmjs.com/package/@ensmetadata/sdk).
+Other claim-level reasons (`bad-signature`, `decode-error`, `unsupported-version`) come from the SDK; the exact list lives in [`@ensmetadata/sdk`](https://www.npmjs.com/package/@ensmetadata/sdk). The CLI also produces `stale` when `--max-age` is supplied and `now - issuedAt` exceeds it — this check is enforced in the CLI, not the SDK.
 
 #### `attestation verify uid <name> <platform> <uid>`
 

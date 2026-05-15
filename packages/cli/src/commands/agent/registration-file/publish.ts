@@ -14,18 +14,18 @@ export const publishCommand = {
     PINATA_API_KEY: z.string().optional().describe('Pinata API key (use with secret)'),
     PINATA_API_SECRET: z.string().optional().describe('Pinata API secret (use with key)'),
   }),
-  async run(c: {
+  async run(ctx: {
     args: { file: string }
     env: { PINATA_JWT?: string; PINATA_API_KEY?: string; PINATA_API_SECRET?: string }
   }) {
-    const { PINATA_JWT, PINATA_API_KEY, PINATA_API_SECRET } = c.env
+    const { PINATA_JWT, PINATA_API_KEY, PINATA_API_SECRET } = ctx.env
     if (!PINATA_JWT && !(PINATA_API_KEY && PINATA_API_SECRET)) {
       throw new Error(
         'Missing Pinata credentials. Set PINATA_JWT or both PINATA_API_KEY and PINATA_API_SECRET.',
       )
     }
 
-    const raw: unknown = JSON.parse(readFileSync(c.args.file, 'utf8'))
+    const raw: unknown = JSON.parse(readFileSync(ctx.args.file, 'utf8'))
     const result = validateRegistrationFile(raw)
     if (!result.success) {
       throw new Error(
@@ -37,7 +37,7 @@ export const publishCommand = {
 
     const { cid } = await publishFile({
       provider: 'pinata',
-      filePath: c.args.file,
+      filePath: ctx.args.file,
       pinataJwt: PINATA_JWT,
       pinataKey: PINATA_API_KEY,
       pinataSecret: PINATA_API_SECRET,

@@ -1,7 +1,7 @@
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import registryRaw from '@ensmetadata/schemas/registry' with { type: 'json' }
 import { describe, expect, it } from 'vitest'
-import { buildTemplatePayload, templateCommand } from './template.js'
+import { buildTemplatePayload, templateCommand } from '../commands/template.js'
 
 const AGENT_SCHEMA = SCHEMA_MAP.Agent
 

@@ -1,4 +1,3 @@
-import { computeDelta } from '@ensmetadata/sdk'
 import type { PublicClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChainConfig } from '../lib/chains.js'
@@ -14,7 +13,13 @@ vi.mock('@ensdomains/ensjs/public', () => ({
   getOwner: (client: unknown, opts: { name: string }) => getOwnerMock(client, opts),
 }))
 
-import { buildPayloadDiff, filterPayloadEntries, readEnsManager, setCommand } from './set.js'
+import {
+  buildPayloadDiff,
+  filterPayloadEntries,
+  resolveEnsManager,
+  setCommand,
+  updateCommand,
+} from '../commands/set.js'
 
 const STUB_CLIENT = {} as unknown as PublicClient
 
@@ -74,8 +79,8 @@ describe('readEnsManager (on-chain)', () => {
 
   it('resolves mainnet names via ensjs getOwner', async () => {
     getOwnerMock.mockResolvedValue({ owner: '0x1111111111111111111111111111111111111111' })
-    const owner = await readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT)
-    expect(owner).toBe('0x1111111111111111111111111111111111111111')
+    const manager = await resolveEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT)
+    expect(manager).toBe('0x1111111111111111111111111111111111111111')
     expect(getOwnerMock).toHaveBeenCalledWith(STUB_CLIENT, { name: 'myagent.eth' })
     expect(readContractMock).not.toHaveBeenCalled()
   })
@@ -83,8 +88,8 @@ describe('readEnsManager (on-chain)', () => {
   it('resolves Basenames via the Base registry contract', async () => {
     readContractMock.mockResolvedValue(undefined)
     const writeClient = baseClientWithReadContract('0x2222222222222222222222222222222222222222')
-    const owner = await readEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient)
-    expect(owner).toBe('0x2222222222222222222222222222222222222222')
+    const manager = await resolveEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient)
+    expect(manager).toBe('0x2222222222222222222222222222222222222222')
     expect(readContractMock).toHaveBeenCalledTimes(1)
     expect(readContractMock.mock.calls[0][0]).toMatchObject({
       address: BASE_CHAIN.ensRegistry,
@@ -97,21 +102,21 @@ describe('readEnsManager (on-chain)', () => {
     readContractMock.mockResolvedValue(undefined)
     const writeClient = baseClientWithReadContract('0x0000000000000000000000000000000000000000')
     await expect(
-      readEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient),
+      resolveEnsManager('alice.base.eth', STUB_CLIENT, BASE_CHAIN, writeClient),
     ).rejects.toThrow(/Could not determine the manager of alice\.base\.eth on base/)
   })
 
   it('hard-fails when ensjs returns no owner for a mainnet name', async () => {
     getOwnerMock.mockResolvedValue({ owner: undefined })
     await expect(
-      readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
+      resolveEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
     ).rejects.toThrow(/Could not determine the manager of myagent\.eth on mainnet/)
   })
 
   it('hard-fails when ensjs returns a non-address owner', async () => {
     getOwnerMock.mockResolvedValue({ owner: 'not-an-address' })
     await expect(
-      readEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
+      resolveEnsManager('myagent.eth', STUB_CLIENT, MAINNET_CHAIN, STUB_CLIENT),
     ).rejects.toThrow(/Could not determine the manager of myagent\.eth on mainnet/)
   })
 })
@@ -121,7 +126,19 @@ describe('setCommand.run — broadcast guard', () => {
     await expect(
       setCommand.run({
         args: { name: 'myagent.eth', payload: '/tmp/never-read.json' },
-        options: { broadcast: true, includeEmpty: false },
+        options: { broadcast: true, includeEmpty: true },
+        env: {},
+      }),
+    ).rejects.toThrow(/--private-key is required when --broadcast is set/)
+  })
+})
+
+describe('updateCommand.run — broadcast guard', () => {
+  it('throws when --broadcast is set without --private-key', async () => {
+    await expect(
+      updateCommand.run({
+        args: { name: 'myagent.eth', payload: '/tmp/never-read.json' },
+        options: { broadcast: true, includeEmpty: true },
         env: {},
       }),
     ).rejects.toThrow(/--private-key is required when --broadcast is set/)
@@ -129,19 +146,18 @@ describe('setCommand.run — broadcast guard', () => {
 })
 
 describe('buildPayloadDiff', () => {
-  it('separates added vs updated vs unchanged using the delta', () => {
-    const existing = {
-      description: 'old description',
-      avatar: null,
-      class: 'Agent',
-    }
+  it('separates added vs updated vs unchanged using the change preview', () => {
+    const existing = { description: 'old description', class: 'Agent' }
     const desired = {
       description: 'new description',
       avatar: 'ipfs://new-avatar',
       class: 'Agent',
     }
-    const delta = computeDelta(existing, desired)
-    const diff = buildPayloadDiff(existing, desired, delta)
+    const changes = {
+      description: 'new description',
+      avatar: 'ipfs://new-avatar',
+    }
+    const diff = buildPayloadDiff(desired, { existing, changes })
     expect(diff.added).toEqual([{ key: 'avatar', value: 'ipfs://new-avatar' }])
     expect(diff.updated).toEqual([
       { key: 'description', from: 'old description', to: 'new description' },
@@ -153,8 +169,8 @@ describe('buildPayloadDiff', () => {
   it('reports deleted keys when desired sends an empty string for an existing value', () => {
     const existing = { description: 'will be cleared', class: 'Agent' }
     const desired = { description: '', class: 'Agent' }
-    const delta = computeDelta(existing, desired)
-    const diff = buildPayloadDiff(existing, desired, delta)
+    const changes = { description: '' }
+    const diff = buildPayloadDiff(desired, { existing, changes })
     expect(diff.deleted).toEqual([{ key: 'description', from: 'will be cleared' }])
     expect(diff.unchanged).toEqual([{ key: 'class', value: 'Agent' }])
     expect(diff.added).toEqual([])
@@ -162,10 +178,10 @@ describe('buildPayloadDiff', () => {
   })
 
   it('treats existing-empty + desired-empty as a no-op (not added, not deleted)', () => {
-    const existing = { description: null }
+    const existing = {}
     const desired = { description: '' }
-    const delta = computeDelta(existing, desired)
-    const diff = buildPayloadDiff(existing, desired, delta)
+    const changes = {}
+    const diff = buildPayloadDiff(desired, { existing, changes })
     expect(diff.added).toEqual([])
     expect(diff.deleted).toEqual([])
     expect(diff.updated).toEqual([])
@@ -175,7 +191,7 @@ describe('buildPayloadDiff', () => {
   })
 
   it('returns an empty diff when desired is empty', () => {
-    expect(buildPayloadDiff({ class: 'Agent' }, {}, { changes: {}, deleted: [] })).toEqual({
+    expect(buildPayloadDiff({}, { existing: { class: 'Agent' }, changes: {} })).toEqual({
       added: [],
       updated: [],
       deleted: [],

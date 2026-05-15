@@ -8,8 +8,8 @@ export const validateCommand = {
     file: z.string().describe('Path to registration-file.json'),
   }),
   options: z.object({}),
-  run(c: { args: { file: string } }) {
-    const raw: unknown = JSON.parse(readFileSync(c.args.file, 'utf8'))
+  run(ctx: { args: { file: string } }) {
+    const raw: unknown = JSON.parse(readFileSync(ctx.args.file, 'utf8'))
     const result = validateRegistrationFile(raw)
     if (result.success) {
       return { valid: true }

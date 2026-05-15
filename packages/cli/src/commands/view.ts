@@ -24,14 +24,14 @@ export const viewCommand = {
   }),
   options: viewOptions,
   env: viewEnv,
-  async run(c: {
+  async run(ctx: {
     args: { name: string }
     options: z.infer<typeof viewOptions>
     env: z.infer<typeof viewEnv>
   }) {
-    const ensName = validateName(c.args.name)
-    const ipfsGateway = c.options.ipfsGateway ?? c.env.IPFS_GATEWAY
-    const { client, chain } = publicClientForName(c, ensName)
+    const ensName = validateName(ctx.args.name)
+    const ipfsGateway = ctx.options.ipfsGateway ?? ctx.env.IPFS_GATEWAY
+    const { client, chain } = publicClientForName(ctx, ensName)
     const reader = metadataReader({ schemaResolver: bundledSchemaResolver })(client)
 
     const metadata = await reader.getMetadata({

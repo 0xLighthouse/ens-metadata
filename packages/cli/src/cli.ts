@@ -10,7 +10,7 @@ import { setWalletCommand as agentRegistrySetWallet } from './commands/agent/reg
 import { unsetWalletCommand as agentRegistryUnsetWallet } from './commands/agent/registry/unset-wallet.js'
 import { verifyHandleCommand as attestationVerifyHandle } from './commands/attestation/verify/handle.js'
 import { verifyUidCommand as attestationVerifyUid } from './commands/attestation/verify/uid.js'
-import { setCommand } from './commands/set.js'
+import { setCommand, updateCommand } from './commands/set.js'
 import { skillCommand } from './commands/skill.js'
 import { templateCommand } from './commands/template.js'
 import { validateCommand } from './commands/validate.js'
@@ -53,6 +53,7 @@ const cli = Cli.create('ens-metadata', {
 })
   .command('view', viewCommand)
   .command('set', setCommand)
+  .command('update', updateCommand)
   .command('validate', validateCommand)
   .command('template', templateCommand)
   .command(attestationGroup)

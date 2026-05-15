@@ -3,9 +3,11 @@
  * the subject name, decode it, resolve owner + attester address, then call
  * the SDK's pure `verifyHandleClaim` / `verifyUidClaim` primitives.
  *
- * Reads route through the SDK reader, which supports both UR-based reads
- * (mainnet) and direct registry+resolver reads (e.g. Basenames on Base)
- * via the per-call `registry` option.
+ * Single-chain: subject and attester must live on the same chain. The
+ * caller passes one client; it's used for both the subject reads and the
+ * attester-ENS address lookup. Reads route through the SDK reader, which
+ * uses direct registry+resolver reads when `registry` is supplied (e.g.
+ * Basenames on Base).
  */
 import {
   type Envelope,
@@ -17,19 +19,11 @@ import {
   verifyHandleClaim,
   verifyUidClaim,
 } from '@ensmetadata/sdk'
-import { type Address, type Hex, type PublicClient, hexToBytes, isAddress, namehash } from 'viem'
+import { type Address, type Hex, type PublicClient, hexToBytes, isAddress, namehash, zeroAddress } from 'viem'
 import { getEnsAddress } from 'viem/actions'
 import { normalize } from 'viem/ens'
 
 export interface VerifyAttestationConfig {
-  /** Max age in seconds. If `now - issuedAt > maxAge`, the claim is stale. */
-  maxAge?: number
-  /**
-   * Mainnet client used to resolve the attester's ENS name → address.
-   * Defaults to `subjectClient` when omitted (correct for `*.eth`
-   * subjects, since the subject and attester then live on the same chain).
-   */
-  attesterClient?: PublicClient
   /**
    * ENS registry on the chain that hosts the subject's resolver. When
    * set, the SDK reader does direct registry+resolver reads instead of
@@ -37,6 +31,13 @@ export interface VerifyAttestationConfig {
    */
   registry?: Address
 }
+
+/**
+ * Result reasons surfaced by the CLI verifier. Extends the SDK's set with
+ * `'stale'`, which the CLI applies post-hoc against a caller-supplied
+ * `--max-age` — the SDK does not enforce freshness.
+ */
+export type CliVerifyFailureReason = VerifyFailureReason | 'stale'
 
 export interface VerifyHandleAttestationOptions {
   name: string
@@ -59,13 +60,13 @@ interface VerifyResultBase {
 export type VerifyHandleResult = VerifyResultBase &
   (
     | { valid: true; handle: string; issuedAt: number }
-    | { valid: false; reason: VerifyFailureReason; handle?: string; issuedAt?: number }
+    | { valid: false; reason: CliVerifyFailureReason; handle?: string; issuedAt?: number }
   )
 
 export type VerifyUidResult = VerifyResultBase &
   (
     | { valid: true; uid: string; issuedAt: number }
-    | { valid: false; reason: VerifyFailureReason; uid?: string; issuedAt?: number }
+    | { valid: false; reason: CliVerifyFailureReason; uid?: string; issuedAt?: number }
   )
 
 // ─── Read helpers ───────────────────────────────────────────────────────────
@@ -80,9 +81,7 @@ const REGISTRY_OWNER_ABI = [
   },
 ] as const
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
-async function readOwner(
+async function resolveOwner(
   client: PublicClient,
   name: string,
   registry?: Address,
@@ -95,7 +94,7 @@ async function readOwner(
         functionName: 'owner',
         args: [namehash(name)],
       })) as Address
-      return owner === ZERO_ADDRESS ? null : owner
+      return owner === zeroAddress ? null : owner
     } catch {
       return null
     }
@@ -161,13 +160,12 @@ export async function verifyHandleAttestation(
 ): Promise<VerifyHandleResult> {
   const name = normalize(opts.name)
   const attesterEns = opts.attester
-  const attesterClient = config.attesterClient ?? subjectClient
   const recordKey = handleAttestationRecordKey(opts.platform, attesterEns)
 
   const [{ envHex, handle }, owner, attesterAddress] = await Promise.all([
     readSubjectRecords(subjectClient, name, recordKey, config.registry, opts.platform),
-    readOwner(subjectClient, name, config.registry),
-    resolveAttester(attesterClient, attesterEns),
+    resolveOwner(subjectClient, name, config.registry),
+    resolveAttester(subjectClient, attesterEns),
   ])
 
   if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }
@@ -194,7 +192,6 @@ export async function verifyHandleAttestation(
     name,
     platform: opts.platform,
     handle,
-    ...(config.maxAge !== undefined ? { maxAge: config.maxAge } : {}),
   })
 
   if (!result.valid) {
@@ -229,13 +226,12 @@ export async function verifyUidAttestation(
 ): Promise<VerifyUidResult> {
   const name = normalize(opts.name)
   const attesterEns = opts.attester
-  const attesterClient = config.attesterClient ?? subjectClient
   const recordKey = uidAttestationRecordKey(opts.platform, attesterEns)
 
   const [{ envHex }, owner, attesterAddress] = await Promise.all([
     readSubjectRecords(subjectClient, name, recordKey, config.registry),
-    readOwner(subjectClient, name, config.registry),
-    resolveAttester(attesterClient, attesterEns),
+    resolveOwner(subjectClient, name, config.registry),
+    resolveAttester(subjectClient, attesterEns),
   ])
 
   if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }
@@ -259,7 +255,6 @@ export async function verifyUidAttestation(
     name,
     platform: opts.platform,
     uid: opts.uid,
-    ...(config.maxAge !== undefined ? { maxAge: config.maxAge } : {}),
   })
 
   if (!result.valid) {

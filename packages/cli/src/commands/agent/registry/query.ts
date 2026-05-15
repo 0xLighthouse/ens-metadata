@@ -9,13 +9,13 @@ export const queryCommand = {
   }),
   options: chainAwareOptions,
   env: globalEnv,
-  async run(c: {
+  async run(ctx: {
     args: { agentId: string }
     options: z.infer<typeof chainAwareOptions>
     env: z.infer<typeof globalEnv>
   }) {
-    const { client, registryAddress } = clientFromContext(c)
-    const tokenId = BigInt(c.args.agentId)
+    const { client, registryAddress } = clientFromContext(ctx)
+    const tokenId = BigInt(ctx.args.agentId)
 
     const [owner, uri] = await Promise.all([
       client.readContract({
@@ -33,7 +33,7 @@ export const queryCommand = {
     ])
 
     return {
-      chain: c.options.chain,
+      chain: ctx.options.chain,
       registry: registryAddress,
       tokenId: tokenId.toString(),
       owner: owner as `0x${string}`,

@@ -58,7 +58,7 @@ export const templateCommand = {
   description: 'Generate empty ERC-8004 v2.0 registration file template',
   args: z.object({}),
   options: templateOptions,
-  run(c: { options: z.infer<typeof templateOptions> }) {
-    return buildTemplate(c.options.chain)
+  run(ctx: { options: z.infer<typeof templateOptions> }) {
+    return buildTemplate(ctx.options.chain)
   },
 }

@@ -9,8 +9,8 @@ export const validateCommand = {
     file: z.string().describe('Path to payload.json'),
   }),
   options: z.object({}),
-  run(c: { args: { file: string } }) {
-    const raw: unknown = JSON.parse(readFileSync(c.args.file, 'utf8'))
+  run(ctx: { args: { file: string } }) {
+    const raw: unknown = JSON.parse(readFileSync(ctx.args.file, 'utf8'))
     const result = validateMetadata(raw, SCHEMA_MAP.Agent)
     if (result.success) {
       return {
