@@ -27,6 +27,28 @@ export const CLAIM_VERSION = 2
 export const DEFAULT_ATTESTER_ENS = 'atst.lighthousegov.eth'
 
 /**
+ * Default attester ENS name for Basenames (`*.base.eth`). Resolves on Base
+ * — same signing key as the mainnet attester, different ENS label so the
+ * record key reflects the chain the subject lives on.
+ */
+export const BASE_DEFAULT_ATTESTER_ENS = 'atst.base.eth'
+
+/**
+ * Pick the default attester ENS for `name` based on the chain its subject
+ * resolves on. `*.base.eth` → `BASE_DEFAULT_ATTESTER_ENS`; everything else
+ * → `DEFAULT_ATTESTER_ENS`. The suffix rule mirrors the chain registry in
+ * `@ensmetadata/shared/chain-for-name` but is inlined here to keep the SDK
+ * dep-tree minimal for published consumers.
+ */
+export function defaultAttesterEnsForName(name: string): string {
+  const normalized = normalize(name)
+  if (normalized !== 'base.eth' && normalized.endsWith('.base.eth')) {
+    return BASE_DEFAULT_ATTESTER_ENS
+  }
+  return DEFAULT_ATTESTER_ENS
+}
+
+/**
  * Build the parameterized text-record key for a handle attestation:
  * `attestations[<platform>][<attester-ens>]`. The attester name is
  * normalized via ENSIP-15 so writer and reader produce the same key.

@@ -1,6 +1,6 @@
+import type { ChainConfig } from '@ensmetadata/shared/chains'
 import type { PublicClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ChainConfig } from '../lib/chains.js'
 
 const getOwnerMock = vi.fn()
 const readContractMock = vi.fn()

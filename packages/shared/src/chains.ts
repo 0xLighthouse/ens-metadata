@@ -1,5 +1,5 @@
 /**
- * Per-chain configuration used by the CLI to build chain-aware viem clients.
+ * Per-chain configuration used to build chain-aware viem clients.
  *
  * Each entry is the single source of truth for everything chain-specific:
  *   - the viem `Chain` to build clients on (mainnet/sepolia get ensjs's

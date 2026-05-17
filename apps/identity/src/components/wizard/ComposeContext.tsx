@@ -9,6 +9,7 @@ import { attesterInfo } from '@/lib/attester-client'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
 import { handleAttestationRecordKey, uidAttestationRecordKey } from '@ensmetadata/sdk'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
 import {
@@ -135,15 +136,15 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   )
   const requiredAttrSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
 
-  // Attester ENS powers the attestation record keys we need to pre-load so
-  // already-published attestations show up as "unchanged" in the diff. Fetched
-  // once from the worker's `GET /`.
-  const [attesterEns, setAttesterEns] = useState<string | null>(null)
+  // Per-chain attester ENS labels, fetched once from the worker's `GET /`.
+  // We pick the right one for the confirmed name below; the map covers
+  // every chain the worker advertises.
+  const [attesters, setAttesters] = useState<Record<string, string> | null>(null)
   useEffect(() => {
     let cancelled = false
     attesterInfo()
       .then((info) => {
-        if (!cancelled) setAttesterEns(info.attester)
+        if (!cancelled) setAttesters(info.attesters)
       })
       .catch(() => {
         // Non-fatal: the wizard still works, existing attestations just won't
@@ -153,6 +154,14 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
       cancelled = true
     }
   }, [])
+
+  // Resolve once the user has a name to read against. Before that, no
+  // attestation keys can be pre-loaded (we don't know which chain's label
+  // to use) — the diff preview just shows everything as new.
+  const attesterEns = useMemo(() => {
+    if (!ens.confirmed || !attesters) return null
+    return attesters[chainForName(ens.ensName).name] ?? null
+  }, [ens.confirmed, ens.ensName, attesters])
 
   const platformList = useMemo(
     () => Array.from(new Set<Platform>([...requiredPlatforms, ...optionalPlatforms])),

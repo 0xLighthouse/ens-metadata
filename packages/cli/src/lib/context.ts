@@ -1,3 +1,5 @@
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import type { ChainConfig } from '@ensmetadata/shared/chains'
 /**
  * Shared CLI context: option/env schemas, client factories, name normalization.
  * *
@@ -19,8 +21,6 @@ import {
 } from 'viem'
 import { normalize } from 'viem/ens'
 import { z } from 'zod'
-import { chainForName } from './chain-for-name.js'
-import type { ChainConfig } from './chains.js'
 import { SUPPORTED_CHAINS, resolveChain } from './registry.js'
 
 // ─── Option schemas ─────────────────────────────────────────────────────────
@@ -185,7 +185,10 @@ export function clientFromContext(
 } {
   const { chain, registryAddress } = resolveChain(chainName ?? ctx.options.chain ?? 'mainnet')
   const rpc = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
-  const transport = buildFallbackTransport({ rpcUrl: rpc, viemDefaults: chain.rpcUrls.default.http })
+  const transport = buildFallbackTransport({
+    rpcUrl: rpc,
+    viemDefaults: chain.rpcUrls.default.http,
+  })
   const client = createPublicClient({ chain, transport })
   return { client, chain, registryAddress }
 }

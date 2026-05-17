@@ -1,11 +1,13 @@
 // Thin helpers around @ensmetadata/sdk for ENS reads/writes used by the
 // proofs wizard. The actual proof write goes through metadataWriter's
-// setMetadata({ name, records: { 'attestations[com.x][0x…]': hex, ... } })
+// setMetadata({ name, desired: { 'attestations[com.x][0x…]': hex, ... } })
 // directly — no dedicated setProof helper in the SDK.
 
+import { getPublicClientForName } from '@/contexts/Web3Provider'
 import { getOwner } from '@ensdomains/ensjs/public'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { GraphQLClient, gql } from 'graphql-request'
-import type { Address } from 'viem'
+import { type Address, type PublicClient, isAddress, namehash } from 'viem'
 // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
 type EnsPublicClient = any
 
@@ -20,9 +22,47 @@ const QUERY_NAMES_FOR_ADDRESS = gql`
   }
 `
 
-export async function resolveOwner(client: EnsPublicClient, name: string) {
-  const result = await getOwner(client, { name })
-  return result?.owner ?? null
+const L2_REGISTRY_ABI = [
+  {
+    type: 'function',
+    name: 'owner',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const
+
+const ZERO_ADDRESS: Address = '0x0000000000000000000000000000000000000000'
+
+/**
+ * Resolve the address that manages `name`'s records. Routes to the chain
+ * the name lives on: ensjs's `getOwner` for mainnet (which transparently
+ * handles registry / registrar / NameWrapper), or a direct `owner(node)`
+ * call on the L2 registry for chains like Base.
+ *
+ * `mainnetClient` is used only for mainnet names; L2 names build their own
+ * client off the chain registry.
+ */
+export async function resolveOwner(
+  mainnetClient: EnsPublicClient,
+  name: string,
+): Promise<Address | null> {
+  const chain = chainForName(name)
+  if (chain.ensRegistry) {
+    const client = getPublicClientForName(name) as PublicClient
+    const owner = (await client.readContract({
+      address: chain.ensRegistry,
+      abi: L2_REGISTRY_ABI,
+      functionName: 'owner',
+      args: [namehash(name)],
+    })) as Address
+    if (!owner || owner === ZERO_ADDRESS) return null
+    return owner
+  }
+
+  const result = await getOwner(mainnetClient, { name })
+  const owner = result?.owner
+  return owner && isAddress(owner) ? (owner as Address) : null
 }
 
 /**

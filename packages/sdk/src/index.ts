@@ -32,6 +32,8 @@ export {
   CLAIM_VERSION,
   ENVELOPE_TAG,
   DEFAULT_ATTESTER_ENS,
+  BASE_DEFAULT_ATTESTER_ENS,
+  defaultAttesterEnsForName,
 } from './attestation'
 
 // --- Public types ---

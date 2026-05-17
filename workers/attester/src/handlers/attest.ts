@@ -1,5 +1,4 @@
 import {
-  DEFAULT_ATTESTER_ENS,
   encodeEnvelope,
   handleAttestationRecordKey,
   signHandleClaim,
@@ -8,6 +7,7 @@ import {
 } from '@ensmetadata/sdk'
 import { bytesToHex, isAddress } from 'viem'
 import { attesterWallet } from '../attester'
+import { attesterEnsForName } from '../attester-ens'
 import { jsonResponse } from '../cors'
 import type { Env } from '../env'
 
@@ -86,7 +86,7 @@ export async function handleAttest(env: Env, request: Request): Promise<Response
     const wallet = await attesterWallet(env)
     const signerAddress = wallet.account?.address
     if (!signerAddress) throw new Error('attester wallet has no account')
-    const attesterEns = env.ATTESTER_ENS ?? DEFAULT_ATTESTER_ENS
+    const attesterEns = attesterEnsForName(name, env)
     const addr = session.wallet!
 
     const attestations = await Promise.all(

@@ -72,7 +72,7 @@ When operating on a Basename:
 
 The 2LD `base.eth` itself is treated as mainnet (consistent with the SDK).
 
-`attestation verify handle/uid` is single-chain: `--attester` must be an ENS name on the same chain as the subject. For a `*.base.eth` subject, supply a `*.base.eth` attester; the default `atst.lighthousegov.eth` only works for mainnet subjects.
+`attestation verify handle/uid` is single-chain: when supplied, `--attester` must be an ENS name on the same chain as the subject. Omit the flag to auto-resolve from the subject's chain — `atst.base.eth` for `*.base.eth`, `atst.lighthousegov.eth` for everything else.
 
 ### Pinata (IPFS publishing)
 
@@ -507,11 +507,11 @@ Output shape matches the other registry write commands, with `function: "unsetAg
 
 Verify EIP-712 attestation envelopes that have been written into ENS text records by an attester. Read-only; no signing key needed.
 
-Single-chain: the subject and the attester must live on the same chain. For `*.base.eth` subjects, the CLI reads the attestation record, owner, and attester ENS all from Base — and `--attester` must end in `.base.eth`. For mainnet subjects, `--attester` must be a mainnet ENS (the default `atst.lighthousegov.eth` qualifies). See [Basenames](#basenames-baseeth).
+Single-chain: the subject and the attester must live on the same chain. The CLI reads the attestation record, owner, and attester ENS all from the subject's chain. `--attester` is optional — when omitted, it auto-resolves to `atst.base.eth` for `*.base.eth` subjects and `atst.lighthousegov.eth` for everything else. When supplied, it must end in the same chain's suffix. See [Basenames](#basenames-baseeth).
 
 #### `attestation verify handle <name> <platform>`
 
-Verify a social-handle attestation written to `social-proofs[<platform>][<attester-ens>]`. The attester defaults to `atst.lighthousegov.eth`.
+Verify a social-handle attestation written to `social-proofs[<platform>][<attester-ens>]`. The attester auto-resolves from the subject's chain; pass `--attester` to verify against a non-default attester.
 
 ```sh
 ens-metadata attestation verify handle myagent.eth com.x

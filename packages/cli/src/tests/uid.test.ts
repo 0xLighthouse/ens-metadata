@@ -25,13 +25,16 @@ vi.mock('../lib/context.js', async () => {
 
 import { verifyUidCommand } from '../commands/attestation/verify/uid.js'
 
+// `attester` intentionally NOT defaulted here — most tests exercise the
+// auto-resolve path (no flag → SDK default). Pass it explicitly to test
+// the override path.
 const baseRun = (
   name: string,
   options: Partial<{ attester: string; maxAge: number; rpc: string }> = {},
 ) =>
   verifyUidCommand.run({
     args: { name, platform: 'com.x', uid: 'some-uid' },
-    options: { attester: 'atst.lighthousegov.eth', ...options },
+    options,
     env: {},
   })
 
@@ -57,7 +60,7 @@ describe('verifyUidCommand.run', () => {
   })
 
   it('rejects a mainnet attester for a *.base.eth subject', async () => {
-    await expect(baseRun('alice.base.eth')).rejects.toThrow(
+    await expect(baseRun('alice.base.eth', { attester: 'atst.lighthousegov.eth' })).rejects.toThrow(
       /must be an ENS name on the same chain as the subject \(base\)/,
     )
     expect(verifyUidAttestationMock).not.toHaveBeenCalled()
@@ -68,6 +71,24 @@ describe('verifyUidCommand.run', () => {
       /must be an ENS name on the same chain as the subject \(mainnet\)/,
     )
     expect(verifyUidAttestationMock).not.toHaveBeenCalled()
+  })
+
+  it('auto-resolves the attester to atst.base.eth for *.base.eth subjects', async () => {
+    await baseRun('alice.base.eth')
+    const opts = verifyUidAttestationMock.mock.calls[0][2] as { attester: string }
+    expect(opts.attester).toBe('atst.base.eth')
+  })
+
+  it('auto-resolves the attester to atst.lighthousegov.eth for mainnet subjects', async () => {
+    await baseRun('myagent.eth')
+    const opts = verifyUidAttestationMock.mock.calls[0][2] as { attester: string }
+    expect(opts.attester).toBe('atst.lighthousegov.eth')
+  })
+
+  it('explicit --attester wins over auto-resolution', async () => {
+    await baseRun('myagent.eth', { attester: 'custom.eth' })
+    const opts = verifyUidAttestationMock.mock.calls[0][2] as { attester: string }
+    expect(opts.attester).toBe('custom.eth')
   })
 
   it('threads uid + platform through to the verifier', async () => {

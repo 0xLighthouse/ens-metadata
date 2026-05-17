@@ -85,9 +85,13 @@ export function createSession(): Promise<CreateSessionResponse> {
 }
 
 export interface AttesterInfoResponse {
-  /** ENS name the worker uses in attestation record keys. */
-  attester: string
-  /** Address the attester ENS resolves to; null if the worker couldn't resolve it. */
+  /**
+   * Per-chain attester ENS labels the worker embeds in record keys. Keys
+   * are chain slugs from `@ensmetadata/shared/chains` (e.g. `mainnet`,
+   * `base`). Look up via `chainForName(name).name`.
+   */
+  attesters: Record<string, string>
+  /** Address the attester key resolves to; null if the worker couldn't resolve it. */
   signerAddress: string | null
 }
 

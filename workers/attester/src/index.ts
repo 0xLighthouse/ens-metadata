@@ -1,5 +1,6 @@
-import { CLAIM_VERSION, DEFAULT_ATTESTER_ENS, ENVELOPE_TAG } from '@ensmetadata/sdk'
+import { CLAIM_VERSION, ENVELOPE_TAG } from '@ensmetadata/sdk'
 import { attesterWallet } from './attester'
+import { attesterEnsMap } from './attester-ens'
 import { jsonResponse, preflightResponse } from './cors'
 import type { Env } from './env'
 import { handleAttest } from './handlers/attest'
@@ -45,7 +46,10 @@ export default {
         service: 'ensmetadata-attester',
         version: CLAIM_VERSION,
         tag: ENVELOPE_TAG,
-        attester: env.ATTESTER_ENS ?? DEFAULT_ATTESTER_ENS,
+        // Per-chain attester ENS labels. Clients look up by chain slug
+        // (`chainForName(name).name`). The signing key is the same across
+        // labels; only the ENS embedded in record keys differs.
+        attesters: attesterEnsMap(env),
         signerAddress: signerAddress ?? null,
         endpoints: [
           'POST /api/session',

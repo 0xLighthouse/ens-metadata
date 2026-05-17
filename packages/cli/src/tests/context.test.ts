@@ -1,6 +1,6 @@
+import { getChainByName } from '@ensmetadata/shared/chains'
 import type { PublicClient } from 'viem'
 import { describe, expect, it } from 'vitest'
-import { getChainByName } from '../lib/chains.js'
 import { publicClientForChain, publicClientForName, resolveRpcUrl } from '../lib/context.js'
 
 const BASE_CHAIN_ID = 8453

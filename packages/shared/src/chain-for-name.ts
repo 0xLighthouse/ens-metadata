@@ -9,10 +9,10 @@
  *   - everything else → mainnet
  *
  * Adding a new chain is one entry in `NAME_RULES` plus one entry in
- * `lib/chains.ts`.
+ * `chains.ts`.
  */
 import { normalize } from 'viem/ens'
-import { type ChainConfig, MAINNET_CHAIN, getChainByName } from './chains.js'
+import { type ChainConfig, MAINNET_CHAIN, getChainByName } from './chains'
 
 interface NameRule {
   /** Longest-match wins. The `.` is included. */

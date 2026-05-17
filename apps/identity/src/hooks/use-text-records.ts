@@ -1,7 +1,8 @@
 'use client'
 
-import { useWeb3 } from '@/contexts/Web3Provider'
+import { getPublicClientForName } from '@/contexts/Web3Provider'
 import { metadataReader } from '@ensmetadata/sdk'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { useEffect, useState } from 'react'
 
 export interface TextRecordsResult {
@@ -20,9 +21,11 @@ export interface TextRecordsResult {
  * Pass `ensName = null` to gate the fetch (e.g. until a session is confirmed).
  * `keys` should be memoized by the caller — reference changes retrigger the
  * fetch.
+ *
+ * The chain is auto-detected from `ensName` so e.g. `*.base.eth` reads off
+ * the Base L2 registry instead of mainnet.
  */
 export function useTextRecords(ensName: string | null, keys: readonly string[]): TextRecordsResult {
-  const { publicClient } = useWeb3()
   const [records, setRecords] = useState<Record<string, string | null> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,12 +35,18 @@ export function useTextRecords(ensName: string | null, keys: readonly string[]):
     // mount but correctly models "refetching" when keys expand.
     setRecords(null)
     setError(null)
-    if (!ensName || !publicClient || keys.length === 0) return
+    if (!ensName || keys.length === 0) return
     let cancelled = false
     ;(async () => {
       try {
-        const reader = metadataReader()(publicClient)
-        const result = await reader.getMetadata({ name: ensName, keys: [...keys] })
+        const chain = chainForName(ensName)
+        const client = getPublicClientForName(ensName)
+        const reader = metadataReader()(client)
+        const result = await reader.getMetadata({
+          name: ensName,
+          keys: [...keys],
+          ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
+        })
         if (cancelled) return
         setRecords(result.properties as Record<string, string | null>)
         setError(null)
@@ -50,7 +59,7 @@ export function useTextRecords(ensName: string | null, keys: readonly string[]):
     return () => {
       cancelled = true
     }
-  }, [publicClient, ensName, keys])
+  }, [ensName, keys])
 
   return { records, error, loaded: records !== null }
 }

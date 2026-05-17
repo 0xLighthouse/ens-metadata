@@ -1,6 +1,6 @@
-import { DEFAULT_ATTESTER_ENS } from '@ensmetadata/sdk'
+import { defaultAttesterEnsForName } from '@ensmetadata/sdk'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { z } from 'zod'
-import { chainForName } from '../../../lib/chain-for-name.js'
 import {
   globalEnv,
   globalOptions,
@@ -12,8 +12,8 @@ import { verifyUidAttestation } from '../../../lib/verify-attestation.js'
 const verifyUidOptions = globalOptions.extend({
   attester: z
     .string()
-    .default(DEFAULT_ATTESTER_ENS)
-    .describe('Attester ENS name (defaults to atst.lighthousegov.eth)'),
+    .optional()
+    .describe('Attester ENS name. Auto-resolves from the subject chain when omitted.'),
   maxAge: z
     .number()
     .int()
@@ -38,7 +38,8 @@ export const verifyUidCommand = {
   }) {
     const ensName = validateName(ctx.args.name)
     const { client, chain } = publicClientForName(ctx, ensName)
-    if (chainForName(ctx.options.attester).id !== chain.id) {
+    const attesterEns = ctx.options.attester ?? defaultAttesterEnsForName(ensName)
+    if (chainForName(attesterEns).id !== chain.id) {
       throw new Error(
         `--attester must be an ENS name on the same chain as the subject (${chain.name}).`,
       )
@@ -53,7 +54,7 @@ export const verifyUidCommand = {
         name: ensName,
         platform: ctx.args.platform,
         uid: ctx.args.uid,
-        attester: ctx.options.attester,
+        attester: attesterEns,
       },
     )
 

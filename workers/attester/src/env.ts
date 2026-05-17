@@ -28,8 +28,14 @@ export interface Env {
 
   // Attester ENS name used as the identity in v2 record keys
   // (attestations[<p>][<ATTESTER_ENS>] and uid[<p>][<ATTESTER_ENS>]).
-  // Falls back to the SDK's DEFAULT_ATTESTER_ENS when unset.
+  // Falls back to the SDK's DEFAULT_ATTESTER_ENS when unset. Applies to
+  // names that resolve on mainnet (everything that isn't *.base.eth).
   ATTESTER_ENS?: string
+  // Attester ENS name used for *.base.eth subjects. Defaults to
+  // 'atst.base.eth' when unset. Same signing key as ATTESTER_ENS — only
+  // the label embedded in record keys differs, so verifiers resolve the
+  // Base-hosted ENS on Base.
+  ATTESTER_ENS_BASE?: string
 
   // Mainnet RPC URL for ENS reverse/avatar resolution during intent creation.
   // Secret — set via `wrangler secret put ENS_RPC_URL` or .dev.vars.

@@ -7,12 +7,12 @@ import {
   metadataEstimator,
   metadataWriter,
 } from '@ensmetadata/sdk'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import type { ChainConfig } from '@ensmetadata/shared/chains'
 import { type Address, type PublicClient, isAddress, namehash } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
-import { chainForName } from '../lib/chain-for-name.js'
-import type { ChainConfig } from '../lib/chains.js'
 import {
   globalEnv,
   globalOptions,
@@ -289,7 +289,11 @@ async function runSetOrUpdate(
    */
   const schemaUri = payloadSchemaUri ?? existingState.schema ?? null
   const schemaInfo = {
-    source: payloadSchemaUri ? ('payload' as const) : schemaUri ? ('ens' as const) : ('none' as const),
+    source: payloadSchemaUri
+      ? ('payload' as const)
+      : schemaUri
+        ? ('ens' as const)
+        : ('none' as const),
     uri: schemaUri,
     validated: validation !== null,
   }

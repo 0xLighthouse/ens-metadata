@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./intent": "./src/intent.ts",
-    "./ipfs": "./src/ipfs.ts"
+    "./ipfs": "./src/ipfs.ts",
+    "./chains": "./src/chains.ts",
+    "./chain-for-name": "./src/chain-for-name.ts"
   },
   "license": "MIT",
   "scripts": {
@@ -17,6 +19,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@ensdomains/ensjs": "^4.0.2",
     "viem": "2.47.6"
   },
   "devDependencies": {

@@ -15,6 +15,7 @@ import {
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState } from 'react'
 import { createSiweMessage } from 'viem/siwe'
@@ -44,7 +45,7 @@ export function useAttestationFlow({
   twitter,
   telegram,
 }: Args) {
-  const { publicClient, walletClient } = useWeb3()
+  const { walletClient } = useWeb3()
   const { wallets } = useWallets()
   const { user } = usePrivy()
   const address = user?.wallet?.address as `0x${string}` | undefined
@@ -91,7 +92,10 @@ export function useAttestationFlow({
         setSignPhase('awaiting-siwe')
         const message = createSiweMessage({
           address: issuer as `0x${string}`,
-          chainId: publicClient?.chain?.id ?? 1,
+          // SIWE binds to the chain we'll publish on, which is derived from
+          // the name's suffix (e.g. `.base.eth` → Base) — not whatever
+          // chain the wallet is currently connected to.
+          chainId: chainForName(ensName).id,
           domain: window.location.host,
           nonce: session.nonce,
           uri: window.location.origin,
