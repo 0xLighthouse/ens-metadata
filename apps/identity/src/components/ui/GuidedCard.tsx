@@ -87,12 +87,7 @@ export function GuidedSection({
           </p>
         )}
         {!active && inactiveHint && (
-          <p
-            className={cn(
-              'mt-2 text-xs italic text-neutral-400 dark:text-neutral-500',
-              indent,
-            )}
-          >
+          <p className={cn('mt-2 text-xs italic text-neutral-400 dark:text-neutral-500', indent)}>
             {inactiveHint}
           </p>
         )}

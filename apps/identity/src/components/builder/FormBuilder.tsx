@@ -11,7 +11,8 @@ import {
 } from '@/config/builder-schemas'
 import { cn } from '@/lib/utils'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
-import { Building2, Check, Plus, User, X } from 'lucide-react'
+import { usePrivy } from '@privy-io/react-auth'
+import { Check, Plus, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /**
@@ -24,8 +25,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
  * one has a valid answer. Once unlocked, sections stay accessible so
  * the user can revise non-linearly.
  */
-
-const ALLOWED_SCHEMA_IDS = ['person', 'org'] as const
 
 interface BuilderState {
   /** Empty string = unanswered; forces the user through Q1 before Q2. */
@@ -45,11 +44,6 @@ interface BuilderState {
 }
 
 type PlatformState = 'off' | 'optional' | 'required'
-
-const SCHEMA_ICON: Record<string, typeof User> = {
-  person: User,
-  org: Building2,
-}
 
 function resolveSchema(id: string): BuilderSchema | null {
   return BUILDER_SCHEMAS.find((s) => s.id === id) ?? null
@@ -84,6 +78,13 @@ export function FormBuilder() {
   // Locked while a shareable link is live, so the user can't silently drift
   // the config away from whatever the link encodes.
   const [linkLocked, setLinkLocked] = useState(false)
+  // Dropdown value before the user presses Load. Kept separate from
+  // state.schemaId so downstream sections stay inactive until commit.
+  const [pendingSchemaId, setPendingSchemaId] = useState('')
+  // Q1 is gated on a connected wallet — same model as CreatorPreviewCard.
+  // If the user disconnects mid-session we tear the form back down to step
+  // zero so the UI never claims a schema is loaded against no wallet.
+  const { authenticated: walletConnected } = usePrivy()
 
   const selectedSchema = useMemo(() => resolveSchema(state.schemaId), [state.schemaId])
   const availableAttrs = selectedSchema?.attrs ?? []
@@ -108,23 +109,35 @@ export function FormBuilder() {
     state.requiredPlatforms.length > 0 ||
     state.optionalPlatforms.length > 0
 
-  const selectSchema = (id: string) => {
-    const target = resolveSchema(id)
-    if (!target) return
-    setState((s) => {
-      if (s.schemaId === target.id) return s
-      // Prune any previously-picked attrs that aren't offered by the new
-      // schema so the generated URL never carries orphan keys.
-      const nextKeys = new Set(target.attrs.map((a) => a.key))
-      return {
-        ...s,
-        schemaId: target.id,
-        required: s.required.filter((k) => nextKeys.has(k)),
-        optional: s.optional.filter((k) => nextKeys.has(k)),
-        chosenOrder: s.chosenOrder.filter((k) => nextKeys.has(k)),
-      }
-    })
+  // Commit the pending dropdown selection. Q2/Q3/Q4 unlock from here.
+  const loadSchema = () => {
+    if (!resolveSchema(pendingSchemaId)) return
+    setState((s) => ({ ...s, schemaId: pendingSchemaId }))
   }
+
+  // Release the loaded schema: re-enable the dropdown and clear anything the
+  // user picked under the previous schema so the URL can't carry orphans.
+  const unloadSchema = () => {
+    setState((s) => ({
+      ...s,
+      schemaId: '',
+      required: [],
+      optional: [],
+      chosenOrder: [],
+    }))
+  }
+
+  // Disconnect mid-session → revert to the pre-load state. Mirrors what
+  // pressing Change would have done, plus clears the pending dropdown.
+  useEffect(() => {
+    if (walletConnected) return
+    setPendingSchemaId('')
+    setState((s) =>
+      s.schemaId === '' && s.required.length === 0 && s.optional.length === 0
+        ? s
+        : { ...s, schemaId: '', required: [], optional: [], chosenOrder: [] },
+    )
+  }, [walletConnected])
 
   // Q2: add to chosen (defaults to optional) or remove entirely.
   const toggleAttrChosen = (key: string) =>
@@ -181,10 +194,6 @@ export function FormBuilder() {
       return { ...s, requiredPlatforms, optionalPlatforms }
     })
 
-  const schemaOptions = BUILDER_SCHEMAS.filter((s) =>
-    (ALLOWED_SCHEMA_IDS as readonly string[]).includes(s.id),
-  )
-
   const attrChipOptions: ChipOption[] = availableAttrs.map((a) => ({
     id: a.key,
     label: a.label,
@@ -210,12 +219,17 @@ export function FormBuilder() {
             number="01"
             title="What type of user is this form intended for?"
             description="Pick the type of entity this profile will represent."
-            active
+            active={walletConnected}
+            inactiveHint="Connect your wallet to begin."
           >
-            <ProfileTypePicker
-              options={schemaOptions}
-              value={state.schemaId}
-              onChange={selectSchema}
+            <SchemaLoader
+              options={BUILDER_SCHEMAS}
+              pendingId={pendingSchemaId}
+              onPendingChange={setPendingSchemaId}
+              loadedId={state.schemaId}
+              onLoad={loadSchema}
+              onUnload={unloadSchema}
+              disabled={!walletConnected}
             />
           </GuidedSection>
 
@@ -270,71 +284,75 @@ export function FormBuilder() {
 }
 
 // -----------------------------
-// Q1 — Profile type (two tap-target cards)
+// Q1 — Schema dropdown + Load/Change button
 // -----------------------------
 
-function ProfileTypePicker({
+function SchemaLoader({
   options,
-  value,
-  onChange,
+  pendingId,
+  onPendingChange,
+  loadedId,
+  onLoad,
+  onUnload,
+  disabled,
 }: {
   options: BuilderSchema[]
-  value: string
-  onChange: (id: string) => void
+  pendingId: string
+  onPendingChange: (id: string) => void
+  loadedId: string
+  onLoad: () => void
+  onUnload: () => void
+  disabled?: boolean
 }) {
+  const isLoaded = loadedId !== ''
+  // Once loaded, show the loaded schema in the (disabled) dropdown regardless
+  // of what `pendingId` is — that way "Change" reliably shows the schema the
+  // user is about to unload.
+  const selectValue = isLoaded ? loadedId : pendingId
+  const selectedSchema = options.find((o) => o.id === selectValue)
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {options.map((opt) => {
-        const Icon = SCHEMA_ICON[opt.id] ?? User
-        const active = opt.id === value
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onChange(opt.id)}
-            className={cn(
-              'group flex items-start gap-3 rounded-xl border p-4 text-left transition-all',
-              active
-                ? 'border-rose-500 bg-rose-50/70 ring-1 ring-rose-500/20 dark:border-rose-500/80 dark:bg-rose-950/30'
-                : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-neutral-900',
-            )}
-          >
-            <span
-              className={cn(
-                'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
-                active
-                  ? 'bg-rose-500 text-white'
-                  : 'bg-neutral-100 text-neutral-500 group-hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400',
-              )}
-            >
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                  {opt.label}
-                </span>
-                <span
-                  aria-hidden
-                  className={cn(
-                    'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-                    active
-                      ? 'border-rose-500 bg-rose-500'
-                      : 'border-neutral-300 dark:border-neutral-600',
-                  )}
-                >
-                  {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                </span>
-              </span>
-              <span className="mt-0.5 text-xs leading-snug text-neutral-500 dark:text-neutral-400">
-                {opt.description}
-              </span>
-            </span>
-          </button>
-        )
-      })}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={selectValue}
+          onChange={(e) => onPendingChange(e.target.value)}
+          disabled={disabled || isLoaded}
+          className={cn(
+            'min-w-[12rem] flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors',
+            'focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500/20',
+            'disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500',
+            'dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:disabled:bg-neutral-900/40',
+          )}
+        >
+          <option value="" disabled>
+            Select a schema…
+          </option>
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label} (v {opt.version})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={isLoaded ? onUnload : onLoad}
+          disabled={disabled || (!isLoaded && pendingId === '')}
+          className={cn(
+            'rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            isLoaded
+              ? 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800'
+              : 'border-rose-500 bg-rose-500 text-white hover:bg-rose-600 disabled:hover:bg-rose-500',
+          )}
+        >
+          {isLoaded ? 'Change' : 'Load'}
+        </button>
+      </div>
+      {selectedSchema?.description && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          {selectedSchema.description}
+        </p>
+      )}
     </div>
   )
 }
@@ -428,7 +446,6 @@ function ChipAddField({
 
       {open && (
         <div
-          role="dialog"
           className={cn(
             'absolute left-0 top-0 z-50 w-80 max-w-full',
             'rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg',
@@ -584,6 +601,7 @@ function ThreeStateControl({
           <button
             key={opt.value}
             type="button"
+            // biome-ignore lint/a11y/useSemanticElements: stylized chip toggle inside a radiogroup; a native <input type="radio"> won't accept this visual treatment.
             role="radio"
             aria-checked={active}
             onClick={() => onChange(opt.value)}

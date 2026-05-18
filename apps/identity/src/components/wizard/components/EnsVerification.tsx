@@ -47,12 +47,9 @@ export function EnsVerification({ ens, disabled }: Props) {
             aria-autocomplete="list"
           />
           {dropdownOpen && ens.ownedNames.length > 0 && (
-            <ul
-              role="listbox"
-              className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
-            >
+            <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
               {ens.ownedNames.map((n) => (
-                <li key={n} role="option" aria-selected={n === ens.draftName}>
+                <li key={n}>
                   <button
                     type="button"
                     // onMouseDown + preventDefault keeps the input focused so

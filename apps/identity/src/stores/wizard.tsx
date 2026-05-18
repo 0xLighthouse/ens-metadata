@@ -1,7 +1,7 @@
 'use client'
 
-import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import type { AttestationProof, UnchangedRecord } from '@/lib/attestation-types'
+import { EMPTY_DIFF, type RecordDiff } from '@/lib/record-diff'
 import { createContext, useContext, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { type StoreApi, createStore, useStore } from 'zustand'
