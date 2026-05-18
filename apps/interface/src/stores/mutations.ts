@@ -76,7 +76,7 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
     // Create SDK wallet extension for writes
     const writer = metadataWriter({ publicClient: publicClient as PublicClient })(walletClient)
 
-    // Submit one applyDelta call per ensName
+    // Submit one setMetadata call per ensName
     for (const edit of edits) {
       // Update jobs to signing
       set({
@@ -86,10 +86,18 @@ export const useMutationsStore = create<MutationsState>((set, get) => ({
       })
 
       try {
-        const result = await writer.applyDelta({
+        // Flatten the { changes, deleted } delta into the SDK's `desired`
+        // shape: a single map where non-empty strings set values and `""`
+        // marks deletions. `ignoreMissing: true` keeps the SDK from
+        // sweeping unrelated on-chain keys into the deletion set.
+        const desired: Record<string, string> = { ...edit.delta.changes }
+        for (const key of edit.delta.deleted) desired[key] = ''
+
+        const result = await writer.setMetadata({
           name: edit.ensName,
-          delta: edit.delta,
-          resolverAddress: edit.resolverAddress as `0x${string}`,
+          desired,
+          resolver: edit.resolverAddress as `0x${string}`,
+          ignoreMissing: true,
         })
 
         // Track in txns store; discard mutation only after on-chain confirmation
