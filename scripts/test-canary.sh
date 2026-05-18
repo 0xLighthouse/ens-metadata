@@ -85,7 +85,7 @@ const checks = [
   ['handleAttestationRecordKey', typeof handleAttestationRecordKey, 'function'],
   ['uidAttestationRecordKey', typeof uidAttestationRecordKey, 'function'],
   ['CLAIM_VERSION', typeof CLAIM_VERSION, 'number'],
-  ['ENVELOPE_TAG', typeof ENVELOPE_TAG, 'string'],
+  ['ENVELOPE_TAG', typeof ENVELOPE_TAG, 'number'],
   ['DEFAULT_ATTESTER_ENS', typeof DEFAULT_ATTESTER_ENS, 'string'],
   ['BASE_DEFAULT_ATTESTER_ENS', typeof BASE_DEFAULT_ATTESTER_ENS, 'string'],
   ['defaultAttesterEnsForName', typeof defaultAttesterEnsForName, 'function'],
