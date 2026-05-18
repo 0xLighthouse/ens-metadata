@@ -118,15 +118,24 @@ export function validateIntentConfig(
     (INTENT_PLATFORMS as readonly string[]).includes(p)
   const requiredPlatforms = requiredPlatformsRaw.filter(isKnownPlatform)
   if (requiredPlatforms.length !== requiredPlatformsRaw.length) {
-    return { ok: false, error: { field: 'requiredPlatforms', message: 'contains unknown platform' } }
+    return {
+      ok: false,
+      error: { field: 'requiredPlatforms', message: 'contains unknown platform' },
+    }
   }
   const optionalPlatforms = optionalPlatformsRaw.filter(isKnownPlatform)
   if (optionalPlatforms.length !== optionalPlatformsRaw.length) {
-    return { ok: false, error: { field: 'optionalPlatforms', message: 'contains unknown platform' } }
+    return {
+      ok: false,
+      error: { field: 'optionalPlatforms', message: 'contains unknown platform' },
+    }
   }
   const platformOverlap = requiredPlatforms.filter((p) => optionalPlatforms.includes(p))
   if (platformOverlap.length > 0) {
-    return { ok: false, error: { field: 'optionalPlatforms', message: 'overlaps requiredPlatforms' } }
+    return {
+      ok: false,
+      error: { field: 'optionalPlatforms', message: 'overlaps requiredPlatforms' },
+    }
   }
   const overlap = required.filter((k) => optional.includes(k))
   if (overlap.length > 0) {

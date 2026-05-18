@@ -50,7 +50,9 @@ export const viewCommand = {
     const schemaUri = properties.schema ?? null
 
     const result = validateMetadata(properties, metadata.schema)
-    const validation = result.success ? { passed: true } : { passed: false, errors: result.errors.map(({ key, message }) => `${key}: ${message}`) }
+    const validation = result.success
+      ? { passed: true }
+      : { passed: false, errors: result.errors.map(({ key, message }) => `${key}: ${message}`) }
 
     return {
       name: metadata.name,

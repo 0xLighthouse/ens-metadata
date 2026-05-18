@@ -1,6 +1,6 @@
 import type { NormalizedTreeNode, TreeNode } from '@/lib/tree/types'
-import { type Address, getAddress, isAddressEqual } from 'viem'
 import { GraphQLClient, type RequestDocument, gql } from 'graphql-request'
+import { type Address, getAddress, isAddressEqual } from 'viem'
 import { fetchTexts } from './fetchTexts'
 import { type ENSDataByAddress, mapNamesByAddress } from './mapNamesByAddress'
 

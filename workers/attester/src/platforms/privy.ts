@@ -49,9 +49,7 @@ const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
 function jwksFor(appId: string) {
   let jwks = jwksCache.get(appId)
   if (!jwks) {
-    jwks = createRemoteJWKSet(
-      new URL(`https://auth.privy.io/api/v1/apps/${appId}/jwks.json`),
-    )
+    jwks = createRemoteJWKSet(new URL(`https://auth.privy.io/api/v1/apps/${appId}/jwks.json`))
     jwksCache.set(appId, jwks)
   }
   return jwks
@@ -102,10 +100,7 @@ export async function fetchPrivyUser(env: Env, userId: string): Promise<PrivyUse
  * Convenience: verify token → fetch user in one call. Most callers want
  * this path.
  */
-export async function getAuthenticatedPrivyUser(
-  env: Env,
-  accessToken: string,
-): Promise<PrivyUser> {
+export async function getAuthenticatedPrivyUser(env: Env, accessToken: string): Promise<PrivyUser> {
   const userId = await verifyPrivyAccessToken(env, accessToken)
   return fetchPrivyUser(env, userId)
 }

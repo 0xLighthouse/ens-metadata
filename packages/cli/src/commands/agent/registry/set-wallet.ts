@@ -64,7 +64,11 @@ export const setWalletCommand = {
     let finalDeadline: bigint
     let finalSignature: `0x${string}`
 
-    const rpcUrl = resolveRpcUrl(chain.id, ctx.options, ctx.env as Record<string, string | undefined>)
+    const rpcUrl = resolveRpcUrl(
+      chain.id,
+      ctx.options,
+      ctx.env as Record<string, string | undefined>,
+    )
     const transport = buildFallbackTransport({ rpcUrl, viemDefaults: chain.rpcUrls.default.http })
 
     if (signatureOpt && deadlineOpt) {

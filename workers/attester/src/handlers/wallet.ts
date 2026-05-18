@@ -1,6 +1,6 @@
 import { jsonResponse } from '../cors'
 import type { Env } from '../env'
-import { verifySiwe } from '../siwe'
+import { type SiweVerifyResult, verifySiwe } from '../siwe'
 
 /**
  * POST /api/session/wallet — bind a wallet to a session via SIWE.
@@ -33,7 +33,7 @@ export async function handleWallet(env: Env, request: Request): Promise<Response
     return jsonResponse(env, request, { error: 'session not found or expired' }, { status: 404 })
   }
 
-  let verified
+  let verified: SiweVerifyResult
   try {
     verified = await verifySiwe(env, {
       message,

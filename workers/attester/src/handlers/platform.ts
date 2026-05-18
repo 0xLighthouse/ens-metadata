@@ -1,6 +1,6 @@
 import { jsonResponse } from '../cors'
 import type { Env } from '../env'
-import { getPlatform } from '../platforms'
+import { type PlatformValidationResult, getPlatform } from '../platforms'
 
 /**
  * POST /api/session/platform/[platform] — bind a platform account to a
@@ -45,7 +45,7 @@ export async function handlePlatform(
     return jsonResponse(env, request, { error: 'session not found or expired' }, { status: 404 })
   }
 
-  let validated
+  let validated: PlatformValidationResult
   try {
     validated = await platform.validate(env, payload)
   } catch (err) {
@@ -66,7 +66,7 @@ export async function handlePlatform(
       return jsonResponse(
         env,
         request,
-        { error: `platform handle not included in signed message` },
+        { error: 'platform handle not included in signed message' },
         { status: 403 },
       )
     }

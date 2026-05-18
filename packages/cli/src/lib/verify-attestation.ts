@@ -19,7 +19,15 @@ import {
   verifyHandleClaim,
   verifyUidClaim,
 } from '@ensmetadata/sdk'
-import { type Address, type Hex, type PublicClient, hexToBytes, isAddress, namehash, zeroAddress } from 'viem'
+import {
+  type Address,
+  type Hex,
+  type PublicClient,
+  hexToBytes,
+  isAddress,
+  namehash,
+  zeroAddress,
+} from 'viem'
 import { getEnsAddress } from 'viem/actions'
 import { normalize } from 'viem/ens'
 

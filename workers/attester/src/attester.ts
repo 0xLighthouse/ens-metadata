@@ -33,10 +33,7 @@ async function buildWallet(env: Env): Promise<WalletClient> {
       apiPrivateKey: env.TURNKEY_API_PRIVATE_KEY!,
       runtimeOverride: 'browser',
     })
-    const client = new TurnkeyClient(
-      { baseUrl: 'https://api.turnkey.com' },
-      stamper,
-    )
+    const client = new TurnkeyClient({ baseUrl: 'https://api.turnkey.com' }, stamper)
     const account = await createAccount({
       client,
       organizationId: env.TURNKEY_ORGANIZATION_ID!,

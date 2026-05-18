@@ -40,4 +40,3 @@ export async function fetchSchemas(): Promise<Schema[]> {
 
   return schemas
 }
-

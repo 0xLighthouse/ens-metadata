@@ -129,9 +129,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error inspecting node:', error)
-    return NextResponse.json(
-      { error: 'Failed to inspect node' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Failed to inspect node' }, { status: 500 })
   }
 }

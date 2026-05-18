@@ -3,13 +3,13 @@ import type { Schema } from './types'
 import { AGENT_SCHEMA } from './schemas/agent'
 import { APPLICATION_SCHEMA } from './schemas/application'
 import { CONTRACT_SCHEMA } from './schemas/contract'
+import { DELEGATE_SCHEMA } from './schemas/delegate'
+import { GRANT_SCHEMA } from './schemas/grant'
+import { GROUP_SCHEMA } from './schemas/group'
 import { ORGANIZATION_SCHEMA } from './schemas/org'
 import { PERSON_SCHEMA } from './schemas/person'
 import { TREASURY_SCHEMA } from './schemas/treasury'
 import { WALLET_SCHEMA } from './schemas/wallet'
-import { GRANT_SCHEMA } from './schemas/grant'
-import { DELEGATE_SCHEMA } from './schemas/delegate'
-import { GROUP_SCHEMA } from './schemas/group'
 
 export const SCHEMAS: Schema[] = [
   AGENT_SCHEMA,

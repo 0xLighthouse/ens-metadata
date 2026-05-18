@@ -13,7 +13,8 @@ import type { Env } from './env'
  * doing it for us.
  */
 export function corsHeaders(env: Env, origin: string | null): HeadersInit {
-  const allowed = origin && matchesAllowlist(origin, parseAllowlist(env.TRUSTED_ORIGIN)) ? origin : ''
+  const allowed =
+    origin && matchesAllowlist(origin, parseAllowlist(env.TRUSTED_ORIGIN)) ? origin : ''
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

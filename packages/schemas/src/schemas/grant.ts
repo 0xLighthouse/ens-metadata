@@ -1,5 +1,5 @@
-import type { Schema } from '../types'
 import { GITHUB_URL } from '../config/constants'
+import type { Schema } from '../types'
 
 const GRANT_SCHEMA_VERSION = '3.0.1'
 

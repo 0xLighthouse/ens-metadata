@@ -301,7 +301,6 @@ describe('verifyHandleClaim — trust & freshness', () => {
     expect(result.reason).toBe('bad-signature')
     expect(result.recovered?.toLowerCase()).toBe(STRANGER_ADDR.toLowerCase())
   })
-
 })
 
 // ------------------------------------------------------------------
