@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-18
+
 ### Added
 
 - Identity attestation system: new `apps/identity` flow for linking X and Telegram accounts to ENS names, backed by a Cloudflare Worker attester (`apps/attester`) with Turnkey production signing. The wizard supports multi-schema profile building, URL pre-fill, multiple attestations per request, and Cloudflare KV-backed intents.
@@ -15,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SDK 0.3.0: text-record and resolver read primitives, schema fetch and resolution helpers, `prepare`/`estimate`/`setMetadataWithDelta` writer, and identity attestation primitives plus verifier. Refreshed README.
 - atst.me static landing page hosting the attestation spec.
 - `social-proofs` schema field and reverse-DNS namespacing (`com.x`, `org.telegram`) for attestation text records.
+- SDK 0.4.0+: per-call `registry` option on `metadataReader` / `metadataWriter` / `metadataEstimator` for any ENS-on-L2 deployment that does not use a Universal Resolver — reads go directly through `registry.resolver(node).text(node, key)`. Plug in any L2, not just Base.
+- SDK 0.5.0: `BASE_DEFAULT_ATTESTER_ENS` constant and `defaultAttesterEnsForName(name)` helper for routing attestations to the correct attester per chain.
+- Identity wizard: schema dropdown in the profile builder so users can pick which schema to pull fields from when constructing a profile.
 
 ### Changed
 
@@ -27,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - viem unified to 2.47.6 across all apps to match the SDK.
 - [81f641e] [803d364] Renamed the GitHub repository from `ens-node-metadata` to `ens-metadata`. All schema `$id` URLs, READMEs, the interface footer, and CLI docs now point at the new location.
 - [803d364] Republished every schema as v3.0.1 with the updated `$id` URL. New IPFS CIDs are recorded in `_registry.json`; v3.0.0 remains pinned at its original CIDs.
+- **BREAKING (SDK 0.5.0):** Removed `multichainMetadataReader`, `multichainMetadataWriter`, `multichainMetadataEstimator`, `multichainAttestationVerifier`, `chainForName`, and `MissingChainClientError`. The same use cases are covered by the new per-call `registry` option on the regular reader/writer/estimator functions.
+- **BREAKING (SDK 0.5.0):** Renamed `validateMetadataSchema` to `validateMetadata` (also exported as `validate`).
+- CLI: chain dispatch consolidated into a single `chainForName(name)` registry (`lib/chains.ts`). Adding a new chain is one registry entry plus one suffix rule; all `isBasename` branches are gone.
+- SDK internals refactored across `schema.ts`, `read.ts`, and `write.ts` with clearer function names.
 
 ### Removed
 
@@ -39,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SDK now distinguishes unconfigured Basenames from RPC errors on read.
 - CLI `verify-attestation` requires a platform argument and redacts RPC URLs to hostname; `withTimeout` clears its setTimeout when the wrapped promise wins.
 - Wizard preserves user input when clicking back, and existing ENS text records are detected and not rewritten on `set`.
+- Identity wizard: wallet chain is now switched at broadcast time rather than at session start, so users who change networks mid-flow no longer hit failed transactions.
 
 ## [0.1.0] - 2026-04-14
 
@@ -58,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [cef3be9] Group schema's lead title is now inherited from the parent node by default.
 - [a8e5c4e] [6683eba] Renamed the `use-cases` docs section to `how-to-guides` and rewrote the ENSIP-XX overview for clarity.
 
-[Unreleased]: https://github.com/0xLighthouse/ens-metadata/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/0xLighthouse/ens-metadata/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/0xLighthouse/ens-metadata/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/0xLighthouse/ens-metadata/compare/ccf5ee8...v0.1.0
 
 [28244ce]: https://github.com/0xLighthouse/ens-metadata/commit/28244ce
