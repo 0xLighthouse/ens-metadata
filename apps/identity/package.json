@@ -22,7 +22,7 @@
     "clsx": "^2.1.1",
     "graphql-request": "^7.2.0",
     "lucide-react": "^0.453.0",
-    "next": "15.5.14",
+    "next": "15.5.18",
     "next-themes": "^0.3.0",
     "react": "^18",
     "react-dom": "^18",
@@ -41,7 +41,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.4.47",
+    "postcss": "^8.5.10",
     "typescript": "^5"
   }
 }
