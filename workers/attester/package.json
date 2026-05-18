@@ -12,16 +12,16 @@
   "dependencies": {
     "@ensmetadata/sdk": "workspace:*",
     "@ensmetadata/shared": "workspace:*",
-    "@turnkey/api-key-stamper": "^0.6.5",
+    "@turnkey/api-key-stamper": "^0.6.6",
     "@turnkey/http": "^3.18.1",
-    "@turnkey/viem": "^0.14.28",
-    "jose": "^6.2.2",
-    "nanoid": "^5.1.9",
-    "viem": "2.47.6"
+    "@turnkey/viem": "^0.14.29",
+    "jose": "^6.2.3",
+    "nanoid": "^5.1.11",
+    "viem": "2.49.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240924.0",
-    "typescript": "^5",
-    "wrangler": "^4.83.0"
+    "@cloudflare/workers-types": "^4.20260518.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.92.0"
   }
 }

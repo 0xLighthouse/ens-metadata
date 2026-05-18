@@ -17,10 +17,10 @@
     "access": "public"
   },
   "dependencies": {
-    "viem": "2.47.6"
+    "viem": "2.49.3"
   },
   "devDependencies": {
     "tsconfig": "workspace:*",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }

@@ -12,7 +12,12 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "SKILL.md", "README.md", "examples"],
+  "files": [
+    "dist",
+    "SKILL.md",
+    "README.md",
+    "examples"
+  ],
   "scripts": {
     "version:patch": "pnpm version patch --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
@@ -24,23 +29,23 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ensdomains/ensjs": "^4.2.2",
     "@ensmetadata/sdk": "workspace:*",
-    "@ensdomains/ensjs": "^4.0.2",
-    "incur": "^0.4.4",
-    "viem": "2.47.6",
-    "zod": "^4.3.6"
+    "incur": "^0.4.6",
+    "viem": "2.49.3",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
     "@ensmetadata/schemas": "workspace:*",
     "@ensmetadata/shared": "workspace:*",
+    "@types/node": "^25.9.0",
     "tsconfig": "workspace:*",
     "tsup": "^8.5.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5",
-    "vitest": "^3.2.1"
+    "tsx": "^4.22.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
