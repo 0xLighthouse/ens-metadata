@@ -4,7 +4,7 @@ import { getPublicClientForName, useWeb3 } from '@/contexts/Web3Provider'
 import { evictSession } from '@/lib/attester-client'
 import { diffToWriteMap } from '@/lib/record-diff'
 import { useWizardStore } from '@/stores/wizard'
-import { metadataWriter } from '@ensmetadata/sdk'
+import { fetchSchema, metadataWriter } from '@ensmetadata/sdk'
 import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { useState } from 'react'
 
@@ -66,11 +66,19 @@ export function usePublishFlow() {
         return
       }
 
+      // When the publish is bootstrapping a fresh name (writing a `schema`
+      // URI for the first time), the SDK can't read the schema from chain
+      // because it isn't there yet. Fetch it locally and hand it in so
+      // setMetadata has something to validate against.
+      const newSchemaUri = recordsToWrite.schema
+      const schema = newSchemaUri ? await fetchSchema(newSchemaUri) : undefined
+
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)
       const { txHash: hash } = await writer.setMetadata({
         name: ensName,
         desired: recordsToWrite,
+        ...(schema ? { schema } : {}),
         ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
       })
       setTxHash(hash)

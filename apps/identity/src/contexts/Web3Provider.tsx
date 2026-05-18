@@ -58,6 +58,28 @@ export function getPublicClientForName(name: string): PublicClient {
 
 const noop = async () => {}
 
+type Eip1193RequestFn = (args: { method: string; params?: unknown[] }) => Promise<unknown>
+
+/**
+ * Poll the provider's `eth_chainId` until it matches `expected` or the
+ * timeout elapses. Works around the race where Privy's `switchChain`
+ * resolves before the injected wallet has finished switching networks.
+ */
+async function waitForProviderChainId(
+  provider: { request: Eip1193RequestFn },
+  expected: number,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const raw = await provider.request({ method: 'eth_chainId' })
+    const current = typeof raw === 'string' ? Number.parseInt(raw, 16) : Number(raw)
+    if (current === expected) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Wallet did not switch to chain ${expected} in time`)
+}
+
 interface IWeb3Context {
   /** Mainnet client — used for chain-agnostic reads (avatars, subgraph). */
   publicClient: PublicClient
@@ -94,14 +116,18 @@ const Web3ContextProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const makeWalletClient = async () => {
-      if (!wallets[0]) return
-      // Default the wallet to mainnet on connect — non-mainnet operations
-      // switch on demand from usePublishFlow.
-      await wallets[0].switchChain(MAINNET_CHAIN.id)
-      const provider = await wallets[0].getEthereumProvider()
+      const wallet = wallets[0]
+      if (!wallet) return
+      const provider = await wallet.getEthereumProvider()
       if (!provider) return
+      // The stored walletClient is only used for chain-agnostic signing
+      // (Objekt EIP-712 uploads). Broadcasts always go through
+      // `getWalletClientForChain`, which switches the wallet and rebuilds a
+      // chain-bound client. The mainnet `chain` here is a typing hint, not
+      // a runtime constraint — we don't force the wallet onto any chain on
+      // connect.
       const next = createWalletClient({
-        account: wallets[0].address as `0x${string}`,
+        account: wallet.address as `0x${string}`,
         chain: MAINNET_CHAIN.viemChain,
         transport: custom(provider),
       })
@@ -126,13 +152,18 @@ const Web3ContextProvider = ({ children }: { children: React.ReactNode }) => {
     async (chainId: number): Promise<WalletClient | null> => {
       const wallet = wallets[0]
       if (!wallet) return null
-      await wallet.switchChain(chainId)
-      const provider = await wallet.getEthereumProvider()
-      if (!provider) return null
       const targetChain = getChainById(chainId)?.viemChain
       if (!targetChain) {
         throw new Error(`Unsupported chain id: ${chainId}`)
       }
+      await wallet.switchChain(chainId)
+      const provider = await wallet.getEthereumProvider()
+      if (!provider) return null
+      // Privy's switchChain can resolve before the EIP-1193 provider has
+      // finished propagating the new chain id. Poll until the provider
+      // actually reports `chainId` so viem's assertCurrentChain check
+      // doesn't trip when broadcasting.
+      await waitForProviderChainId(provider, chainId)
       return createWalletClient({
         account: wallet.address as `0x${string}`,
         chain: targetChain,
