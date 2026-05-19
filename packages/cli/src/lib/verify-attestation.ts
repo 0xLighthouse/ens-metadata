@@ -4,10 +4,11 @@
  * the SDK's pure `verifyHandleClaim` / `verifyUidClaim` primitives.
  *
  * Single-chain: subject and attester must live on the same chain. The
- * caller passes one client; it's used for both the subject reads and the
- * attester-ENS address lookup. Reads route through the SDK reader, which
- * uses direct registry+resolver reads when `registry` is supplied (e.g.
- * Basenames on Base).
+ * caller passes one client; it's used for all three reads (subject
+ * records, owner, attester address). When `registry` is supplied — i.e.
+ * the chain has no Universal Resolver (Basenames on Base) — every read
+ * goes through direct `registry.resolver(node)` / `registry.owner(node)`
+ * / `resolver.addr(node)` calls, bypassing viem's UR-based helpers.
  */
 import {
   type Envelope,
@@ -89,6 +90,26 @@ const REGISTRY_OWNER_ABI = [
   },
 ] as const
 
+const REGISTRY_RESOLVER_ABI = [
+  {
+    type: 'function',
+    name: 'resolver',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const
+
+const RESOLVER_ADDR_ABI = [
+  {
+    type: 'function',
+    name: 'addr',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const
+
 async function resolveOwner(
   client: PublicClient,
   name: string,
@@ -117,8 +138,44 @@ async function resolveOwner(
   return null
 }
 
-async function resolveAttester(client: PublicClient, attesterEns: string): Promise<Address | null> {
-  const resolved = await getEnsAddress(client, { name: normalize(attesterEns) }).catch(() => null)
+/**
+ * Resolve an attester ENS name to its Ethereum address.
+ *
+ * On chains without a Universal Resolver (Basenames on Base), `registry`
+ * is supplied and we read `registry.resolver(node)` → `resolver.addr(node)`
+ * directly, matching how `resolveOwner` and the subject text reads work.
+ *
+ * On mainnet/sepolia (no `registry`), we fall back to viem's `getEnsAddress`,
+ * which routes through the chain's Universal Resolver.
+ */
+async function resolveAttester(
+  client: PublicClient,
+  attesterEns: string,
+  registry?: Address,
+): Promise<Address | null> {
+  const name = normalize(attesterEns)
+  if (registry) {
+    try {
+      const node = namehash(name)
+      const resolverAddr = (await client.readContract({
+        address: registry,
+        abi: REGISTRY_RESOLVER_ABI,
+        functionName: 'resolver',
+        args: [node],
+      })) as Address
+      if (resolverAddr === zeroAddress) return null
+      const addr = (await client.readContract({
+        address: resolverAddr,
+        abi: RESOLVER_ADDR_ABI,
+        functionName: 'addr',
+        args: [node],
+      })) as Address
+      return addr === zeroAddress ? null : addr
+    } catch {
+      return null
+    }
+  }
+  const resolved = await getEnsAddress(client, { name }).catch(() => null)
   return resolved && isAddress(resolved) ? (resolved as Address) : null
 }
 
@@ -173,7 +230,7 @@ export async function verifyHandleAttestation(
   const [{ envHex, handle }, owner, attesterAddress] = await Promise.all([
     readSubjectRecords(subjectClient, name, recordKey, config.registry, opts.platform),
     resolveOwner(subjectClient, name, config.registry),
-    resolveAttester(subjectClient, attesterEns),
+    resolveAttester(subjectClient, attesterEns, config.registry),
   ])
 
   if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }
@@ -239,7 +296,7 @@ export async function verifyUidAttestation(
   const [{ envHex }, owner, attesterAddress] = await Promise.all([
     readSubjectRecords(subjectClient, name, recordKey, config.registry),
     resolveOwner(subjectClient, name, config.registry),
-    resolveAttester(subjectClient, attesterEns),
+    resolveAttester(subjectClient, attesterEns, config.registry),
   ])
 
   if (!envHex) return { valid: false, reason: 'missing', attester: attesterEns }

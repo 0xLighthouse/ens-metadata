@@ -40,7 +40,6 @@ const BASE_CHAIN: ChainConfig = {
   rpcDefaults: [],
   explorerTxBase: 'https://basescan.org/tx/',
   ensRegistry: '0xb94704422c2a1e396835a571837aa5ae53285a95',
-  l2Resolver: '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD',
 }
 
 const baseClientWithReadContract = (result: unknown): PublicClient =>
