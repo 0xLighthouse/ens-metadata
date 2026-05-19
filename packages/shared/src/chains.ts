@@ -35,16 +35,12 @@ export interface ChainConfig {
   explorerTxBase: string
   /**
    * ENS-on-L2 registry. Set when this chain hosts its own ENS registry
-   * (e.g. Basenames on Base). Used by manager-lookup helpers when the SDK's
-   * mainnet-bound `getOwner` can't resolve the name.
+   * (e.g. Basenames on Base). Threaded into SDK reads/writes as `registry`
+   * so they do direct `registry.resolver(node)` lookups instead of going
+   * through a Universal Resolver. Also used by manager-lookup helpers
+   * when the SDK's mainnet-bound `getOwner` can't resolve the name.
    */
   ensRegistry?: Address
-  /**
-   * Dedicated L2 resolver address. Pre-supplied to the SDK's
-   * `prepareSetMetadata` via `opts.resolver` when writing to a name that
-   * lives on this chain, bypassing the SDK's mainnet `getEnsResolver` lookup.
-   */
-  l2Resolver?: Address
 }
 
 const MAINNET: ChainConfig = {
@@ -72,7 +68,6 @@ const BASE: ChainConfig = {
   // Basenames deployment on Base mainnet
   // https://github.com/base/basenames
   ensRegistry: '0xb94704422c2a1e396835a571837aa5ae53285a95',
-  l2Resolver: '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD',
 }
 
 const CHAINS: readonly ChainConfig[] = [MAINNET, SEPOLIA, BASE]
