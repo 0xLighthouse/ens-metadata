@@ -2,18 +2,21 @@
 
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
 import { useWizardStore } from '@/stores/wizard'
+import { chainForName } from '@ensmetadata/shared/chain-for-name'
 import { CheckCircle2, ExternalLink } from 'lucide-react'
-import { mainnet } from 'viem/chains'
 
 interface Props {
   txHash: string | null
 }
 
 /** Terminal success state after a confirmed publish. Shows the tx hash and
- *  links out to Etherscan. */
+ *  links out to the explorer for the chain the name lives on (Basescan for
+ *  `*.base.eth`, Etherscan otherwise). */
 export function PublishSuccessCard({ txHash }: Props) {
   const ensName = useWizardStore((s) => s.ensName)
-  const explorerUrl = txHash ? `${mainnet.blockExplorers.default.url}/tx/${txHash}` : null
+  const chain = ensName ? chainForName(ensName) : null
+  const explorerUrl = txHash && chain ? `${chain.explorerTxBase}${txHash}` : null
+  const explorerLabel = chain?.name === 'base' ? 'Basescan' : 'Etherscan'
 
   return (
     <div className="space-y-6">
@@ -42,7 +45,7 @@ export function PublishSuccessCard({ txHash }: Props) {
                   className="inline-flex items-center rounded-md border border-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
                 >
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                  Etherscan
+                  {explorerLabel}
                 </a>
               </div>
             )}
