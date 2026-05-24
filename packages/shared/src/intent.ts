@@ -35,8 +35,11 @@ export const INTENT_LIMITS = {
 } as const
 
 // EIP-712 binds the signature to the config bytes and the claimed ensName.
-// chainId=1 because the reverse record lives on mainnet and we never want
-// the wallet to prompt a chain switch for a pure signature.
+// chainId=1 anchors the intent to mainnet (where the reverse record lives),
+// so the signature stays canonical regardless of which chain the user's
+// wallet is on. Callers must switch the wallet to mainnet before signing —
+// modern wallets refuse to sign typed data when their active chain doesn't
+// match the domain's chainId. See IntentCreator for the switch.
 export const INTENT_EIP712_DOMAIN = {
   name: 'ENS Identity Intent',
   version: '1',

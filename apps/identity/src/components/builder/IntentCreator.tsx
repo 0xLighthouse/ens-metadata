@@ -28,7 +28,7 @@ interface Props {
 
 export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Props) {
   const { authenticated, user } = usePrivy()
-  const { publicClient, walletClient } = useWeb3()
+  const { publicClient, walletClient, getWalletClientForChain } = useWeb3()
 
   const address = user?.wallet?.address as Hex | undefined
   const [ensName, setEnsName] = useState<string | null>(null)
@@ -79,7 +79,17 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
       setPhase('signing')
       const configHash = hashConfig(config)
       const expiry = Date.now() + 10 * 60 * 1000
-      const signature = await walletClient.signTypedData({
+      // The Intent EIP-712 domain pins `chainId: 1` (reverse records live on
+      // mainnet, so the intent is anchored to a single canonical chain).
+      // MetaMask refuses to sign typed data when the wallet's active chain
+      // doesn't match the domain — switch to mainnet first.
+      const mainnetClient = await getWalletClientForChain(1)
+      if (!mainnetClient) {
+        setError('Wallet not ready.')
+        setPhase('error')
+        return
+      }
+      const signature = await mainnetClient.signTypedData({
         account: address,
         domain: INTENT_EIP712_DOMAIN,
         types: INTENT_EIP712_TYPES,
