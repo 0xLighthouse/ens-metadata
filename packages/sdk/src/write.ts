@@ -1,7 +1,8 @@
+import type { Schema } from '@ensmetadata/schemas/types'
 import { type PublicClient, type WalletClient, zeroAddress } from 'viem'
 import { normalize } from 'viem/ens'
 import { getMetadata, getResolverFromRegistry, getSchema } from './read'
-import { type SchemaResolver, validateMetadata } from './schema'
+import { type SchemaResolver, getSchemaKeys, matchArrayEntry, validateMetadata } from './schema'
 import type {
   ChangePreview,
   EstimateResult,
@@ -24,14 +25,24 @@ import type {
  *
  * When `ignoreMissing` is `false` (default), keys present in `existing` but
  * absent from `desired` are also marked for deletion. When `true`, those keys
- * are left untouched.
+ * are left untouched — *except* for array baseKeys the caller touched (see
+ * below).
+ *
+ * Array-aware PATCH semantics: if `schema` is supplied and `desired` includes
+ * any `${baseKey}[N]` entry for an array-pattern baseKey, the entries `desired`
+ * provides are treated as the authoritative new array for that baseKey — any
+ * existing `${baseKey}[N]` not mentioned in `desired` is marked for deletion,
+ * even under `ignoreMissing: true`. Without this, PATCH mode could never shrink
+ * an array, and a flat-RecordSet view of a hydrated `string[]` would silently
+ * leave tail entries behind.
  */
 export function computeDelta(
   desired: RecordSet,
   existing: RecordSet,
-  options?: { ignoreMissing?: boolean },
+  options?: { ignoreMissing?: boolean; schema?: Schema },
 ): RecordSet {
   const ignoreMissing = options?.ignoreMissing ?? false
+  const schema = options?.schema
   const changes: RecordSet = {}
 
   for (const [key, value] of Object.entries(desired)) {
@@ -48,6 +59,31 @@ export function computeDelta(
     for (const key of Object.keys(existing)) {
       if (key in desired) continue
       changes[key] = ''
+    }
+    return changes
+  }
+
+  // PATCH (ignoreMissing=true) + array auto-tail-clear: for every array baseKey
+  // the caller touched in `desired`, treat the provided entries as the new full
+  // array and delete any existing entries for that baseKey not in `desired`.
+  if (schema) {
+    const { arrayPatterns } = getSchemaKeys(schema)
+    if (arrayPatterns.length > 0) {
+      const arrayBaseKeys = new Set(arrayPatterns.map((p) => p.baseKey))
+      const touchedBaseKeys = new Set<string>()
+      for (const key of Object.keys(desired)) {
+        const m = matchArrayEntry(key, arrayBaseKeys)
+        if (m) touchedBaseKeys.add(m.baseKey)
+      }
+      if (touchedBaseKeys.size > 0) {
+        for (const existingKey of Object.keys(existing)) {
+          if (existingKey in desired) continue
+          const m = matchArrayEntry(existingKey, arrayBaseKeys)
+          if (m && touchedBaseKeys.has(m.baseKey)) {
+            changes[existingKey] = ''
+          }
+        }
+      }
     }
   }
 
@@ -181,6 +217,7 @@ async function prepareSetMetadata(
 
   const changes = computeDelta(opts.desired, existing, {
     ignoreMissing: opts.ignoreMissing ?? false,
+    schema,
   })
   const projected = applyDelta(existing, changes)
   const validation = validateMetadata(projected, schema)
@@ -198,16 +235,48 @@ async function prepareSetMetadata(
 
 /**
  * Broadcast a previously prepared `PreparedMetadata`.
+ *
+ * Throws `MetadataValidationFailedError` when the prepared bundle's
+ * `validation.success` is `false`. With array semantics enforcing
+ * contiguity, an invalid projection would write on-chain state the reader
+ * silently truncates — so the write path always blocks on validation
+ * failure. Callers that want to inspect-but-not-fix should use
+ * `prepareSetMetadata` and read `prepared.changePreview.validation`
+ * themselves.
  */
 async function setPreparedMetadata(
   walletClient: WalletClient,
   prepared: PreparedMetadata,
 ): Promise<SetMetadataResult> {
+  assertPreparedValid(prepared)
   return broadcast(walletClient, {
     name: prepared.name,
     records: prepared.changePreview.changes,
     resolver: prepared.resolver,
   })
+}
+
+/**
+ * Thrown by `setMetadata` / `setPreparedMetadata` when the projected state
+ * fails `validateMetadata`. The `errors` array carries the per-key validation
+ * errors so callers can surface them directly.
+ */
+export class MetadataValidationFailedError extends Error {
+  readonly errors: ReadonlyArray<{ key: string; message: string }>
+  constructor(errors: ReadonlyArray<{ key: string; message: string }>) {
+    super(
+      `Metadata validation failed; refusing to broadcast:\n${errors
+        .map((e) => `  [${e.key}] ${e.message}`)
+        .join('\n')}`,
+    )
+    this.name = 'MetadataValidationFailedError'
+    this.errors = errors
+  }
+}
+
+function assertPreparedValid(prepared: PreparedMetadata): void {
+  const v = prepared.changePreview.validation
+  if (v && !v.success) throw new MetadataValidationFailedError(v.errors)
 }
 
 /**

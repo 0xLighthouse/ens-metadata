@@ -53,6 +53,18 @@ export interface GetSchemaOptions {
 export interface GetMetadataOptions {
   name: string
   schema?: Schema
+  /**
+   * Extra keys to read alongside the schema-declared keys. Use this when you
+   * need a record the schema doesn't declare.
+   *
+   * **Beware array-pattern entries past a gap.** If you list an explicit
+   * `${baseKey}[N]` for an `parameterType: "array"` pattern, it is fetched
+   * in parallel with regular keys, *separately* from the sequential
+   * stop-at-first-gap probe. If on-chain has a gap before N, the result
+   * will contain a non-contiguous array (`audits[0..2]` + `audits[5]`) that
+   * `validateMetadata` will reject and `unflatten` will silently drop. Only
+   * pass array-entry keys explicitly when you know the on-chain layout.
+   */
   keys?: string[]
   blockNumber?: bigint
   blockTag?: 'latest' | 'earliest' | 'pending' | 'safe' | 'finalized'
@@ -122,6 +134,19 @@ export interface SetMetadataOptions {
    */
   registry?: Address
   ignoreMissing?: boolean
+  /**
+   * The changes RecordSet to publish. Non-empty `string` sets the value,
+   * `""` deletes the key, absent keys are left alone (under PATCH —
+   * `ignoreMissing: true`) or deleted (under PUT — default).
+   *
+   * **Array-pattern handling under PATCH:** any `${baseKey}[N]` entry marks
+   * the baseKey as touched; existing tail entries not in `desired` are then
+   * auto-deleted. To *clear* an entire array under PATCH the desired must
+   * contain at least one entry for that baseKey, otherwise the baseKey
+   * counts as untouched. Pass `${baseKey}[0]: ""` (or use the hydrate
+   * helper convention `h.audits = [""]` → `flatten(h)`) to signal
+   * "this array should be empty."
+   */
   desired: RecordSet
   existing?: RecordSet
   /**

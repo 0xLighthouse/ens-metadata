@@ -1,6 +1,6 @@
 // --- Core ---
 export { metadataReader } from './read'
-export { metadataWriter, metadataEstimator } from './write'
+export { metadataWriter, metadataEstimator, MetadataValidationFailedError } from './write'
 
 // --- Schema fetch / resolve ---
 export {
@@ -16,6 +16,9 @@ export {
 // --- Validation + delta ---
 export { validateMetadata, validate } from './schema'
 export { computeDelta, hasChanges } from './delta'
+
+// --- Hydrate / flatten helpers (array-pattern shape conversions) ---
+export { flatten, unflatten, type HydratedRecordSet } from './hydrate'
 
 // --- Attestation primitives (sign / verify-claim, encoding, record keys) ---
 export {

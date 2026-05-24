@@ -1,6 +1,7 @@
 import type { Schema } from '@ensmetadata/schemas/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  extractArrayPatternBase,
   fetchSchema,
   fetchSchemaFromHttps,
   fetchSchemaFromIpfs,
@@ -43,7 +44,10 @@ describe('getSchemaKeys', () => {
         mid: { type: 'string', description: 'm' },
       },
     }
-    expect(getSchemaKeys(schema)).toEqual({ keys: ['zeta', 'alpha', 'mid'] })
+    expect(getSchemaKeys(schema)).toEqual({
+      keys: ['zeta', 'alpha', 'mid'],
+      arrayPatterns: [],
+    })
   })
 
   it('excludes patternProperties from keys', () => {
@@ -58,10 +62,68 @@ describe('getSchemaKeys', () => {
         class: { type: 'string', description: 'class id' },
       },
       patternProperties: {
-        '^statement(\\[[^\\]]+\\])?$': { type: 'string', description: 's' },
+        '^statement(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 's',
+          parameterType: 'map',
+        },
       },
     }
-    expect(getSchemaKeys(schema)).toEqual({ keys: ['class'] })
+    // Map-form pattern → not surfaced in arrayPatterns
+    expect(getSchemaKeys(schema)).toEqual({ keys: ['class'], arrayPatterns: [] })
+  })
+
+  it('surfaces array-form patternProperties as arrayPatterns', () => {
+    const attribute = {
+      type: 'string',
+      description: 'audit URI',
+      parameterType: 'array' as const,
+    }
+    const schema: Schema = {
+      $id: 'arr',
+      source: 'test',
+      title: 'Arr',
+      version: '1.0.0',
+      description: 'arr',
+      type: 'object',
+      properties: { class: { type: 'string', description: 'c' } },
+      patternProperties: {
+        '^audits(\\[[^\\]]+\\])?$': attribute,
+        // map entry should be ignored
+        '^services(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 's',
+          parameterType: 'map',
+        },
+      },
+    }
+    expect(getSchemaKeys(schema)).toEqual({
+      keys: ['class'],
+      arrayPatterns: [{ pattern: '^audits(\\[[^\\]]+\\])?$', baseKey: 'audits', attribute }],
+    })
+  })
+
+  it('skips array patterns whose regex shape cannot be parsed', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const schema: Schema = {
+        $id: 'bad',
+        source: 'test',
+        title: 'Bad',
+        version: '1.0.0',
+        description: 'bad',
+        type: 'object',
+        properties: {},
+        patternProperties: {
+          // anchors but no recognised bracket suffix
+          '^weird$': { type: 'string', description: 'w', parameterType: 'array' },
+        },
+      }
+      expect(getSchemaKeys(schema).arrayPatterns).toEqual([])
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('returns an empty array for a schema with no properties', () => {
@@ -74,7 +136,36 @@ describe('getSchemaKeys', () => {
       type: 'object',
       properties: {},
     } as Schema
-    expect(getSchemaKeys(schema)).toEqual({ keys: [] })
+    expect(getSchemaKeys(schema)).toEqual({ keys: [], arrayPatterns: [] })
+  })
+})
+
+describe('extractArrayPatternBase', () => {
+  it('parses the optional-bracket form used by current schemas', () => {
+    expect(extractArrayPatternBase('^audits(\\[[^\\]]+\\])?$')).toBe('audits')
+    expect(extractArrayPatternBase('^registrations(\\[[^\\]]+\\])?$')).toBe('registrations')
+  })
+
+  it('parses the required-bracket form', () => {
+    expect(extractArrayPatternBase('^member\\[[^\\]]+\\]$')).toBe('member')
+  })
+
+  it('unescapes backslash-escaped literals inside the base', () => {
+    expect(extractArrayPatternBase('^foo\\-bar(\\[[^\\]]+\\])?$')).toBe('foo-bar')
+    expect(extractArrayPatternBase('^foo\\.bar\\[[^\\]]+\\]$')).toBe('foo.bar')
+  })
+
+  it('returns null for shapes without a recognised bracket suffix', () => {
+    expect(extractArrayPatternBase('^plain$')).toBeNull()
+    expect(extractArrayPatternBase('^foo(bar)?$')).toBeNull()
+  })
+
+  it('returns null when the base contains unescaped regex metacharacters', () => {
+    expect(extractArrayPatternBase('^foo.*bar\\[[^\\]]+\\]$')).toBeNull()
+  })
+
+  it('returns null for an empty base', () => {
+    expect(extractArrayPatternBase('^\\[[^\\]]+\\]$')).toBeNull()
   })
 })
 

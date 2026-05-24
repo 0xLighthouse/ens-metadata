@@ -1,4 +1,4 @@
-import type { Schema } from '@ensmetadata/schemas/types'
+import type { Attribute, Schema } from '@ensmetadata/schemas/types'
 import type { MetadataValidationError, MetadataValidationResult } from './types'
 
 // --------------------------------------------------------------------------
@@ -167,14 +167,129 @@ export async function fetchSchema(
 // --------------------------------------------------------------------------
 
 /**
- * Return the keys declared by a Schema's `properties` object, in declaration
- * order. `patternProperties` are excluded for now since regex patterns are
- * not concrete record keys. The return shape is intentionally an object so
- * additional categories (e.g. `requiredKeys`, `recommendedKeys`,
- * `patternKeys`) can be added later without breaking callers.
+ * Descriptor for a `patternProperties` entry with `parameterType: "array"`.
+ * `baseKey` is the literal prefix extracted from the regex; concrete record
+ * names are formed as `${baseKey}[<index>]`.
  */
-export function getSchemaKeys(schema: Schema): { keys: string[] } {
-  return { keys: Object.keys(schema.properties ?? {}) }
+export interface ArrayPatternKey {
+  pattern: string
+  baseKey: string
+  attribute: Attribute
+}
+
+/**
+ * Pull the literal base from a recognised array-pattern regex. Returns null
+ * for any shape we don't understand, so callers can warn-and-skip rather than
+ * crash on an exotic schema.
+ *
+ * Recognised shapes (matching ENSIP-64 canonical forms):
+ *  - `^<base>(\[[^\]]+\])?$` — optional bracket (current schema convention)
+ *  - `^<base>\[[^\]]+\]$`    — required bracket
+ *
+ * `<base>` must be a regex-escaped literal (alphanumerics, `-`, `_`, `.`,
+ * plus backslash-escaped metacharacters). Anything else returns null.
+ */
+export function extractArrayPatternBase(pattern: string): string | null {
+  let body = pattern
+  if (body.startsWith('^')) body = body.slice(1)
+  if (body.endsWith('$')) body = body.slice(0, -1)
+
+  const optionalSuffix = '(\\[[^\\]]+\\])?'
+  const requiredSuffix = '\\[[^\\]]+\\]'
+  if (body.endsWith(optionalSuffix)) {
+    body = body.slice(0, -optionalSuffix.length)
+  } else if (body.endsWith(requiredSuffix)) {
+    body = body.slice(0, -requiredSuffix.length)
+  } else {
+    return null
+  }
+
+  // Walk the remaining regex: each char is either a literal, a `\X` escape
+  // (yields the literal X), or — if it's an unescaped metacharacter — proof
+  // that we don't understand the shape and must bail.
+  const REGEX_META = new Set('\\^$.*+?()[]{}|')
+  let base = ''
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (ch === '\\') {
+      if (i + 1 >= body.length) return null
+      base += body[i + 1]
+      i++
+    } else if (REGEX_META.has(ch)) {
+      return null
+    } else {
+      base += ch
+    }
+  }
+  return base.length > 0 ? base : null
+}
+
+/**
+ * Match `<baseKey>[<n>]` where baseKey is one we expect AND n is a
+ * non-negative integer with no leading zeros (except "0" itself). Returns
+ * null for anything that doesn't fit — map-form patterns, unrelated
+ * bracketed keys, malformed indices.
+ *
+ * Shared between hydrate, validation, and the writer's array-aware delta so
+ * all three agree on what counts as a canonical array entry.
+ */
+export function matchArrayEntry(
+  key: string,
+  baseKeys: Set<string>,
+): { baseKey: string; index: number } | null {
+  const open = key.lastIndexOf('[')
+  if (open <= 0 || !key.endsWith(']')) return null
+  const baseKey = key.slice(0, open)
+  if (!baseKeys.has(baseKey)) return null
+  const inside = key.slice(open + 1, -1)
+  if (inside.length === 0) return null
+  if (inside !== '0' && !/^[1-9][0-9]*$/.test(inside)) return null
+  return { baseKey, index: Number(inside) }
+}
+
+/**
+ * Like {@link matchArrayEntry} but also reports the malformed-index case so
+ * validation can emit a precise error. Returns `null` when the key doesn't
+ * look like a `${baseKey}[…]` entry for any known array baseKey.
+ */
+function classifyArrayEntry(
+  key: string,
+  baseKeys: Set<string>,
+): { baseKey: string; index: number } | { baseKey: string; badIndex: string } | null {
+  const open = key.lastIndexOf('[')
+  if (open <= 0 || !key.endsWith(']')) return null
+  const baseKey = key.slice(0, open)
+  if (!baseKeys.has(baseKey)) return null
+  const inside = key.slice(open + 1, -1)
+  if (inside === '0' || /^[1-9][0-9]*$/.test(inside)) {
+    return { baseKey, index: Number(inside) }
+  }
+  return { baseKey, badIndex: inside }
+}
+
+/**
+ * Return the keys declared by a Schema's `properties` object (in declaration
+ * order) and the array-form `patternProperties` entries we can resolve to a
+ * concrete base key. Map-form pattern properties are not surfaced — without
+ * a parameter to look up, there's nothing concrete to read.
+ */
+export function getSchemaKeys(schema: Schema): {
+  keys: string[]
+  arrayPatterns: ArrayPatternKey[]
+} {
+  const arrayPatterns: ArrayPatternKey[] = []
+  for (const [pattern, attribute] of Object.entries(schema.patternProperties ?? {})) {
+    if (attribute.parameterType !== 'array') continue
+    const baseKey = extractArrayPatternBase(pattern)
+    if (!baseKey) {
+      console.warn(
+        `[ensmetadata/sdk] Could not extract base key from array pattern "${pattern}"; skipping.`,
+      )
+      continue
+    }
+    arrayPatterns.push({ pattern, baseKey, attribute })
+  }
+  return { keys: Object.keys(schema.properties ?? {}), arrayPatterns }
 }
 
 // --------------------------------------------------------------------------
@@ -187,6 +302,15 @@ export function getSchemaKeys(schema: Schema): { keys: string[] } {
  * matches one of the regexes in `patternProperties`). Returns a discriminated
  * union: on success the `data` is the validated record, on failure a list of
  * per-key errors.
+ *
+ * Array-pattern entries (`parameterType: "array"`) get stricter treatment than
+ * the bare `patternProperties` regex implies, so the writer can't publish
+ * state the reader will silently truncate:
+ *  - Indices must be canonical (`0` or `[1-9][0-9]*`).
+ *  - Entries per baseKey must be contiguous `0..k`. A gap means `getMetadata`
+ *    would stop reading before the tail.
+ *  - The literal baseKey (e.g. `audits` with no bracket) is rejected — it
+ *    can't be reached by the array-read phase.
  */
 export function validateMetadata(data: unknown, schema: Schema): MetadataValidationResult {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
@@ -197,14 +321,55 @@ export function validateMetadata(data: unknown, schema: Schema): MetadataValidat
   const errors: MetadataValidationError[] = []
   const knownKeys = new Set(Object.keys(schema.properties))
   const patternRegexes = Object.keys(schema.patternProperties ?? {}).map((p) => new RegExp(p))
+  const { arrayPatterns } = getSchemaKeys(schema)
+  const arrayBaseKeys = new Set(arrayPatterns.map((p) => p.baseKey))
 
   for (const key of schema.required ?? []) {
     if (!record[key]) errors.push({ key, message: `Required field "${key}" is missing` })
   }
 
+  // baseKey → set of canonical indices seen in `record`
+  const arrayIndices = new Map<string, Set<number>>()
+
   for (const key of Object.keys(record)) {
+    if (arrayBaseKeys.has(key)) {
+      errors.push({
+        key,
+        message: `"${key}" is an array baseKey and cannot be used as a literal key — use ${key}[0], ${key}[1], ...`,
+      })
+      continue
+    }
+    const cls = classifyArrayEntry(key, arrayBaseKeys)
+    if (cls) {
+      if ('badIndex' in cls) {
+        errors.push({
+          key,
+          message: `Invalid array index in "${key}" — indices must be 0 or a positive integer with no leading zeros`,
+        })
+      } else {
+        let seen = arrayIndices.get(cls.baseKey)
+        if (!seen) {
+          seen = new Set()
+          arrayIndices.set(cls.baseKey, seen)
+        }
+        seen.add(cls.index)
+      }
+      continue
+    }
     if (!knownKeys.has(key) && !patternRegexes.some((r) => r.test(key))) {
       errors.push({ key, message: `Unknown field "${key}"` })
+    }
+  }
+
+  for (const [baseKey, indices] of arrayIndices) {
+    const max = Math.max(...indices)
+    for (let i = 0; i <= max; i++) {
+      if (!indices.has(i)) {
+        errors.push({
+          key: `${baseKey}[${i}]`,
+          message: `Array "${baseKey}" is missing index ${i} — entries must be contiguous starting at 0`,
+        })
+      }
     }
   }
 

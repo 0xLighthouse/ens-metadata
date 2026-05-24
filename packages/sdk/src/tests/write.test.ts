@@ -17,7 +17,13 @@ vi.mock('@ensdomains/ensjs/wallet', () => ({
   setRecords: setRecordsMock,
 }))
 
-import { applyDelta, computeDelta, metadataEstimator, metadataWriter } from '../write'
+import {
+  MetadataValidationFailedError,
+  applyDelta,
+  computeDelta,
+  metadataEstimator,
+  metadataWriter,
+} from '../write'
 
 const RESOLVER = '0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR' as `0x${string}`
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`
@@ -98,6 +104,145 @@ describe('computeDelta', () => {
     expect(
       computeDelta({ class: 'A' }, { class: 'A', avatar: 'ipfs://x' }, { ignoreMissing: true }),
     ).toEqual({})
+  })
+
+  // Array-aware PATCH semantics (option A: desired is authoritative for any
+  // array baseKey it touches).
+  describe('ignoreMissing + array schema (tail clears)', () => {
+    const arrSchema: Schema = {
+      $id: 'arr',
+      source: 'test',
+      title: 'Arr',
+      version: '1.0',
+      description: 'arr',
+      type: 'object',
+      properties: { class: { type: 'string', description: 'c' } },
+      patternProperties: {
+        '^audits(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 'a',
+          parameterType: 'array',
+        },
+        '^members(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 'm',
+          parameterType: 'array',
+        },
+      },
+    }
+
+    it('emits deletes for existing tail past the desired array length', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'new0', 'audits[1]': 'new1' },
+        {
+          class: 'C',
+          'audits[0]': 'old0',
+          'audits[1]': 'old1',
+          'audits[2]': 'old2',
+          'audits[3]': 'old3',
+        },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({
+        'audits[0]': 'new0',
+        'audits[1]': 'new1',
+        'audits[2]': '',
+        'audits[3]': '',
+      })
+    })
+
+    it('only touches the array baseKeys the caller actually modified', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'new0' },
+        {
+          'audits[0]': 'old0',
+          'audits[1]': 'old1',
+          'members[0]': 'm0',
+          'members[1]': 'm1',
+        },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      // audits tail cleared; members[*] left alone (members baseKey untouched).
+      expect(changes).toEqual({ 'audits[0]': 'new0', 'audits[1]': '' })
+    })
+
+    it('does not touch unrelated scalar keys absent from desired', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'new0' },
+        { class: 'C', avatar: 'ipfs://x', 'audits[0]': 'old0' },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({ 'audits[0]': 'new0' })
+    })
+
+    it('shrinks an array to empty by passing no entries → no tail clears (baseKey untouched)', () => {
+      // Calling with no audits entries at all means "I am not touching audits"
+      // under PATCH semantics — the existing array is preserved.
+      const changes = computeDelta(
+        { class: 'C' },
+        { class: 'C', 'audits[0]': 'old0', 'audits[1]': 'old1' },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({})
+    })
+
+    it('reduces an array to a single entry, clearing all higher tail', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'only' },
+        { 'audits[0]': 'old0', 'audits[1]': 'old1', 'audits[2]': 'old2' },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({ 'audits[0]': 'only', 'audits[1]': '', 'audits[2]': '' })
+    })
+
+    it('PUT mode (ignoreMissing=false) still deletes every unmentioned key (array or not)', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'new0' },
+        { class: 'C', avatar: 'ipfs://x', 'audits[0]': 'old0', 'audits[1]': 'old1' },
+        { ignoreMissing: false, schema: arrSchema },
+      )
+      // PUT semantics: every existing key not in desired is deleted, schema or no schema.
+      expect(changes).toEqual({
+        'audits[0]': 'new0',
+        class: '',
+        avatar: '',
+        'audits[1]': '',
+      })
+    })
+
+    it('ignoreMissing=true without a schema falls back to vanilla PATCH (no array smarts)', () => {
+      const changes = computeDelta(
+        { 'audits[0]': 'new0' },
+        { 'audits[0]': 'old0', 'audits[1]': 'old1' },
+        { ignoreMissing: true },
+      )
+      expect(changes).toEqual({ 'audits[0]': 'new0' })
+    })
+
+    it('empty-array sentinel: audits[0]="" clears the entire array under PATCH', () => {
+      // This is the documented `flatten({ audits: [""] })` workaround for
+      // expressing "clear this array" in a flat RecordSet — the sentinel
+      // marks the baseKey as touched so the tail clear runs.
+      const changes = computeDelta(
+        { 'audits[0]': '' },
+        { 'audits[0]': 'a0', 'audits[1]': 'a1', 'audits[2]': 'a2' },
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({
+        'audits[0]': '',
+        'audits[1]': '',
+        'audits[2]': '',
+      })
+    })
+
+    it('empty-array sentinel against an already-empty on-chain array is a no-op', () => {
+      const changes = computeDelta(
+        { 'audits[0]': '' },
+        {},
+        { ignoreMissing: true, schema: arrSchema },
+      )
+      expect(changes).toEqual({})
+    })
   })
 })
 
@@ -233,6 +378,47 @@ describe('prepareSetMetadata', () => {
       ignoreMissing: true,
     })
     expect(prepared.changePreview.changes).toEqual({})
+  })
+
+  it('ignoreMissing=true with an array schema clears existing tail entries for touched baseKeys', async () => {
+    const arrSchema: Schema = {
+      $id: 'arr',
+      source: 'test',
+      title: 'Arr',
+      version: '1.0',
+      description: 'arr',
+      type: 'object',
+      required: ['class'],
+      properties: { class: { type: 'string', description: 'c' } },
+      patternProperties: {
+        '^audits(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 'a',
+          parameterType: 'array',
+        },
+      },
+    }
+    const client = makePublicClient()
+    const estimator = metadataEstimator({ publicClient: client })
+    const prepared = await estimator.prepareSetMetadata({
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: arrSchema,
+      existing: {
+        class: 'C',
+        'audits[0]': 'old0',
+        'audits[1]': 'old1',
+        'audits[2]': 'old2',
+      },
+      desired: { 'audits[0]': 'new0' },
+      ignoreMissing: true,
+    })
+    expect(prepared.changePreview.changes).toEqual({
+      'audits[0]': 'new0',
+      'audits[1]': '',
+      'audits[2]': '',
+    })
+    expect(prepared.changePreview.validation?.success).toBe(true)
   })
 
   it('returns validation.success=false without throwing when projected state is invalid', async () => {
@@ -519,6 +705,34 @@ describe('setPreparedMetadata', () => {
     expect(setRecordsMock).not.toHaveBeenCalled()
   })
 
+  it('throws MetadataValidationFailedError when the prepared bundle has validation errors', async () => {
+    // Manually construct a prepared bundle with a failing validation; we
+    // bypass prepareSetMetadata so setPreparedMetadata's check is exercised
+    // in isolation.
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    const prepared = {
+      name: 'alice.eth',
+      resolver: RESOLVER,
+      schema: baseSchema,
+      changePreview: {
+        name: 'alice.eth',
+        resolver: RESOLVER,
+        existing: {},
+        changes: { description: 'something' },
+        validation: {
+          success: false as const,
+          errors: [{ key: 'class', message: 'Required field "class" is missing' }],
+        },
+      },
+    }
+    await expect(writer.setPreparedMetadata(prepared)).rejects.toBeInstanceOf(
+      MetadataValidationFailedError,
+    )
+    expect(setRecordsMock).not.toHaveBeenCalled()
+  })
+
   it('calls setRecords with the normalized name, texts, resolverAddress, account, and coins=[]', async () => {
     const client = makePublicClient()
     const wallet = makeWallet()
@@ -579,6 +793,59 @@ describe('setMetadata', () => {
     })
     expect(setRecordsMock).toHaveBeenCalledOnce()
     expect(result.txHash).toBe(TX_HASH)
+  })
+
+  it('throws MetadataValidationFailedError end-to-end when the projected state is invalid', async () => {
+    // Required `class` missing in both existing and desired → projection
+    // invalid → setMetadata must refuse to broadcast.
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    await expect(
+      writer.setMetadata({
+        name: 'alice.eth',
+        resolver: RESOLVER,
+        schema: baseSchema,
+        existing: {},
+        desired: { description: 'no class anywhere' },
+      }),
+    ).rejects.toBeInstanceOf(MetadataValidationFailedError)
+    expect(setRecordsMock).not.toHaveBeenCalled()
+  })
+
+  it('throws MetadataValidationFailedError when array contiguity is violated', async () => {
+    const arrSchema: Schema = {
+      $id: 'arr',
+      source: 'test',
+      title: 'Arr',
+      version: '1.0',
+      description: 'arr',
+      type: 'object',
+      required: ['class'],
+      properties: { class: { type: 'string', description: 'c' } },
+      patternProperties: {
+        '^audits(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          description: 'a',
+          parameterType: 'array',
+        },
+      },
+    }
+    const client = makePublicClient()
+    const wallet = makeWallet()
+    const writer = metadataWriter({ publicClient: client })(wallet)
+    // Sparse array: index 0 set, index 2 set, index 1 missing.
+    await expect(
+      writer.setMetadata({
+        name: 'alice.eth',
+        resolver: RESOLVER,
+        schema: arrSchema,
+        existing: { class: 'C' },
+        desired: { class: 'C', 'audits[0]': 'a0', 'audits[2]': 'a2' },
+        ignoreMissing: true,
+      }),
+    ).rejects.toBeInstanceOf(MetadataValidationFailedError)
+    expect(setRecordsMock).not.toHaveBeenCalled()
   })
 
   it('propagates the prepare-stage "No resolver found" error without calling setRecords', async () => {
