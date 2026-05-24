@@ -12,6 +12,10 @@ import type {
 
 const SCHEMA_KEYS = ['schema', 'class']
 
+// Safety cap on sequential array-pattern reads. A misbehaving resolver that
+// always returns a non-empty string would otherwise loop forever.
+const MAX_ARRAY_ENTRIES = 1000
+
 // Ensure we get a non-empty string or null
 function nonEmpty(value: string | null | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
@@ -75,12 +79,15 @@ export async function getResolverFromRegistry(
 
 async function directReadTextRecords(
   client: PublicClient,
-  registry: Address,
   name: string,
   keys: string[],
   timeoutMs: number,
+  opts: { registry?: Address; resolver?: Address | null },
 ): Promise<Record<string, string | null>> {
-  const resolverAddr = await getResolverFromRegistry(client, registry, name)
+  let resolverAddr = opts.resolver ?? null
+  if (resolverAddr === null && opts.registry) {
+    resolverAddr = await getResolverFromRegistry(client, opts.registry, name)
+  }
   if (!resolverAddr) {
     return Object.fromEntries(keys.map((k) => [k, null]))
   }
@@ -106,9 +113,11 @@ async function directReadTextRecords(
 // ─── Public reads ───────────────────────────────────────────────────────────
 
 // Strict read: RPC errors and timeouts propagate; empty strings normalise to null.
-// When `registry` is supplied, reads go directly through the registry + resolver
-// pair (no Universal Resolver). Otherwise we delegate to viem's `getEnsText`,
-// which routes through the chain's UniversalResolver.
+// When `registry` or `resolver` is supplied, reads go directly through the
+// registry + resolver pair (no Universal Resolver). Otherwise we delegate to
+// viem's `getEnsText`, which routes through the chain's UniversalResolver.
+// `resolver` short-circuits the `registry.resolver(node)` lookup — callers
+// reading repeatedly against the same name should pre-resolve once.
 export async function readTextRecords(opts: {
   client: PublicClient
   name: string
@@ -119,14 +128,15 @@ export async function readTextRecords(opts: {
   strict?: boolean
   universalResolverAddress?: string
   registry?: Address
+  resolver?: Address | null
   timeoutMs?: number
 }): Promise<Record<string, string | null>> {
-  const { client, name, keys, timeoutMs, registry, ...textOptions } = opts
+  const { client, name, keys, timeoutMs, registry, resolver, ...textOptions } = opts
   const normalizedName = normalize(name)
   const ms = timeoutMs ?? 10_000
 
-  if (registry) {
-    return directReadTextRecords(client, registry, normalizedName, keys, ms)
+  if (registry || resolver) {
+    return directReadTextRecords(client, normalizedName, keys, ms, { registry, resolver })
   }
 
   const entries = await Promise.all(
@@ -174,9 +184,11 @@ export async function getMetadata(
     for (const k of SCHEMA_KEYS) alreadyRead.add(k)
   }
 
+  const schemaKeys = schema ? getSchemaKeys(schema) : { keys: [], arrayPatterns: [] }
+
   const keys = new Set<string>()
   if (schema) {
-    for (const k of getSchemaKeys(schema).keys) keys.add(k)
+    for (const k of schemaKeys.keys) keys.add(k)
     keys.add('schema')
   }
   if (opts.keys) {
@@ -184,11 +196,50 @@ export async function getMetadata(
   }
   for (const k of alreadyRead) keys.delete(k)
 
-  const texts = keys.size > 0 ? await readTextRecords({ ...opts, client, keys: [...keys] }) : {}
+  // Pre-resolve the resolver once when using the direct path, so the array
+  // phase below doesn't re-run `registry.resolver(node)` per index. A null
+  // result means the name has no resolver — every read returns null, so we
+  // can short-circuit both phases.
+  const hasArrayWork = schemaKeys.arrayPatterns.length > 0
+  let readOpts: typeof opts & { client: PublicClient; resolver?: Address | null }
+  if (opts.registry && (keys.size > 0 || hasArrayWork)) {
+    const resolverAddr = await getResolverFromRegistry(client, opts.registry, normalize(opts.name))
+    if (!resolverAddr) {
+      return { name: normalize(opts.name), properties, schema }
+    }
+    readOpts = { ...opts, client, registry: undefined, resolver: resolverAddr }
+  } else {
+    readOpts = { ...opts, client }
+  }
+
+  const texts = keys.size > 0 ? await readTextRecords({ ...readOpts, keys: [...keys] }) : {}
 
   // State RecordSet convention: only keys with values on-chain appear.
   for (const [k, v] of Object.entries(texts)) {
     if (v !== null) properties[k] = v
+  }
+
+  // Array-pattern phase: for each `parameterType: "array"` pattern, read
+  // `${baseKey}[0]`, `${baseKey}[1]`, ... sequentially and stop at the first
+  // gap. Different patterns run in parallel; entries within one pattern do
+  // not, since we don't know the length up front.
+  if (hasArrayWork) {
+    const arrayResults = await Promise.all(
+      schemaKeys.arrayPatterns.map(async ({ baseKey }) => {
+        const found: Array<[string, string]> = []
+        for (let i = 0; i < MAX_ARRAY_ENTRIES; i++) {
+          const key = `${baseKey}[${i}]`
+          const result = await readTextRecords({ ...readOpts, keys: [key] })
+          const value = result[key]
+          if (value === null || value === undefined) break
+          found.push([key, value])
+        }
+        return found
+      }),
+    )
+    for (const entries of arrayResults) {
+      for (const [k, v] of entries) properties[k] = v
+    }
   }
 
   return {

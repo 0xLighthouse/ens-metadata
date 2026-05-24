@@ -28,7 +28,9 @@ function makeDirectReadClient({
     }
     throw new Error(`unexpected readContract call: ${args.functionName}`)
   })
-  const getEnsText = vi.fn(async () => null)
+  const getEnsText = vi.fn<(args: { name: string; key: string }) => Promise<string | null>>(
+    async () => null,
+  )
   return {
     client: { readContract, getEnsText } as unknown as PublicClient,
     readContract,
@@ -148,6 +150,121 @@ describe('getMetadata (registry-direct path)', () => {
 
     expect(result.properties).toMatchObject({ class: 'Agent', description: 'hi' })
     expect(getEnsText).not.toHaveBeenCalled()
+  })
+})
+
+describe('getMetadata array-pattern reads', () => {
+  const arraySchema: Schema = {
+    $id: 'arr',
+    source: 'test',
+    title: 'Arr',
+    version: '1.0',
+    description: 't',
+    type: 'object',
+    properties: {
+      class: { type: 'string', description: 'c' },
+    },
+    patternProperties: {
+      '^audits(\\[[^\\]]+\\])?$': {
+        type: 'string',
+        description: 'audit',
+        parameterType: 'array',
+      },
+    },
+  }
+
+  it('reads audits[0], audits[1]... until the first gap (registry path)', async () => {
+    const { client, readContract } = makeDirectReadClient({
+      text: {
+        class: 'Contract',
+        'audits[0]': 'ipfs://a0',
+        'audits[1]': 'ipfs://a1',
+        'audits[2]': 'ipfs://a2',
+        // audits[3] absent → loop stops here
+        'audits[4]': 'ipfs://a4', // beyond the gap, must not be read
+      },
+    })
+
+    const result = await getMetadata(client, {
+      name: 'alice.base.eth',
+      schema: arraySchema,
+      registry: REGISTRY,
+    })
+
+    expect(result.properties).toMatchObject({
+      class: 'Contract',
+      'audits[0]': 'ipfs://a0',
+      'audits[1]': 'ipfs://a1',
+      'audits[2]': 'ipfs://a2',
+    })
+    expect(result.properties['audits[3]']).toBeUndefined()
+    expect(result.properties['audits[4]']).toBeUndefined()
+
+    // Indices probed: 0, 1, 2, 3 (gap). Must not have read 4.
+    type ReadCallArg = { functionName: string; args: readonly unknown[] }
+    const textKeys = readContract.mock.calls
+      .filter((c) => (c[0] as ReadCallArg).functionName === 'text')
+      .map((c) => (c[0] as ReadCallArg).args[1] as string)
+    expect(textKeys).toContain('audits[3]')
+    expect(textKeys).not.toContain('audits[4]')
+  })
+
+  it('pre-resolves the resolver once and reuses it across array reads', async () => {
+    const { client, readContract } = makeDirectReadClient({
+      text: { class: 'Contract', 'audits[0]': 'ipfs://a0' },
+    })
+
+    await getMetadata(client, {
+      name: 'alice.base.eth',
+      schema: arraySchema,
+      registry: REGISTRY,
+    })
+
+    const resolverCalls = readContract.mock.calls.filter(
+      (c) => (c[0] as { functionName: string }).functionName === 'resolver',
+    )
+    // Exactly one registry.resolver(node) regardless of how many text reads ran.
+    expect(resolverCalls).toHaveLength(1)
+  })
+
+  it('reads array entries through viem getEnsText when no registry is supplied', async () => {
+    const { client, getEnsText } = makeDirectReadClient()
+    getEnsText.mockImplementation(async ({ key }: { key: string }) => {
+      if (key === 'class') return 'Contract'
+      if (key === 'audits[0]') return 'ipfs://a0'
+      if (key === 'audits[1]') return 'ipfs://a1'
+      return null
+    })
+
+    const result = await getMetadata(client, {
+      name: 'alice.eth',
+      schema: arraySchema,
+    })
+
+    expect(result.properties).toMatchObject({
+      class: 'Contract',
+      'audits[0]': 'ipfs://a0',
+      'audits[1]': 'ipfs://a1',
+    })
+    expect(result.properties['audits[2]']).toBeUndefined()
+
+    const probedKeys = getEnsText.mock.calls.map((c) => c[0].key)
+    expect(probedKeys).toContain('audits[2]') // the gap probe
+    expect(probedKeys).not.toContain('audits[3]')
+  })
+
+  it('returns no array entries when the name has no resolver set', async () => {
+    const { client, readContract } = makeDirectReadClient({ resolver: ZERO_ADDRESS })
+
+    const result = await getMetadata(client, {
+      name: 'alice.base.eth',
+      schema: arraySchema,
+      registry: REGISTRY,
+    })
+
+    expect(result.properties).toEqual({})
+    // One resolver lookup, then nothing — no per-index text() probes.
+    expect(readContract).toHaveBeenCalledTimes(1)
   })
 })
 
