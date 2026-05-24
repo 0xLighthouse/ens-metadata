@@ -1,7 +1,7 @@
 'use client'
 
 import { getPublicClientForName, useWeb3 } from '@/contexts/Web3Provider'
-import { evictSession } from '@/lib/attester-client'
+import { evictSession, notifySubmission } from '@/lib/attester-client'
 import { diffToWriteMap } from '@/lib/record-diff'
 import { useWizardStore } from '@/stores/wizard'
 import { fetchSchema, metadataWriter } from '@ensmetadata/sdk'
@@ -20,7 +20,7 @@ export type PublishPhase = 'idle' | 'writing' | 'confirming' | 'done' | 'error'
  * the new chain, and waits for confirmations on the same chain the tx landed
  * on.
  */
-export function usePublishFlow() {
+export function usePublishFlow(intentId: string) {
   const { isInitialized, getWalletClientForChain } = useWeb3()
   const ensName = useWizardStore((s) => s.ensName)
   const sessionId = useWizardStore((s) => s.sessionId)
@@ -82,6 +82,26 @@ export function usePublishFlow() {
         ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
       })
       setTxHash(hash)
+
+      // Notify the worker as soon as the tx is broadcast; the webhook receiver
+      // is responsible for waiting for confirmations and re-reading on-chain
+      // for the actual record values. Awaited (not parallel with the wait
+      // below) so the session validation lands before we evict the session.
+      // Errors are non-fatal — the on-chain publish is the source of truth.
+      if (sessionId) {
+        try {
+          await notifySubmission(intentId, {
+            sessionId,
+            ensName,
+            txHash: hash,
+            from: walletClient.account?.address,
+            chainId: chain.id,
+          })
+        } catch (err) {
+          console.warn('notifySubmission failed', err)
+        }
+      }
+
       setPhase('confirming')
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 2 })
       if (sessionId) await evictSession(sessionId).catch(() => {})

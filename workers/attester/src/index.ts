@@ -7,6 +7,7 @@ import { handleAttest } from './handlers/attest'
 import { handleCreateIntent, handleGetIntent } from './handlers/intent'
 import { handlePlatform } from './handlers/platform'
 import { handleSession } from './handlers/session'
+import { handleSubmission } from './handlers/submission'
 import { handleWallet } from './handlers/wallet'
 
 // Re-export the Durable Object class so wrangler can register it via the
@@ -26,7 +27,7 @@ export { SessionStore } from './session-store'
  *   GET  /api/intent/:id                    — read profile-builder intent
  */
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return preflightResponse(env, request)
     }
@@ -78,6 +79,10 @@ export default {
 
     if (request.method === 'POST' && path === '/api/intent') {
       return handleCreateIntent(env, request)
+    }
+    const submissionMatch = /^\/api\/intent\/([^/]+)\/submission\/?$/.exec(path)
+    if (request.method === 'POST' && submissionMatch) {
+      return handleSubmission(env, request, ctx, decodeURIComponent(submissionMatch[1]!))
     }
     const intentMatch = /^\/api\/intent\/([^/]+)\/?$/.exec(path)
     if (request.method === 'GET' && intentMatch) {

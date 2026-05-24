@@ -15,6 +15,13 @@ export interface IntentConfig {
   /** Platforms offered as linkable but skippable. Disjoint with requiredPlatforms. */
   optionalPlatforms: IntentPlatform[]
   message: string
+  /**
+   * Optional creator webhook. When set, the attester worker POSTs the
+   * recipient's submission to this URL after the wizard reports a confirmed
+   * publish. Bound into the EIP-712 signature via canonical config bytes, but
+   * stripped from the public GET response so recipients never see it.
+   */
+  webhookUrl?: string
 }
 
 export const INTENT_PLATFORMS = ['com.x', 'org.telegram'] as const
@@ -24,6 +31,7 @@ export const INTENT_LIMITS = {
   maxMessageChars: 280,
   maxAttrCount: 32,
   maxPayloadBytes: 8 * 1024,
+  maxWebhookUrlChars: 2048,
 } as const
 
 // EIP-712 binds the signature to the config bytes and the claimed ensName.
@@ -145,6 +153,26 @@ export function validateIntentConfig(
     return { ok: false, error: { field: 'required', message: 'too many attributes' } }
   }
 
+  let webhookUrl: string | undefined
+  if (c.webhookUrl !== undefined && c.webhookUrl !== null && c.webhookUrl !== '') {
+    if (typeof c.webhookUrl !== 'string') {
+      return { ok: false, error: { field: 'webhookUrl', message: 'must be a string' } }
+    }
+    if (c.webhookUrl.length > INTENT_LIMITS.maxWebhookUrlChars) {
+      return { ok: false, error: { field: 'webhookUrl', message: 'too long' } }
+    }
+    let parsed: URL
+    try {
+      parsed = new URL(c.webhookUrl)
+    } catch {
+      return { ok: false, error: { field: 'webhookUrl', message: 'not a valid URL' } }
+    }
+    if (parsed.protocol !== 'https:') {
+      return { ok: false, error: { field: 'webhookUrl', message: 'must be https' } }
+    }
+    webhookUrl = c.webhookUrl
+  }
+
   const value: IntentConfig = {
     version: 1,
     name: c.name as string | null,
@@ -155,6 +183,7 @@ export function validateIntentConfig(
     requiredPlatforms,
     optionalPlatforms,
     message: c.message,
+    ...(webhookUrl !== undefined ? { webhookUrl } : {}),
   }
 
   if (

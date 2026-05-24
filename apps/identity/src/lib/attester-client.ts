@@ -182,3 +182,33 @@ export interface IntentResponse {
 export function getIntent(id: string): Promise<IntentResponse> {
   return getJson<IntentResponse>(`/api/intent/${encodeURIComponent(id)}`)
 }
+
+export interface NotifySubmissionArgs {
+  sessionId: string
+  /** The ENS name being updated. */
+  ensName: string
+  /** The publish transaction's hash. The receiver waits for confirmations
+   *  and re-reads chain state from this. */
+  txHash: string
+  /** The address that signed the publish tx — wizard-claimed; the receiver
+   *  can re-verify via `eth_getTransactionByHash`. */
+  from?: `0x${string}`
+  chainId?: number
+}
+
+/**
+ * Tell the attester worker that the recipient has broadcast a publish tx
+ * for this intent. The worker fires the creator's configured webhook (if
+ * any) with a minimal payload — txHash + ensName + from — and the receiver
+ * handles waiting for confirmation + re-reading on-chain state.
+ *
+ * Safe to call unconditionally — the worker returns `delivered: false` when
+ * the intent has no webhook URL. Errors are non-fatal at the call site: the
+ * publish itself is the source of truth.
+ */
+export function notifySubmission(
+  intentId: string,
+  args: NotifySubmissionArgs,
+): Promise<{ ok: true; delivered: boolean }> {
+  return postJson(`/api/intent/${encodeURIComponent(intentId)}/submission`, args)
+}

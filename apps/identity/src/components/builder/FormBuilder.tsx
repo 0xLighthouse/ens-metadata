@@ -3,6 +3,7 @@
 import { CreatorPreviewCard } from '@/components/builder/CreatorPreviewCard'
 import { IntentCreator } from '@/components/builder/IntentCreator'
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
+import { Input } from '@/components/ui/input'
 import {
   BUILDER_PLATFORMS,
   BUILDER_SCHEMAS,
@@ -41,6 +42,10 @@ interface BuilderState {
   /** Platforms shown as linkable but skippable. Disjoint with requiredPlatforms. */
   optionalPlatforms: BuilderPlatformId[]
   message: string
+  /** Optional HTTPS URL the worker POSTs each completed submission to. Empty
+   *  string = no webhook. Bound into the EIP-712 signature when non-empty;
+   *  stripped from the public intent response so recipients never see it. */
+  webhookUrl: string
 }
 
 type PlatformState = 'off' | 'optional' | 'required'
@@ -52,6 +57,12 @@ function resolveSchema(id: string): BuilderSchema | null {
 function buildConfigFromState(state: BuilderState): IntentConfig | null {
   const schema = resolveSchema(state.schemaId)
   if (!schema) return null
+  // Only include webhookUrl in the canonical config when it's both non-empty
+  // AND a parseable https URL. The shared validator will reject anything else
+  // server-side, but skipping it here keeps the local hash stable while the
+  // user is still typing.
+  const trimmedWebhook = state.webhookUrl.trim()
+  const webhookUrl = isValidWebhookUrl(trimmedWebhook) ? trimmedWebhook : undefined
   return {
     version: 1,
     name: null,
@@ -62,6 +73,17 @@ function buildConfigFromState(state: BuilderState): IntentConfig | null {
     requiredPlatforms: state.requiredPlatforms,
     optionalPlatforms: state.optionalPlatforms,
     message: state.message,
+    ...(webhookUrl !== undefined ? { webhookUrl } : {}),
+  }
+}
+
+function isValidWebhookUrl(value: string): boolean {
+  if (value.length === 0) return false
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:'
+  } catch {
+    return false
   }
 }
 
@@ -74,6 +96,7 @@ export function FormBuilder() {
     requiredPlatforms: [],
     optionalPlatforms: [],
     message: '',
+    webhookUrl: '',
   })
   // Locked while a shareable link is live, so the user can't silently drift
   // the config away from whatever the link encodes.
@@ -270,6 +293,18 @@ export function FormBuilder() {
             active={q1Answered}
           >
             <PlatformStateList getState={getPlatformState} onChange={setPlatformState} />
+          </GuidedSection>
+
+          <GuidedSection
+            number="05"
+            title="Receive submissions on your server? (optional)"
+            description="When set, we POST the submitted form data to this URL every time a recipient publishes. HTTPS only."
+            active={q1Answered}
+          >
+            <WebhookUrlField
+              value={state.webhookUrl}
+              onChange={(webhookUrl) => setState((s) => ({ ...s, webhookUrl }))}
+            />
           </GuidedSection>
         </GuidedCard>
       </div>
@@ -538,6 +573,41 @@ function RequiredToggleField({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// -----------------------------
+// Q5 — Optional webhook URL
+// -----------------------------
+
+function WebhookUrlField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (next: string) => void
+}) {
+  const trimmed = value.trim()
+  // Only surface a validation error when the user has typed something but it
+  // doesn't parse. Empty stays neutral — the field is optional.
+  const invalid = trimmed.length > 0 && !isValidWebhookUrl(trimmed)
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Input
+        type="url"
+        inputMode="url"
+        placeholder="https://example.com/webhook"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={invalid || undefined}
+        aria-describedby={invalid ? 'webhook-url-error' : undefined}
+      />
+      {invalid && (
+        <p id="webhook-url-error" className="text-xs text-red-600 dark:text-red-400">
+          Webhook URL must be a valid https:// URL.
+        </p>
+      )}
     </div>
   )
 }

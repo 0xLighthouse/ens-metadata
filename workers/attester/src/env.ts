@@ -45,4 +45,10 @@ export interface Env {
   PRIVY_APP_ID?: string
   PRIVY_APP_SECRET?: string
   TELEGRAM_BOT_TOKEN?: string
+
+  // HMAC key used to sign outbound webhook payloads. The receiver verifies
+  // the `X-Identity-Signature` header against the request body using this
+  // shared secret. Optional — when unset, outbound webhooks are sent without
+  // a signature header (useful for local dev against webhook.site).
+  WEBHOOK_SIGNING_SECRET?: string
 }
