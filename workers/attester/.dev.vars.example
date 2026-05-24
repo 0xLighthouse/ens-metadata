@@ -22,3 +22,8 @@ TELEGRAM_BOT_TOKEN=
 # creator's primary ENS name and fetch their avatar. A public RPC works;
 # Goldsky/Alchemy/Infura keys are fine. Required for /api/intent to function.
 ENS_RPC_URL=
+
+# HMAC key for signing outbound webhook payloads (X-Identity-Signature header).
+# Optional — if unset, outbound webhooks are sent without a signature, which is
+# fine for testing against webhook.site but should be set for production.
+WEBHOOK_SIGNING_SECRET=

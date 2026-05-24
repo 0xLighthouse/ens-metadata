@@ -11,6 +11,7 @@ import { PublishSuccessCard } from './components/PublishSuccessCard'
 import { type PreviewMode, ViewTogglePill } from './components/ViewTogglePill'
 
 interface Props {
+  intentId: string
   keyLabels: Record<string, string>
 }
 
@@ -19,9 +20,9 @@ interface Props {
  * selected + the publish action bar. Flips to the success card once the
  * publish flow confirms.
  */
-export function PreviewScreen({ keyLabels }: Props) {
+export function PreviewScreen({ intentId, keyLabels }: Props) {
   const ensName = useWizardStore((s) => s.ensName)
-  const publish = usePublishFlow()
+  const publish = usePublishFlow(intentId)
   const [view, setView] = useState<PreviewMode>('pretty')
 
   if (publish.phase === 'done') {

@@ -19,7 +19,7 @@ const MAX_FORWARD_MS = 15 * 60 * 1000
 const ID_LENGTH = 10
 const MAX_COLLISION_RETRIES = 3
 
-interface StoredIntent {
+export interface StoredIntent {
   creator: { address: string; ensName: string }
   config: IntentConfig
   signature: string
@@ -200,11 +200,23 @@ export async function handleGetIntent(env: Env, request: Request, id: string): P
 
   return jsonResponse(env, request, {
     id,
-    config: stored.config,
+    config: redactPublicConfig(stored.config),
     creator: {
       address: stored.creator.address,
       ensName: stored.creator.ensName,
       avatar,
     },
   })
+}
+
+/**
+ * Strip creator-private fields from the intent config before returning it to
+ * the wizard. Currently just `webhookUrl`, which is a credential and must not
+ * be exposed to recipients. The signed `configHash` covers the original
+ * (pre-redaction) bytes, so anyone re-verifying needs the raw config from KV.
+ */
+function redactPublicConfig(config: IntentConfig): IntentConfig {
+  if (config.webhookUrl === undefined) return config
+  const { webhookUrl: _omit, ...rest } = config
+  return rest
 }

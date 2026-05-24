@@ -24,7 +24,7 @@ export function Wizard(props: WizardProps) {
   )
 }
 
-function WizardBody({ intent, schema, keyLabels }: Omit<WizardProps, 'intentId'>) {
+function WizardBody({ intentId, intent, schema, keyLabels }: WizardProps) {
   const config = intent.config
   const hasHydrated = useWizardStore((s) => s.hasHydrated)
   const screen = useWizardStore((s) => s.screen)
@@ -68,7 +68,9 @@ function WizardBody({ intent, schema, keyLabels }: Omit<WizardProps, 'intentId'>
         <ComposeScreen config={config} schema={schema} keyLabels={keyLabels} />
       )}
 
-      {screen === 'preview' && sessionId && <PreviewScreen keyLabels={keyLabels} />}
+      {screen === 'preview' && sessionId && (
+        <PreviewScreen intentId={intentId} keyLabels={keyLabels} />
+      )}
     </div>
   )
 }
