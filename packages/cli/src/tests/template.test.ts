@@ -64,10 +64,13 @@ describe('templateCommand', () => {
     await expect(runTemplate('agent', '99.99.99')).rejects.toThrow(/not found for schema/)
   })
 
-  it('initialises every property except class/schema to ""', async () => {
-    const out = (await runTemplate('agent')) as Record<string, string>
+  it('initialises every non-array property except class/schema to ""', async () => {
+    const out = (await runTemplate('agent')) as Record<string, unknown>
+    // `registrations` is also declared as a parameterType:"array" pattern, so
+    // it surfaces as [] instead of "" — covered by the next test.
     for (const key of Object.keys(AGENT_SCHEMA.properties)) {
       if (key === 'class' || key === 'schema') continue
+      if (Array.isArray(out[key])) continue
       expect(out[key]).toBe('')
     }
   })
@@ -77,17 +80,27 @@ describe('templateCommand', () => {
     expect(Object.keys(out)).toEqual(Object.keys(AGENT_SCHEMA.properties))
   })
 
-  it('does not emit any patternProperties keys', async () => {
+  it('does not emit any raw regex/example patternProperties keys', async () => {
     // The Agent schema uses regex-like keys such as `^services(...)?$`. The
-    // template payload must contain only concrete `properties` keys, never
-    // raw regex patterns or example pattern keys.
-    const out = (await runTemplate('agent')) as Record<string, string>
+    // template payload must never contain those raw regex strings — instead
+    // array-pattern entries surface as a single `baseKey: []` (tested
+    // separately below) and map-form patterns are omitted entirely.
+    const out = (await runTemplate('agent')) as Record<string, unknown>
     const patternKeys = Object.keys(AGENT_SCHEMA.patternProperties ?? {})
     for (const key of Object.keys(out)) {
       expect(patternKeys).not.toContain(key)
       expect(key.startsWith('^')).toBe(false)
       expect(key.includes('[')).toBe(false)
     }
+  })
+
+  it('emits empty `[]` for every parameterType:"array" pattern in the schema', async () => {
+    const out = (await runTemplate('agent')) as Record<string, unknown>
+    // Agent schema declares `registrations` and `supported-trust` as array
+    // patterns. The template should surface both as empty arrays so the user
+    // sees the canonical nested shape.
+    expect(out.registrations).toEqual([])
+    expect(out['supported-trust']).toEqual([])
   })
 
   it('declares JSON as its default output format', () => {

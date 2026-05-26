@@ -1,5 +1,4 @@
-import type { Schema } from '@ensmetadata/schemas/types'
-import { metadataReader, validateMetadata } from '@ensmetadata/sdk'
+import { metadataReader, unflatten, validateMetadata } from '@ensmetadata/sdk'
 import { z } from 'zod'
 import { bundledSchemaResolver } from '../lib/bundled-schemas.js'
 import { globalEnv, globalOptions, publicClientForName, validateName } from '../lib/context.js'
@@ -46,24 +45,24 @@ export const viewCommand = {
       )
     }
 
-    const properties: Record<string, string> = { ...metadata.properties }
-    const schemaUri = properties.schema ?? null
+    const flatProperties: Record<string, string> = { ...metadata.properties }
+    const schemaUri = flatProperties.schema ?? null
 
-    const result = validateMetadata(properties, metadata.schema)
+    const result = validateMetadata(flatProperties, metadata.schema)
     const validation = result.success
       ? { passed: true }
       : { passed: false, errors: result.errors.map(({ key, message }) => `${key}: ${message}`) }
 
     return {
       name: metadata.name,
-      class: properties.class ?? null,
+      class: flatProperties.class ?? null,
       schemaDetails: {
         title: metadata.schema.title,
         version: metadata.schema.version,
         uri: schemaUri,
       },
       validation,
-      properties,
+      properties: unflatten(flatProperties, metadata.schema),
     }
   },
 }

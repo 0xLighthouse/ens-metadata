@@ -1,6 +1,7 @@
 import { SCHEMA_MAP } from '@ensmetadata/schemas'
 import { getPublishedRegistry } from '@ensmetadata/schemas/published'
 import type { Attribute, Schema } from '@ensmetadata/schemas/types'
+import { type HydratedRecordSet, getSchemaKeys } from '@ensmetadata/sdk'
 import { z } from 'zod'
 
 /**
@@ -40,19 +41,33 @@ function resolveSchemaRef(input: string): { schema: Schema; registryId: string }
  * Build a payload skeleton from a schema's concrete `properties`.
  * `class` is pre-filled with its declared default; `schema` is set to the
  * supplied IPFS URI; every other property is initialised to an empty string.
- * `patternProperties` are intentionally excluded.
+ *
+ * Array-form `patternProperties` (`parameterType: "array"`) are surfaced as
+ * empty `[]` so the user sees the canonical nested shape rather than having
+ * to know the flat `key[0]`, `key[1]`, ... encoding. Map-form patterns are
+ * still skipped — there's no baseKey to suggest.
  */
-export function buildTemplatePayload(schema: Schema, ipfsUri: string): Record<string, string> {
-  const out: Record<string, string> = {}
+export function buildTemplatePayload(schema: Schema, ipfsUri: string): HydratedRecordSet {
+  const arrayBaseKeys = new Set(getSchemaKeys(schema).arrayPatterns.map((p) => p.baseKey))
+  const out: HydratedRecordSet = {}
   const entries = Object.entries(schema.properties) as Array<[string, Attribute]>
   for (const [key, prop] of entries) {
     if (key === 'schema') {
       out[key] = ipfsUri
     } else if (key === 'class') {
       out[key] = prop.default ?? ''
+    } else if (arrayBaseKeys.has(key)) {
+      // The schema declares both a string `properties.<key>` (often a URI
+      // pointer to an external payload) and a `patternProperties` array for
+      // the same baseKey. Prefer the inline array form in templates — it's
+      // friendlier to fill out than an external URI.
+      out[key] = []
     } else {
       out[key] = ''
     }
+  }
+  for (const baseKey of arrayBaseKeys) {
+    if (!(baseKey in out)) out[baseKey] = []
   }
   return out
 }

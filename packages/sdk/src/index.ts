@@ -9,8 +9,10 @@ export {
   fetchSchemaFromIpfs,
   fetchSchemaFromLocal,
   getSchemaKeys,
+  matchArrayEntry,
   DEFAULT_IPFS_GATEWAY,
   type SchemaResolver,
+  type ArrayPatternKey,
 } from './schema'
 
 // --- Validation + delta ---
