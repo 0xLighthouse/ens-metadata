@@ -103,7 +103,11 @@ describe('getSchemaKeys', () => {
     })
   })
 
-  it('skips array patterns whose regex shape cannot be parsed', () => {
+  it('silently skips array patterns whose regex shape cannot be parsed', () => {
+    // No console.warn — getSchemaKeys is library-level code that doesn't know
+    // whether the caller cares about exotic patterns. Callers who need to
+    // surface unrecognised patterns can iterate `patternProperties` themselves
+    // and call `extractArrayPatternBase` directly.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const schema: Schema = {
@@ -120,7 +124,7 @@ describe('getSchemaKeys', () => {
         },
       }
       expect(getSchemaKeys(schema).arrayPatterns).toEqual([])
-      expect(warn).toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
     } finally {
       warn.mockRestore()
     }

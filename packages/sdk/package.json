@@ -12,6 +12,7 @@
     "./types": "./dist/types.js",
     "./delta": "./dist/delta.js"
   },
+  "files": ["dist", "README.md", "schemas"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

@@ -272,6 +272,13 @@ function classifyArrayEntry(
  * order) and the array-form `patternProperties` entries we can resolve to a
  * concrete base key. Map-form pattern properties are not surfaced — without
  * a parameter to look up, there's nothing concrete to read.
+ *
+ * Array patterns whose regex doesn't match the two ENSIP-canonical shapes
+ * (see {@link extractArrayPatternBase}) are silently skipped. This is not an
+ * error from a reader/writer's perspective — the pattern still works as a
+ * regular `patternProperties` entry; the SDK just can't auto-bucket entries
+ * under it into a JS array. Library code can't tell whether the caller cares,
+ * so we stay quiet and let callers diagnose if they need to.
  */
 export function getSchemaKeys(schema: Schema): {
   keys: string[]
@@ -281,12 +288,7 @@ export function getSchemaKeys(schema: Schema): {
   for (const [pattern, attribute] of Object.entries(schema.patternProperties ?? {})) {
     if (attribute.parameterType !== 'array') continue
     const baseKey = extractArrayPatternBase(pattern)
-    if (!baseKey) {
-      console.warn(
-        `[ensmetadata/sdk] Could not extract base key from array pattern "${pattern}"; skipping.`,
-      )
-      continue
-    }
+    if (!baseKey) continue
     arrayPatterns.push({ pattern, baseKey, attribute })
   }
   return { keys: Object.keys(schema.properties ?? {}), arrayPatterns }

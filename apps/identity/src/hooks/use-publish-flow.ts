@@ -75,9 +75,14 @@ export function usePublishFlow(intentId: string) {
 
       setPhase('writing')
       const writer = metadataWriter({ publicClient })(walletClient)
+      // PATCH semantics: `recordsToWrite` is already a diff (added/updated/removed)
+      // built from `computeRecordDiff`. Without this, the SDK's default PUT mode
+      // re-reads on-chain state and deletes every key not in `desired` — wiping
+      // `class`, `schema`, and any other records the user didn't touch.
       const { txHash: hash } = await writer.setMetadata({
         name: ensName,
         desired: recordsToWrite,
+        ignoreMissing: true,
         ...(schema ? { schema } : {}),
         ...(chain.ensRegistry ? { registry: chain.ensRegistry } : {}),
       })

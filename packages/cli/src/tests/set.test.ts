@@ -1,9 +1,40 @@
+import type { Schema } from '@ensmetadata/schemas/types'
 import type { ChainConfig } from '@ensmetadata/shared/chains'
 import type { PublicClient } from 'viem'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getOwnerMock = vi.fn()
 const readContractMock = vi.fn()
+const readFileSyncMock = vi.fn<(path: string, enc: string) => string>()
+const fetchSchemaMock = vi.fn()
+const publicClientForChainMock = vi.fn()
+
+vi.mock('node:fs', () => ({
+  readFileSync: (path: string, enc: string) => readFileSyncMock(path, enc),
+}))
+
+vi.mock('@ensmetadata/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@ensmetadata/sdk')>('@ensmetadata/sdk')
+  return {
+    ...actual,
+    fetchSchema: (...args: unknown[]) => fetchSchemaMock(...args),
+  }
+})
+
+vi.mock('../lib/context.js', async () => {
+  const actual = await vi.importActual<typeof import('../lib/context.js')>('../lib/context.js')
+  return {
+    ...actual,
+    publicClientForChain: (...args: unknown[]) => {
+      publicClientForChainMock(...args)
+      return {} as unknown as PublicClient
+    },
+  }
+})
+
+vi.mock('../lib/bundled-schemas.js', () => ({
+  bundledSchemaResolver: vi.fn(async () => null),
+}))
 
 /**
  * Mock ensjs's `getOwner` (used for mainnet manager lookup). The dynamic
@@ -141,6 +172,69 @@ describe('updateCommand.run — broadcast guard', () => {
         env: {},
       }),
     ).rejects.toThrow(/--private-key is required when --broadcast is set/)
+  })
+})
+
+const SHAPE_SCHEMA: Schema = {
+  $id: 'sample',
+  source: 'test',
+  title: 'Sample',
+  version: '1.0.0',
+  description: 'sample',
+  type: 'object',
+  properties: {
+    class: { type: 'string', default: 'Sample', description: 'class id' },
+    schema: { type: 'string', description: 'schema URI' },
+    description: { type: 'string', description: 'description' },
+  },
+  patternProperties: {
+    '^audits(\\[[^\\]]+\\])?$': {
+      type: 'string',
+      parameterType: 'array',
+      description: 'audit URIs',
+    },
+  },
+}
+
+describe('setCommand.run — payload shape validation', () => {
+  beforeEach(() => {
+    readFileSyncMock.mockReset()
+    fetchSchemaMock.mockReset()
+    fetchSchemaMock.mockResolvedValue(SHAPE_SCHEMA)
+    publicClientForChainMock.mockReset()
+  })
+
+  it('rejects flat array-form payload keys with a "use nested array" error', async () => {
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        schema: 'ipfs://QmSchema',
+        class: 'Sample',
+        'audits[0]': 'ipfs://a0',
+      }),
+    )
+    await expect(
+      setCommand.run({
+        args: { name: 'myagent.eth', payload: '/tmp/payload.json' },
+        options: { includeEmpty: true },
+        env: {},
+      }),
+    ).rejects.toThrow(/flat array form is not accepted/)
+  })
+
+  it('rejects nested objects in the payload', async () => {
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        schema: 'ipfs://QmSchema',
+        class: { nested: true },
+      }),
+    )
+    await expect(
+      setCommand.run({
+        args: { name: 'myagent.eth', payload: '/tmp/payload.json' },
+        options: { includeEmpty: true },
+        env: {},
+      }),
+    ).rejects.toThrow(/\[class\] must be a string or string\[\]/)
   })
 })
 

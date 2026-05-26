@@ -4,7 +4,9 @@ import {
   type ChangePreview,
   type SetMetadataOptions,
   fetchSchema,
+  flatten,
   metadataEstimator,
+  metadataReader,
   metadataWriter,
 } from '@ensmetadata/sdk'
 import { chainForName } from '@ensmetadata/shared/chain-for-name'
@@ -21,6 +23,7 @@ import {
   walletClientForChain,
 } from '../lib/context.js'
 import { formatCost, formatEstimate } from '../lib/estimate-cost.js'
+import { assertNestedPayload } from '../lib/shape.js'
 
 /**
  * `set` and `update` share an option schema. They differ only in semantics
@@ -197,8 +200,6 @@ async function runSetOrUpdate(
   }
   const rawRecord = raw as Record<string, unknown>
 
-  const filtered = filterPayloadEntries(rawRecord, { includeEmpty })
-
   /**
    * One chain hosts both the reads and writes for `ensName`. The SDK
    * does direct registry+resolver lookups when `registry` is passed,
@@ -209,19 +210,34 @@ async function runSetOrUpdate(
   const registryOpt = chain.ensRegistry ? { registry: chain.ensRegistry } : {}
 
   /**
-   * If the payload carries its own `schema` URI, validate against THAT
-   * schema (the one the user is publishing), not the on-chain one.
-   * Otherwise let the SDK fetch the current ENS schema itself.
+   * Resolve the schema before flattening, since the shape validator needs
+   * it to know which top-level keys may be arrays. The payload's own
+   * `schema` URI wins (the user is publishing against it); otherwise fall
+   * back to the on-chain `schema` text record. When neither is available
+   * we proceed with `null` — the shape validator will reject array values
+   * (since we can't know which keys are arrays) but plain string payloads
+   * still go through.
    */
   const payloadSchemaUri =
     typeof rawRecord.schema === 'string' && rawRecord.schema.length > 0 ? rawRecord.schema : null
-  let overrideSchema: Schema | null = null
+  let resolvedSchema: Schema | null = null
   if (payloadSchemaUri) {
-    overrideSchema = await fetchSchema(payloadSchemaUri, {
+    resolvedSchema = await fetchSchema(payloadSchemaUri, {
       resolver: bundledSchemaResolver,
-      ...(ipfsGateway ? { gateway: ipfsGateway } : {}),
+      ...(ipfsGateway ? { ipfsGateway } : {}),
     })
+  } else {
+    const reader = metadataReader({
+      schemaResolver: bundledSchemaResolver,
+      ...(ipfsGateway ? { ipfsGateway } : {}),
+    })(client)
+    const onChain = await reader.getSchema({ name: ensName, ...registryOpt })
+    resolvedSchema = onChain.schema
   }
+
+  const hydrated = assertNestedPayload(rawRecord, resolvedSchema)
+  const flatPayload = flatten(hydrated)
+  const filtered = filterPayloadEntries(flatPayload, { includeEmpty })
 
   /**
    * `set` = PUT (ignoreMissing: false → keys absent from payload get
@@ -233,7 +249,7 @@ async function runSetOrUpdate(
     desired: filtered,
     ignoreMissing: mode === 'update',
     schemaResolver: bundledSchemaResolver,
-    ...(overrideSchema ? { schema: overrideSchema } : {}),
+    ...(resolvedSchema ? { schema: resolvedSchema } : {}),
     ...(ipfsGateway ? { ipfsGateway } : {}),
     ...registryOpt,
   }
@@ -376,7 +392,7 @@ export const setCommand = {
 
 export const updateCommand = {
   description:
-    'Update ENS metadata text records from a partial payload file (PATCH — only keys present in the payload are touched; empty-string values delete the record).',
+    'Update ENS metadata text records from a partial payload file (PATCH — only keys present in the payload are touched; empty-string values delete the record; for an array field, pass `[""]` to clear it — `[]` leaves the existing array alone).',
   args: sharedArgs,
   options: setOptions,
   env: setEnv,

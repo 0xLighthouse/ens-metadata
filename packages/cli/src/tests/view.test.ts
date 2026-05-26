@@ -222,6 +222,39 @@ describe('viewCommand.run', () => {
     expect(publicClientForNameMock.mock.calls[0][1]).toBe('alice.base.eth')
   })
 
+  it('unflattens array-pattern entries into a nested array in the output', async () => {
+    const schemaWithArray: Schema = {
+      ...sampleSchema,
+      patternProperties: {
+        '^audits(\\[[^\\]]+\\])?$': {
+          type: 'string',
+          parameterType: 'array',
+          description: 'audit URIs',
+        },
+      },
+    }
+    getMetadataMock.mockResolvedValue({
+      name: 'myagent.eth',
+      properties: {
+        class: 'Sample',
+        description: 'hello',
+        'audits[0]': 'ipfs://a0',
+        'audits[1]': 'ipfs://a1',
+      },
+      schema: schemaWithArray,
+    })
+
+    const out = await baseRun()
+
+    expect(out.properties).toEqual({
+      class: 'Sample',
+      description: 'hello',
+      audits: ['ipfs://a0', 'ipfs://a1'],
+    })
+    // validation still runs on the flat shape — passes here
+    expect(out.validation).toEqual({ passed: true })
+  })
+
   it('uses a mainnet client for mainnet names', async () => {
     getMetadataMock.mockResolvedValue({
       name: 'myagent.eth',
