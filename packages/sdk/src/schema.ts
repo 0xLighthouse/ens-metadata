@@ -183,8 +183,11 @@ export interface ArrayPatternKey {
  * crash on an exotic schema.
  *
  * Recognised shapes (matching ENSIP-64 canonical forms):
- *  - `^<base>(\[[^\]]+\])?$` — optional bracket (current schema convention)
- *  - `^<base>\[[^\]]+\]$`    — required bracket
+ *  - `^<base>\[[^\]]+\]$`    — required bracket (current schema convention)
+ *  - `^<base>(\[[^\]]+\])?$` — optional bracket (legacy; still accepted for
+ *    compatibility with pre-fix published schemas, but the bare `<base>` is
+ *    ambiguous with a `properties.<base>` entry and should be avoided in new
+ *    schemas)
  *
  * `<base>` must be a regex-escaped literal (alphanumerics, `-`, `_`, `.`,
  * plus backslash-escaped metacharacters). Anything else returns null.

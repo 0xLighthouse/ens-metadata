@@ -80,7 +80,7 @@ export const CONTRACT_SCHEMA: Schema = {
     },
   },
   patternProperties: {
-    '^audits(\\[[^\\]]+\\])?$': {
+    '^audits\\[[^\\]]+\\]$': {
       type: 'string',
       parameterType: 'array',
       description: 'A URI pointing to an audit report',
