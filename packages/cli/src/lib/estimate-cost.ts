@@ -122,12 +122,11 @@ export async function formatEstimate(est: EstimateResult): Promise<FormattedEsti
   }
 }
 
-/** One-liner for display: "$0.42 (0.00025 ETH)". Works for both legacy
- * CostEstimate and SDK-derived FormattedEstimate shapes. */
 export function formatCost(input: { costEth: string; costUsd: string }): string {
-  if (input.costEth === '0') return '$0.00 (0 ETH)'
-  const eth = Number.parseFloat(input.costEth).toPrecision(4)
-  return `$${input.costUsd} (${eth} ETH)`
+  if (input.costEth === '0') return '0 ETH ($0.00)'
+  const ethNum = Number.parseFloat(input.costEth)
+  const eth = ethNum < 0.000001 ? ethNum.toFixed(10).replace(/0+$/, '') : ethNum.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')
+  return `${eth} ETH ($${input.costUsd})`
 }
 
 /**

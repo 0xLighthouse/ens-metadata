@@ -1,13 +1,13 @@
 {
   "schemaId": "agent",
   "version": "3.1.0",
-  "cid": "Qmc76vz9SfUh6GVdYwqgmYq9yqR7Y4SQB2Kehk2hMDb6Me",
+  "cid": "dry-run",
   "checksum": "sha256:7f94e2a12b3474c83e2ceb714baa4c229a5a71aa8458f8bcab7bcc9d4e30a72a",
-  "timestamp": 1779910765,
+  "timestamp": 1779910281,
   "schemaPath": "packages/schemas/published/agent/versions/3.1.0/schema.json",
   "publisher": "pinata",
   "signer": "0x6837047F46Da1d5d9A79846b25810b92adF456F6",
-  "signature": "0xb47f2ef962cfed34395c84ac4dbef054f7f18a945af6a01ee0bf889af1e293982bab8e5b81d9d4c6d4031940e042d5daf6bb30f90f2ee55a4b614bda923b91991b",
+  "signature": "0x00b2f5dd88b2e6f55baceff532ca1bda587e46081ce4fff594e8e4c4ed735e2a79ba661643560e8bcaf0c1cef0cdca265485b183cb0357aa1158fd917dde376a1c",
   "eip712": {
     "domain": {
       "name": "ENS Schema Publisher",
@@ -53,9 +53,9 @@
     "message": {
       "schemaId": "agent",
       "version": "3.1.0",
-      "cid": "Qmc76vz9SfUh6GVdYwqgmYq9yqR7Y4SQB2Kehk2hMDb6Me",
+      "cid": "dry-run",
       "checksum": "sha256:7f94e2a12b3474c83e2ceb714baa4c229a5a71aa8458f8bcab7bcc9d4e30a72a",
-      "timestamp": 1779910765,
+      "timestamp": 1779910281,
       "schemaPath": "packages/schemas/published/agent/versions/3.1.0/schema.json",
       "publisher": "pinata",
       "notes": ""
