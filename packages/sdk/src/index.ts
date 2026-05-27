@@ -16,7 +16,7 @@ export {
 } from './schema'
 
 // --- Validation + delta ---
-export { validateMetadata, validate } from './schema'
+export { validateMetadata, validate, validateSchema } from './schema'
 export { computeDelta, hasChanges } from './delta'
 
 // --- Hydrate / flatten helpers (array-pattern shape conversions) ---
@@ -48,6 +48,9 @@ export type {
   GetMetadataResult,
   MetadataValidationError,
   MetadataValidationResult,
+  SchemaValidationError,
+  SchemaValidationWarning,
+  SchemaValidationResult,
   MetadataDelta,
   ComputeDeltaOptions,
   SetMetadataOptions,

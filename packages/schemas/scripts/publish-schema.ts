@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateSchema } from '@ensmetadata/sdk'
 import {
   type PublishedSchema,
   arg,
@@ -131,6 +132,20 @@ if (bumpRaw && nextVersion !== currentVersion) {
 
 const schema = await loadSchema(schemaFile)
 schema.version = nextVersion
+
+const validation = validateSchema(schema)
+if (validation.warnings.length > 0) {
+  for (const w of validation.warnings) {
+    console.warn(`  ⚠ ${w.path}: ${w.message}`)
+  }
+}
+if (!validation.success) {
+  console.error(`Schema ${schemaId}@${nextVersion} failed ENSIP-64 validation:`)
+  for (const e of validation.errors) {
+    console.error(`  ✗ ${e.path}: ${e.message}`)
+  }
+  process.exit(1)
+}
 
 const timestamp = Math.floor(Date.now() / 1000)
 const versionRoot = path.join(schemaRoot, 'versions', nextVersion)

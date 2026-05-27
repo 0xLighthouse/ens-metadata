@@ -378,6 +378,9 @@ importers:
 
   packages/schemas:
     dependencies:
+      '@ensmetadata/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@ensmetadata/shared':
         specifier: workspace:*
         version: link:../shared
