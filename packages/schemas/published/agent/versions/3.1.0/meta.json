@@ -1,6 +1,9 @@
 {
   "schemaId": "agent",
   "version": "3.1.0",
+  "title": "Agent",
+  "description": "An AI agent with ERC-8004 metadata.",
+  "source": "https://github.com/0xLighthouse/ens-metadata",
   "cid": "Qmc76vz9SfUh6GVdYwqgmYq9yqR7Y4SQB2Kehk2hMDb6Me",
   "checksum": "sha256:7f94e2a12b3474c83e2ceb714baa4c229a5a71aa8458f8bcab7bcc9d4e30a72a",
   "timestamp": 1779910765,

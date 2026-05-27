@@ -271,7 +271,7 @@ async function runSetOrUpdate(
       chain: chain.name,
       txHash: result.txHash,
       explorerUrl: `${chain.explorerTxBase}${result.txHash}`,
-      records: result.texts,
+      txPayload: result.texts,
     }
   }
 
@@ -355,7 +355,7 @@ async function runSetOrUpdate(
     chain: chain.name,
     schema: schemaInfo,
     signer: { address: signerAddress, source: signerSource },
-    records: texts,
+    txPayload: texts,
     diff,
     ...(formatted
       ? {

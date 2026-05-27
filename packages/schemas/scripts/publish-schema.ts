@@ -115,9 +115,11 @@ const registryCheck = readJson(registryPath, { schemas: {} as Record<string, any
 const publishedByRegistry = registryCheck.schemas?.[schemaId]?.published?.[nextVersion]
 const indexCheck = readJson(indexPath, { published: [] as Array<any> })
 const publishedByIndex = Array.isArray(indexCheck.published)
-  ? indexCheck.published.some((entry) => entry?.version === nextVersion)
-  : false
-if (publishedByRegistry || publishedByIndex) {
+  ? indexCheck.published.find((entry: any) => entry?.version === nextVersion)
+  : undefined
+const isDryRunOverwrite =
+  publishedByRegistry?.cid === 'dry-run' || publishedByIndex?.cid === 'dry-run'
+if ((publishedByRegistry || publishedByIndex) && !isDryRunOverwrite) {
   console.error(
     `Version ${nextVersion} for ${schemaId} is already published. Bump version or choose a new one.`,
   )

@@ -74,7 +74,6 @@ export const AGENT_SCHEMA: Schema = {
   patternProperties: {
     '^registrations\\[[^\\]]+\\]$': {
       type: 'string',
-      // TODO: Research adding custom `format` values, like CAIP-29
       parameterType: 'array',
       description:
         'An array of ERC-8004 registrations belonging to the agent, following CAIP-19 format',

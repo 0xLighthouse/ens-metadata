@@ -208,7 +208,7 @@ Dry-run output:
     "address": "0xAbC0...",
     "source": "ensManager"
   },
-  "records": [
+  "txPayload": [
     { "key": "name", "value": "My Agent" },
     { "key": "description", "value": "Helps with on-chain research." }
   ],
@@ -226,7 +226,7 @@ Dry-run output:
 
 `estimatedCost` and `balance` are best-effort and omitted if gas estimation fails.
 
-The `schema.source` field is one of `payload`, `ens`, or `none`. The `signer.source` field is `privateKey` when `--private-key` is supplied and `ensManager` when it isn't. If the payload contains no changes against current on-chain values, `set` returns `noOp: true` instead of `records` and exits without simulating a transaction.
+The `schema.source` field is one of `payload`, `ens`, or `none`. The `signer.source` field is `privateKey` when `--private-key` is supplied and `ensManager` when it isn't. If the payload contains no changes against current on-chain values, `set` returns `noOp: true` instead of `txPayload` and exits without simulating a transaction.
 
 Broadcast output:
 
