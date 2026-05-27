@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateSchema } from '@ensmetadata/sdk'
 import {
   type PublishedSchema,
   arg,
@@ -114,11 +115,28 @@ if (publishedByRegistry || publishedByIndex) {
 
 // Load all globals schemas sorted for stable checksum across platforms
 const schemas: Record<string, any> = {}
+let validationFailed = false
 for (const file of globalFiles) {
   const filePath = path.join(globalsDir, file)
   const key = path.basename(file, '.ts')
   const schema = await loadSchema(filePath)
+  const validation = validateSchema(schema)
+  if (validation.warnings.length > 0) {
+    for (const w of validation.warnings) {
+      console.warn(`  ⚠ ${key}: ${w.path}: ${w.message}`)
+    }
+  }
+  if (!validation.success) {
+    console.error(`Global schema "${key}" failed ENSIP-64 validation:`)
+    for (const e of validation.errors) {
+      console.error(`  ✗ ${e.path}: ${e.message}`)
+    }
+    validationFailed = true
+  }
   schemas[key] = schema
+}
+if (validationFailed) {
+  process.exit(1)
 }
 
 const timestamp = Math.floor(Date.now() / 1000)

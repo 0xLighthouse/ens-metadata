@@ -104,6 +104,12 @@ export type MetadataValidationResult =
   | { success: true; data: Record<string, string> }
   | { success: false; errors: MetadataValidationError[] }
 
+export type SchemaValidationError = { path: string; message: string }
+export type SchemaValidationWarning = { path: string; message: string }
+export type SchemaValidationResult =
+  | { success: true; schema: Schema; warnings: SchemaValidationWarning[] }
+  | { success: false; errors: SchemaValidationError[]; warnings: SchemaValidationWarning[] }
+
 // --- Delta types ---
 
 export interface MetadataDelta {

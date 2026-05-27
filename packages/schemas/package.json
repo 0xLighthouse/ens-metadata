@@ -17,6 +17,7 @@
     "./latest": "./published/_latest.json"
   },
   "dependencies": {
+    "@ensmetadata/sdk": "workspace:*",
     "@ensmetadata/shared": "workspace:*"
   },
   "devDependencies": {
