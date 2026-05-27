@@ -9,6 +9,7 @@ export {
   fetchSchemaFromIpfs,
   fetchSchemaFromLocal,
   getSchemaKeys,
+  extractArrayPatternBase,
   matchArrayEntry,
   DEFAULT_IPFS_GATEWAY,
   type SchemaResolver,

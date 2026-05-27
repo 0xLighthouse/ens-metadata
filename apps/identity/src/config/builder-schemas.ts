@@ -83,6 +83,7 @@ const AGENT_OWN_KEYS = [
   'agent-wallet',
   'x402-support',
   'active',
+  'registrations',
   'supported-trust',
 ] as const
 const ORG_OWN_KEYS = ['alias'] as const
@@ -130,8 +131,8 @@ export const BUILDER_SCHEMAS: BuilderSchema[] = [
     label: 'Agent',
     description: 'An AI agent with ERC-8004 metadata.',
     classValue: 'Agent',
-    version: '3.0.1',
-    schemaUri: 'ipfs://QmUATTZzuow7zUPz9KV4AbY2YgVtaRKHzbQ1Kh8w8dTeZs',
+    version: '3.1.0',
+    schemaUri: 'ipfs://Qmc76vz9SfUh6GVdYwqgmYq9yqR7Y4SQB2Kehk2hMDb6Me',
     schemaOwnKeys: AGENT_OWN_KEYS,
     attrs: [
       { key: 'alias', label: 'Alias', description: 'Display name of the agent' },
@@ -148,6 +149,11 @@ export const BUILDER_SCHEMAS: BuilderSchema[] = [
         description: 'Whether the agent accepts x402 payments',
       },
       { key: 'active', label: 'Active', description: 'Whether the agent is currently active' },
+      {
+        key: 'registrations',
+        label: 'Registrations',
+        description: 'Cross-chain identity registrations in CAIP-19 format',
+      },
       { key: 'supported-trust', label: 'Supported trust models' },
       ...ENSIP5_ATTRS,
     ],

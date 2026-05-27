@@ -25,6 +25,7 @@ export type SignPhase = 'idle' | 'awaiting-siwe' | 'binding' | 'attesting'
 interface Args {
   loadedRecords: Record<string, string | null> | null
   requestedAttrs: string[]
+  arrayAttrSet: Set<string>
   classValue?: string
   schemaUri?: string
   twitter: PrivyTwitterAccount | null
@@ -40,6 +41,7 @@ interface Args {
 export function useAttestationFlow({
   loadedRecords,
   requestedAttrs,
+  arrayAttrSet,
   classValue,
   schemaUri,
   twitter,
@@ -174,7 +176,21 @@ export function useAttestationFlow({
       // attrs, class/schema, plain handle records, and attestation envelopes.
       // Keys whose on-chain value already matches drop out in computeDelta.
       const attrsValues = storeApi.getState().attrsValues
-      const desired: Record<string, string> = { ...attrsValues }
+      const desired: Record<string, string> = {}
+      for (const [k, v] of Object.entries(attrsValues)) {
+        if (v !== '') desired[k] = v
+      }
+      // Mark on-chain array entries past the user's current list for deletion
+      // so they appear in the diff and get cleared on publish.
+      if (loadedRecords && arrayAttrSet.size > 0) {
+        for (const baseKey of arrayAttrSet) {
+          for (const [k, v] of Object.entries(loadedRecords)) {
+            if (k.startsWith(`${baseKey}[`) && typeof v === 'string' && v && !(k in desired)) {
+              desired[k] = ''
+            }
+          }
+        }
+      }
       if (classValue) desired.class = classValue
       if (schemaUri) desired.schema = schemaUri
       for (const { draft, records } of proofsOut) {

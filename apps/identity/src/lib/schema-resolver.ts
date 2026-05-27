@@ -1,3 +1,4 @@
+import { extractArrayPatternBase } from '@ensmetadata/sdk'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { isEnsip5Global } from './ensip-5'
 import { formatKeyName } from './utils'
@@ -14,10 +15,15 @@ export interface SchemaProperty {
   format?: string
 }
 
+export interface ArrayProperty extends SchemaProperty {
+  baseKey: string
+}
+
 export interface FetchedSchema {
   title?: string
   description?: string
   properties?: Record<string, SchemaProperty>
+  arrayProperties?: Record<string, ArrayProperty>
 }
 
 /**
@@ -53,6 +59,29 @@ async function fetchOne(uri: string): Promise<FetchedSchema> {
   if (!fetched.properties || typeof fetched.properties !== 'object') {
     throw new Error('schema document has no `properties` map — not a JSON Schema')
   }
+
+  const raw = json as Record<string, unknown>
+  const patternProps = raw.patternProperties as Record<string, Record<string, unknown>> | undefined
+  if (patternProps && typeof patternProps === 'object') {
+    const arrayProperties: Record<string, ArrayProperty> = {}
+    for (const [pattern, attr] of Object.entries(patternProps)) {
+      if (attr.parameterType !== 'array') continue
+      const baseKey = extractArrayPatternBase(pattern)
+      if (!baseKey) continue
+      arrayProperties[baseKey] = {
+        baseKey,
+        type: attr.type as string | undefined,
+        title: attr.title as string | undefined,
+        description: attr.description as string | undefined,
+        examples: attr.examples as unknown[] | undefined,
+        format: attr.format as string | undefined,
+      }
+    }
+    if (Object.keys(arrayProperties).length > 0) {
+      fetched.arrayProperties = arrayProperties
+    }
+  }
+
   return fetched
 }
 
@@ -91,16 +120,25 @@ export async function resolveSchemas(
       if (!(k in mergedProps)) mergedProps[k] = v
     }
   }
+  const mergedArrayProps: Record<string, ArrayProperty> = {}
+  for (const s of fetched) {
+    for (const [k, v] of Object.entries(s.arrayProperties ?? {})) {
+      if (!(k in mergedArrayProps)) mergedArrayProps[k] = v
+    }
+  }
   const merged: FetchedSchema = {
     title: fetched[0]?.title,
     description: fetched[0]?.description,
     properties: mergedProps,
+    ...(Object.keys(mergedArrayProps).length > 0 ? { arrayProperties: mergedArrayProps } : {}),
   }
 
   // Every required key must be defined in the merged property set or be an
   // ENSIP-5 global. ENSIP-5 globals are universally valid text records
   // regardless of schema.
-  const missing = requiredKeys.filter((k) => !(k in mergedProps) && !isEnsip5Global(k))
+  const missing = requiredKeys.filter(
+    (k) => !(k in mergedProps) && !(k in mergedArrayProps) && !isEnsip5Global(k),
+  )
   if (missing.length > 0) {
     throw new Error(
       `schema does not define requested attribute${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}`,
@@ -122,7 +160,8 @@ export function buildKeyLabels(
   const allKeys = [...config.required, ...config.optional]
   return Object.fromEntries(
     allKeys.map((key) => {
-      const title = schema?.properties?.[key]?.title
+      const title =
+        schema?.properties?.[key]?.title ?? schema?.arrayProperties?.[key]?.title
       return [key, title ?? formatKeyName(key)]
     }),
   )
