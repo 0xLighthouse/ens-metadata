@@ -70,21 +70,21 @@ export const DELEGATE_SCHEMA: Schema = {
     },
   },
   patternProperties: {
-    '^statement(\\[[^\\]]+\\])?$': {
+    '^statement\\[[^\\]]+\\]$': {
       type: 'string',
       description:
         "Delegate statements written for specific organizations, labeled by the organization's ENS name",
       examples: ['statement[dao.eth] = "I am a delegate for the DAO"'],
       inherit: true,
     },
-    '^conflict-of-interest(\\[[^\\]]+\\])?$': {
+    '^conflict-of-interest\\[[^\\]]+\\]$': {
       type: 'string',
       description:
         "Conflict of interest declarations written for specific organizations, labeled by the organization's ENS name",
       examples: ['conflict-of-interest[dao.eth] = "I have no conflicts of interest"'],
       inherit: true,
     },
-    '^forum-handle(\\[[^\\]]+\\])?$': {
+    '^forum-handle\\[[^\\]]+\\]$': {
       type: 'string',
       description:
         "Specific forum handles the delegate uses for each organization, labeled by the organization's ENS name",
