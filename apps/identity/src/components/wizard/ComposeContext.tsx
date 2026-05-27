@@ -26,6 +26,8 @@ type Ens = ReturnType<typeof useVerifyEns>
 type Socials = ReturnType<typeof useSocialAccounts>
 type Attestation = ReturnType<typeof useAttestationFlow>
 
+const MAX_ARRAY_PROBE = 20
+
 interface ComposeContextValue {
   // Inputs
   config: IntentConfig
@@ -44,6 +46,7 @@ interface ComposeContextValue {
   optionalAttrs: string[]
   requestedAttrs: string[]
   requiredAttrSet: Set<string>
+  arrayAttrSet: Set<string>
   requiredPlatforms: Platform[]
   visiblePlatforms: Platform[]
 
@@ -63,6 +66,7 @@ interface ComposeContextValue {
   // Form store
   attrsValues: Record<string, string>
   setAttrValue: (key: string, value: string) => void
+  setAttrsValues: (values: Record<string, string>) => void
 
   // Privy / web3 pass-throughs used by WalletSection
   authenticated: boolean
@@ -136,6 +140,15 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   )
   const requiredAttrSet = useMemo(() => new Set(requiredAttrs), [requiredAttrs])
 
+  const arrayAttrSet = useMemo(() => {
+    const set = new Set<string>()
+    if (!schema?.arrayProperties) return set
+    for (const key of requestedAttrs) {
+      if (key in schema.arrayProperties) set.add(key)
+    }
+    return set
+  }, [schema, requestedAttrs])
+
   // Per-chain attester ENS labels, fetched once from the worker's `GET /`.
   // We pick the right one for the confirmed name below; the map covers
   // every chain the worker advertises.
@@ -169,11 +182,16 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   )
 
   const textRecordKeys = useMemo(() => {
-    const keys = [...requestedAttrs]
+    const keys: string[] = []
+    for (const attr of requestedAttrs) {
+      if (arrayAttrSet.has(attr)) {
+        for (let i = 0; i < MAX_ARRAY_PROBE; i++) keys.push(`${attr}[${i}]`)
+      } else {
+        keys.push(attr)
+      }
+    }
     if (classValue) keys.push('class')
     if (schemaUri) keys.push('schema')
-    // Platform IDs (e.g. `com.x`) double as the plain-handle record keys.
-    // Load them so the publish diff can skip records that already match.
     keys.push(...platformList)
     if (attesterEns) {
       for (const p of platformList) {
@@ -182,7 +200,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
       }
     }
     return [...new Set(keys)]
-  }, [requestedAttrs, classValue, schemaUri, platformList, attesterEns])
+  }, [requestedAttrs, arrayAttrSet, classValue, schemaUri, platformList, attesterEns])
 
   const {
     records: loadedRecords,
@@ -200,10 +218,22 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     const nextValues = { ...currentAttrs }
     let changed = false
     for (const key of requestedAttrs) {
-      const existing = loadedRecords[key]
-      if (typeof existing === 'string' && existing && !nextValues[key]) {
-        nextValues[key] = existing
-        changed = true
+      if (arrayAttrSet.has(key)) {
+        const hasExisting = Object.keys(currentAttrs).some((k) => k.startsWith(`${key}[`))
+        if (hasExisting) continue
+        for (let i = 0; i < MAX_ARRAY_PROBE; i++) {
+          const flatKey = `${key}[${i}]`
+          const existing = loadedRecords[flatKey]
+          if (typeof existing !== 'string' || !existing) break
+          nextValues[flatKey] = existing
+          changed = true
+        }
+      } else {
+        const existing = loadedRecords[key]
+        if (typeof existing === 'string' && existing && !nextValues[key]) {
+          nextValues[key] = existing
+          changed = true
+        }
       }
     }
     if (changed) setAttrsValues(nextValues)
@@ -213,6 +243,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   const attestation = useAttestationFlow({
     loadedRecords,
     requestedAttrs,
+    arrayAttrSet,
     classValue,
     schemaUri,
     twitter: requestedPlatformSet.has('com.x') ? socials.twitter : null,
@@ -222,10 +253,15 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   const missingRequiredAttrs = useMemo(
     () =>
       requiredAttrs.filter((k) => {
+        if (arrayAttrSet.has(k)) {
+          return !Object.entries(attrsValues).some(
+            ([key, val]) => key.startsWith(`${k}[`) && val.trim().length > 0,
+          )
+        }
         const v = attrsValues[k]
         return typeof v !== 'string' || v.trim().length === 0
       }),
-    [requiredAttrs, attrsValues],
+    [requiredAttrs, attrsValues, arrayAttrSet],
   )
 
   // Which platforms to show. Required ∪ optional; if neither is specified,
@@ -275,6 +311,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     optionalAttrs,
     requestedAttrs,
     requiredAttrSet,
+    arrayAttrSet,
     requiredPlatforms: [...requiredPlatforms],
     visiblePlatforms,
     loadedRecords,
@@ -286,6 +323,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     previewLabel,
     attrsValues,
     setAttrValue,
+    setAttrsValues,
     authenticated,
     ready,
     isInitialized,

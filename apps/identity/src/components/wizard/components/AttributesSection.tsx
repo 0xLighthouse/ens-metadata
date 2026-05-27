@@ -3,6 +3,7 @@
 import { GuidedSection } from '@/components/ui/GuidedCard'
 import { Label } from '@/components/ui/label'
 import { useCompose } from '../ComposeContext'
+import { ArrayAttributeInput } from './ArrayAttributeInput'
 import { AutoGrowInput } from './AutoGrowInput'
 import { HelpTooltip } from './HelpTooltip'
 
@@ -12,8 +13,10 @@ export function AttributesSection() {
   const {
     requestedAttrs,
     requiredAttrSet,
+    arrayAttrSet,
     attrsValues,
     setAttrValue,
+    setAttrsValues,
     schema,
     keyLabels,
     classValue,
@@ -46,15 +49,33 @@ export function AttributesSection() {
           </div>
         )}
         {requestedAttrs.map((key) => {
-          const value = attrsValues[key] ?? ''
           const isRequired = requiredAttrSet.has(key)
-          const prop = schema?.properties?.[key]
+          const prop = arrayAttrSet.has(key)
+            ? schema?.arrayProperties?.[key]
+            : schema?.properties?.[key]
           const helpText = prop?.description
           const placeholder =
             (Array.isArray(prop?.examples) && typeof prop.examples[0] === 'string'
               ? (prop.examples[0] as string)
               : undefined) ?? placeholderFor(key)
           const label = keyLabels[key] ?? key
+
+          if (arrayAttrSet.has(key)) {
+            return (
+              <ArrayAttributeInput
+                key={key}
+                baseKey={key}
+                label={label}
+                isRequired={isRequired}
+                helpText={helpText}
+                placeholder={placeholder}
+                attrsValues={attrsValues}
+                setAttrsValues={setAttrsValues}
+              />
+            )
+          }
+
+          const value = attrsValues[key] ?? ''
           return (
             <div key={key} className="space-y-1.5">
               <Label htmlFor={`attr-${key}`} className="flex items-center gap-2">
