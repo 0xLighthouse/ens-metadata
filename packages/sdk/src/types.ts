@@ -104,11 +104,13 @@ export type MetadataValidationResult =
   | { success: true; data: Record<string, string> }
   | { success: false; errors: MetadataValidationError[] }
 
-export type SchemaValidationError = { path: string; message: string }
-export type SchemaValidationWarning = { path: string; message: string }
-export type SchemaValidationResult =
-  | { success: true; schema: Schema; warnings: SchemaValidationWarning[] }
-  | { success: false; errors: SchemaValidationError[]; warnings: SchemaValidationWarning[] }
+// Schema-validation result types live with `validateSchema` in
+// `@ensmetadata/schemas`; re-exported here so the SDK's public API is unchanged.
+export type {
+  SchemaValidationError,
+  SchemaValidationWarning,
+  SchemaValidationResult,
+} from '@ensmetadata/schemas/validate'
 
 // --- Delta types ---
 
