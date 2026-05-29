@@ -1,6 +1,6 @@
 'use client'
 
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { type ChainConfig, getChainById, getChainByName } from '@ensmetadata/shared/chains'
 import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
@@ -52,7 +52,7 @@ export type EnsPublicClient = PublicClient
  * to mainnet when the name's chain isn't pre-registered.
  */
 export function getPublicClientForName(name: string): PublicClient {
-  const chain = chainForName(name)
+  const chain = chainFromName(name)
   return PUBLIC_CLIENTS[chain.id] ?? DEFAULT_PUBLIC_CLIENT
 }
 

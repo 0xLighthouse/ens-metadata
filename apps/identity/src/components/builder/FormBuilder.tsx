@@ -616,13 +616,13 @@ function WebhookUrlField({
 // Q4 — Per-platform three-state rows
 // -----------------------------
 
-function PlatformStateList({
+const PlatformStateList = ({
   getState,
   onChange,
 }: {
   getState: (id: BuilderPlatformId) => PlatformState
   onChange: (id: BuilderPlatformId, next: PlatformState) => void
-}) {
+}) => {
   return (
     <div className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
       {BUILDER_PLATFORMS.map((p) => {

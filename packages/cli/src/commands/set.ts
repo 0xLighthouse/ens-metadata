@@ -9,7 +9,7 @@ import {
   metadataReader,
   metadataWriter,
 } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import type { ChainConfig } from '@ensmetadata/shared/chains'
 import { type Address, type PublicClient, isAddress, namehash } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -205,7 +205,7 @@ async function runSetOrUpdate(
    * does direct registry+resolver lookups when `registry` is passed,
    * so there's no UR dependency on the chain.
    */
-  const chain = chainForName(ensName)
+  const chain = chainFromName(ensName)
   const client = publicClientForChain(ctx, chain)
   const registryOpt = chain.ensRegistry ? { registry: chain.ensRegistry } : {}
 

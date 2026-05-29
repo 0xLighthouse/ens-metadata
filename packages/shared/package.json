@@ -9,7 +9,7 @@
     "./intent": "./src/intent.ts",
     "./ipfs": "./src/ipfs.ts",
     "./chains": "./src/chains.ts",
-    "./chain-for-name": "./src/chain-for-name.ts"
+    "./chain-from-name": "./src/chain-from-name.ts"
   },
   "license": "MIT",
   "scripts": {

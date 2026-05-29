@@ -79,10 +79,9 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
       setPhase('signing')
       const configHash = hashConfig(config)
       const expiry = Date.now() + 10 * 60 * 1000
-      // The Intent EIP-712 domain pins `chainId: 1` (reverse records live on
-      // mainnet, so the intent is anchored to a single canonical chain).
-      // MetaMask refuses to sign typed data when the wallet's active chain
-      // doesn't match the domain — switch to mainnet first.
+      // Intents must be signed from mainnet: the EIP-712 domain pins
+      // `chainId: 1` (reverse records live there), and wallets refuse to sign
+      // typed data whose domain chain doesn't match the active chain.
       const mainnetClient = await getWalletClientForChain(1)
       if (!mainnetClient) {
         setError('Wallet not ready.')

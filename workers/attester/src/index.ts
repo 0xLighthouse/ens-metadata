@@ -48,7 +48,7 @@ export default {
         version: CLAIM_VERSION,
         tag: ENVELOPE_TAG,
         // Per-chain attester ENS labels. Clients look up by chain slug
-        // (`chainForName(name).name`). The signing key is the same across
+        // (`chainFromName(name).name`). The signing key is the same across
         // labels; only the ENS embedded in record keys differs.
         attesters: attesterEnsMap(env),
         signerAddress: signerAddress ?? null,

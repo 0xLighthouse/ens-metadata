@@ -9,7 +9,7 @@ import { attesterInfo } from '@/lib/attester-client'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
 import { handleAttestationRecordKey, uidAttestationRecordKey } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import type { IntentConfig } from '@ensmetadata/shared/intent'
 import { usePrivy } from '@privy-io/react-auth'
 import {
@@ -173,7 +173,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   // to use) — the diff preview just shows everything as new.
   const attesterEns = useMemo(() => {
     if (!ens.confirmed || !attesters) return null
-    return attesters[chainForName(ens.ensName).name] ?? null
+    return attesters[chainFromName(ens.ensName).name] ?? null
   }, [ens.confirmed, ens.ensName, attesters])
 
   const platformList = useMemo(

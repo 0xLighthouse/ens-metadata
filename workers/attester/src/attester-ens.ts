@@ -3,7 +3,7 @@ import {
   DEFAULT_ATTESTER_ENS,
   defaultAttesterEnsForName,
 } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import type { Env } from './env'
 
 /**
@@ -16,14 +16,14 @@ import type { Env } from './env'
  */
 export function attesterEnsForName(name: string, env: Env): string {
   const sdkDefault = defaultAttesterEnsForName(name)
-  if (chainForName(name).name === 'base') return env.ATTESTER_ENS_BASE ?? sdkDefault
+  if (chainFromName(name).name === 'base') return env.ATTESTER_ENS_BASE ?? sdkDefault
   return env.ATTESTER_ENS ?? sdkDefault
 }
 
 /**
  * Discovery map advertised by `GET /` — keys are the chain slugs from the
  * shared chain registry so identity clients can resolve via
- * `chainForName(name).name`.
+ * `chainFromName(name).name`.
  */
 export function attesterEnsMap(env: Env): Record<string, string> {
   return {

@@ -9,7 +9,7 @@
  *     when writing to names whose subject lives on this chain
  *
  * Adding support for a new chain is one entry here plus one entry in
- * `chain-for-name.ts`.
+ * `chain-from-name.ts`.
  */
 import { addEnsContracts } from '@ensdomains/ensjs'
 import type { Address, Chain } from 'viem'
@@ -18,7 +18,7 @@ import { base, mainnet, sepolia } from 'viem/chains'
 export interface ChainConfig {
   /** Numeric chain id (also the env var suffix: `RPC_URL_<id>`). */
   id: number
-  /** Short slug used in chain-for-name rules and human output. */
+  /** Short slug used in chain-from-name rules and human output. */
   name: 'mainnet' | 'base' | 'sepolia'
   /**
    * viem `Chain` object used to build PublicClient/WalletClient. For mainnet

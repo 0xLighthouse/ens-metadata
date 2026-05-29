@@ -38,6 +38,35 @@ function resolveSchemaUrl(uri: string): string {
   return uri
 }
 
+/**
+ * Pull the array-form entries out of a schema's `patternProperties` — i.e.
+ * those marked `parameterType: 'array'` whose regex resolves to a literal
+ * base key (e.g. `^audits\[…\]$` → `audits`). Map-form patterns and shapes we
+ * can't resolve are skipped. Returns the array properties keyed by base key,
+ * or `{}` when the document has none.
+ */
+function extractArrayProperties(json: unknown): Record<string, ArrayProperty> {
+  const raw = json as Record<string, unknown>
+  const patternProps = raw.patternProperties as Record<string, Record<string, unknown>> | undefined
+  if (!patternProps || typeof patternProps !== 'object') return {}
+
+  const arrayProperties: Record<string, ArrayProperty> = {}
+  for (const [pattern, attr] of Object.entries(patternProps)) {
+    if (attr.parameterType !== 'array') continue
+    const baseKey = extractArrayPatternBase(pattern)
+    if (!baseKey) continue
+    arrayProperties[baseKey] = {
+      baseKey,
+      type: attr.type as string | undefined,
+      title: attr.title as string | undefined,
+      description: attr.description as string | undefined,
+      examples: attr.examples as unknown[] | undefined,
+      format: attr.format as string | undefined,
+    }
+  }
+  return arrayProperties
+}
+
 async function fetchOne(uri: string): Promise<FetchedSchema> {
   const url = resolveSchemaUrl(uri)
   const res = await fetch(url)
@@ -60,26 +89,9 @@ async function fetchOne(uri: string): Promise<FetchedSchema> {
     throw new Error('schema document has no `properties` map — not a JSON Schema')
   }
 
-  const raw = json as Record<string, unknown>
-  const patternProps = raw.patternProperties as Record<string, Record<string, unknown>> | undefined
-  if (patternProps && typeof patternProps === 'object') {
-    const arrayProperties: Record<string, ArrayProperty> = {}
-    for (const [pattern, attr] of Object.entries(patternProps)) {
-      if (attr.parameterType !== 'array') continue
-      const baseKey = extractArrayPatternBase(pattern)
-      if (!baseKey) continue
-      arrayProperties[baseKey] = {
-        baseKey,
-        type: attr.type as string | undefined,
-        title: attr.title as string | undefined,
-        description: attr.description as string | undefined,
-        examples: attr.examples as unknown[] | undefined,
-        format: attr.format as string | undefined,
-      }
-    }
-    if (Object.keys(arrayProperties).length > 0) {
-      fetched.arrayProperties = arrayProperties
-    }
+  const arrayProperties = extractArrayProperties(json)
+  if (Object.keys(arrayProperties).length > 0) {
+    fetched.arrayProperties = arrayProperties
   }
 
   return fetched
@@ -160,8 +172,7 @@ export function buildKeyLabels(
   const allKeys = [...config.required, ...config.optional]
   return Object.fromEntries(
     allKeys.map((key) => {
-      const title =
-        schema?.properties?.[key]?.title ?? schema?.arrayProperties?.[key]?.title
+      const title = schema?.properties?.[key]?.title ?? schema?.arrayProperties?.[key]?.title
       return [key, title ?? formatKeyName(key)]
     }),
   )

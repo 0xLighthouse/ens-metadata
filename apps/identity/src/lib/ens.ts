@@ -5,7 +5,7 @@
 
 import { getPublicClientForName } from '@/contexts/Web3Provider'
 import { getOwner } from '@ensdomains/ensjs/public'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { GraphQLClient, gql } from 'graphql-request'
 import { type Address, type PublicClient, isAddress, namehash } from 'viem'
 // biome-ignore lint/suspicious/noExplicitAny: ensjs-extended PublicClient
@@ -47,7 +47,7 @@ export async function resolveOwner(
   mainnetClient: EnsPublicClient,
   name: string,
 ): Promise<Address | null> {
-  const chain = chainForName(name)
+  const chain = chainFromName(name)
   if (chain.ensRegistry) {
     const client = getPublicClientForName(name) as PublicClient
     const owner = (await client.readContract({

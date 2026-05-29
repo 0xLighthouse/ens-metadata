@@ -2,7 +2,7 @@
 
 import { GuidedCard, GuidedSection } from '@/components/ui/GuidedCard'
 import { useWizardStore } from '@/stores/wizard'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { CheckCircle2, ExternalLink } from 'lucide-react'
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
  *  `*.base.eth`, Etherscan otherwise). */
 export function PublishSuccessCard({ txHash }: Props) {
   const ensName = useWizardStore((s) => s.ensName)
-  const chain = ensName ? chainForName(ensName) : null
+  const chain = ensName ? chainFromName(ensName) : null
   const explorerUrl = txHash && chain ? `${chain.explorerTxBase}${txHash}` : null
   const explorerLabel = chain?.name === 'base' ? 'Basescan' : 'Etherscan'
 
