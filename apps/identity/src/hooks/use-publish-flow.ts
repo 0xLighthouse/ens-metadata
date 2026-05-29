@@ -109,7 +109,12 @@ export function usePublishFlow(intentId: string) {
 
       setPhase('confirming')
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 2 })
-      if (sessionId) await evictSession(sessionId).catch(() => {})
+      if (sessionId) {
+        // Best-effort cleanup; don't fail the publish, but don't hide failures either.
+        await evictSession(sessionId).catch((err) =>
+          console.warn('[publish] session eviction failed:', err),
+        )
+      }
       setPhase('done')
     } catch (err) {
       setError(friendlyError(err))

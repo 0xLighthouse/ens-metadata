@@ -26,6 +26,12 @@ type Ens = ReturnType<typeof useVerifyEns>
 type Socials = ReturnType<typeof useSocialAccounts>
 type Attestation = ReturnType<typeof useAttestationFlow>
 
+/**
+ * Upper bound on how many indices we probe per array attribute when
+ * pre-loading existing on-chain records (`attr[0]..attr[19]`). Reads are
+ * batched, so this just caps the request fan-out; reconstruction stops at the
+ * first empty index.
+ */
 const MAX_ARRAY_PROBE = 20
 
 interface ComposeContextValue {
@@ -274,14 +280,10 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
 
   const requiredAccountsLinked = requiredPlatforms.every(socials.isLinked)
 
+  const walletReady = !!walletClient && !!address
+  const formReady = attrsLoaded && missingRequiredAttrs.length === 0
   const canCreate =
-    ens.confirmed &&
-    !!walletClient &&
-    !!address &&
-    missingRequiredAttrs.length === 0 &&
-    requiredAccountsLinked &&
-    attrsLoaded &&
-    !attestation.isSigning
+    ens.confirmed && walletReady && formReady && requiredAccountsLinked && !attestation.isSigning
 
   const previewLabel = (() => {
     switch (attestation.signPhase) {

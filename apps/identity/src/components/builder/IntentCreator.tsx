@@ -14,6 +14,11 @@ import { AlertCircle, Check, Copy, ExternalLink, PencilLine } from 'lucide-react
 import { useEffect, useState } from 'react'
 import type { Hex } from 'viem'
 
+/** How long a signed intent stays valid (10 minutes). */
+const INTENT_EXPIRY_MS = 10 * 60 * 1000
+/** How long the "copied" affordance shows before resetting. */
+const COPY_RESET_MS = 1800
+
 type Phase = 'idle' | 'ens-missing' | 'signing' | 'submitting' | 'success' | 'error'
 
 interface Props {
@@ -78,7 +83,7 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
     try {
       setPhase('signing')
       const configHash = hashConfig(config)
-      const expiry = Date.now() + 10 * 60 * 1000
+      const expiry = Date.now() + INTENT_EXPIRY_MS
       // Intents must be signed from mainnet: the EIP-712 domain pins
       // `chainId: 1` (reverse records live there), and wallets refuse to sign
       // typed data whose domain chain doesn't match the active chain.
@@ -98,7 +103,6 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
 
       setPhase('submitting')
       const body = { address, ensName, config, signature, expiry }
-      console.log('[intent] POST /api/intent body:', JSON.stringify(body, null, 2))
       const { id } = await createIntent(body)
       setShareUrl(`${window.location.origin}/${id}`)
       setPhase('success')
@@ -117,7 +121,7 @@ export function IntentCreator({ buildConfig, hasContent, onGeneratedChange }: Pr
     if (!shareUrl) return
     await navigator.clipboard.writeText(shareUrl)
     setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    setTimeout(() => setCopied(false), COPY_RESET_MS)
   }
 
   const handleMakeChanges = () => {
