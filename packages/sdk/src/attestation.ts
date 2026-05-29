@@ -37,7 +37,7 @@ export const BASE_DEFAULT_ATTESTER_ENS = 'atst.base.eth'
  * Pick the default attester ENS for `name` based on the chain its subject
  * resolves on. `*.base.eth` → `BASE_DEFAULT_ATTESTER_ENS`; everything else
  * → `DEFAULT_ATTESTER_ENS`. The suffix rule mirrors the chain registry in
- * `@ensmetadata/shared/chain-for-name` but is inlined here to keep the SDK
+ * `@ensmetadata/shared/chain-from-name` but is inlined here to keep the SDK
  * dep-tree minimal for published consumers.
  */
 export function defaultAttesterEnsForName(name: string): string {

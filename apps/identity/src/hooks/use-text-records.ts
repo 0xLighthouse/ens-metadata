@@ -2,7 +2,7 @@
 
 import { getPublicClientForName } from '@/contexts/Web3Provider'
 import { metadataReader } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { useEffect, useState } from 'react'
 
 export interface TextRecordsResult {
@@ -39,7 +39,7 @@ export function useTextRecords(ensName: string | null, keys: readonly string[]):
     let cancelled = false
     ;(async () => {
       try {
-        const chain = chainForName(ensName)
+        const chain = chainFromName(ensName)
         const client = getPublicClientForName(ensName)
         const reader = metadataReader()(client)
         const result = await reader.getMetadata({

@@ -56,3 +56,6 @@ yarn-error.log*
 .yarn/cache
 .yarn/install-state.gz
 .env*.local
+
+# codegraph index (local code-intelligence cache)
+.codegraph/

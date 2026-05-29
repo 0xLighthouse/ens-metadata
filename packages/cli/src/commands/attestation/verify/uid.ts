@@ -1,5 +1,5 @@
 import { defaultAttesterEnsForName } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { z } from 'zod'
 import {
   globalEnv,
@@ -39,7 +39,7 @@ export const verifyUidCommand = {
     const ensName = validateName(ctx.args.name)
     const { client, chain } = publicClientForName(ctx, ensName)
     const attesterEns = ctx.options.attester ?? defaultAttesterEnsForName(ensName)
-    if (chainForName(attesterEns).id !== chain.id) {
+    if (chainFromName(attesterEns).id !== chain.id) {
       throw new Error(
         `--attester must be an ENS name on the same chain as the subject (${chain.name}).`,
       )
