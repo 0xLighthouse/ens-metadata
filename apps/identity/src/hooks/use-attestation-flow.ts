@@ -15,7 +15,7 @@ import {
   buildTwitterProofFromPrivy,
 } from '@/lib/twitter-proof'
 import { useWizardStore, useWizardStoreApi } from '@/stores/wizard'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { getAccessToken, usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState } from 'react'
 import { createSiweMessage } from 'viem/siwe'
@@ -97,7 +97,7 @@ export function useAttestationFlow({
           // SIWE binds to the chain we'll publish on, which is derived from
           // the name's suffix (e.g. `.base.eth` → Base) — not whatever
           // chain the wallet is currently connected to.
-          chainId: chainForName(ensName).id,
+          chainId: chainFromName(ensName).id,
           domain: window.location.host,
           nonce: session.nonce,
           uri: window.location.origin,

@@ -1,10 +1,10 @@
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import type { ChainConfig } from '@ensmetadata/shared/chains'
 /**
  * Shared CLI context: option/env schemas, client factories, name normalization.
  * *
  *   - ENS commands (view/set/attestation verify) auto-select their chain
- *     from the subject name via `lib/chain-for-name.ts` + `lib/chains.ts`.
+ *     from the subject name via `lib/chain-from-name.ts` + `lib/chains.ts`.
  *     They use `publicClientForChain` / `publicClientForName` /
  *     `walletClientForChain`. Each command touches a single chain;
  *     `--rpc` always binds to that chain.
@@ -145,7 +145,7 @@ export function publicClientForName(
   ctx: Context,
   name: string,
 ): { client: PublicClient; chain: ChainConfig } {
-  const chain = chainForName(name)
+  const chain = chainFromName(name)
   return { client: publicClientForChain(ctx, chain), chain }
 }
 

@@ -88,7 +88,7 @@ export interface AttesterInfoResponse {
   /**
    * Per-chain attester ENS labels the worker embeds in record keys. Keys
    * are chain slugs from `@ensmetadata/shared/chains` (e.g. `mainnet`,
-   * `base`). Look up via `chainForName(name).name`.
+   * `base`). Look up via `chainFromName(name).name`.
    */
   attesters: Record<string, string>
   /** Address the attester key resolves to; null if the worker couldn't resolve it. */

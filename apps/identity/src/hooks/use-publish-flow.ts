@@ -5,7 +5,7 @@ import { evictSession, notifySubmission } from '@/lib/attester-client'
 import { diffToWriteMap } from '@/lib/record-diff'
 import { useWizardStore } from '@/stores/wizard'
 import { fetchSchema, metadataWriter } from '@ensmetadata/sdk'
-import { chainForName } from '@ensmetadata/shared/chain-for-name'
+import { chainFromName } from '@ensmetadata/shared/chain-from-name'
 import { useState } from 'react'
 
 export type PublishPhase = 'idle' | 'writing' | 'confirming' | 'done' | 'error'
@@ -51,7 +51,7 @@ export function usePublishFlow(intentId: string) {
 
     try {
       const recordsToWrite = diffToWriteMap(recordDiff)
-      const chain = chainForName(ensName)
+      const chain = chainFromName(ensName)
       const publicClient = getPublicClientForName(ensName)
 
       // Switch the wallet to the target chain and build a WalletClient

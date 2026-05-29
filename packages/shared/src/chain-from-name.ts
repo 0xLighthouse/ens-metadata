@@ -42,7 +42,7 @@ function matchRule(name: string): NameRule | null {
  * `registry.resolver(node)` → `resolver.text(node, key)` reads/writes,
  * bypassing the need for a Universal Resolver on the chain.
  */
-export function chainForName(name: string): ChainConfig {
+export function chainFromName(name: string): ChainConfig {
   const rule = matchRule(name)
   if (rule) return getChainByName(rule.chain)
   return MAINNET_CHAIN
