@@ -1,4 +1,5 @@
 {
   "outputDirectory": "dist",
-  "buildCommand": "pnpm build"
+  "buildCommand": "pnpm build",
+  "ignoreCommand": "npx turbo-ignore"
 }
