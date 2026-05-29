@@ -12,12 +12,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
+    "./validate": "./src/validate.ts",
     "./published": "./src/published.ts",
     "./registry": "./published/_registry.json",
     "./latest": "./published/_latest.json"
   },
   "dependencies": {
-    "@ensmetadata/sdk": "workspace:*",
     "@ensmetadata/shared": "workspace:*"
   },
   "devDependencies": {
