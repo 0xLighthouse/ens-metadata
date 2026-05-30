@@ -4,7 +4,8 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import type { IntentResponse } from '@/lib/attester-client'
 import type { FetchedSchema } from '@/lib/schema-resolver'
 import { WizardProvider, useWizardStore } from '@/stores/wizard'
-import { useEffect } from 'react'
+import { usePrivy } from '@privy-io/react-auth'
+import { useEffect, useRef } from 'react'
 import { ComposeScreen } from './ComposeScreen'
 import { CreatorBanner } from './CreatorBanner'
 import { PreviewScreen } from './PreviewScreen'
@@ -30,6 +31,16 @@ function WizardBody({ intentId, intent, schema, keyLabels }: WizardProps) {
   const screen = useWizardStore((s) => s.screen)
   const sessionId = useWizardStore((s) => s.sessionId)
   const seedEnsName = useWizardStore((s) => s.seedEnsName)
+  const resetForm = useWizardStore((s) => s.resetForm)
+
+  const { authenticated } = usePrivy()
+  const wasAuthenticatedRef = useRef(authenticated)
+  useEffect(() => {
+    if (wasAuthenticatedRef.current && !authenticated) {
+      resetForm()
+    }
+    wasAuthenticatedRef.current = authenticated
+  }, [authenticated, resetForm])
 
   // Seed the creator-provided name once, and only when nothing has claimed
   // the field yet — the store's `seedEnsName` is a no-op otherwise.
