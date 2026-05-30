@@ -18,7 +18,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 
@@ -118,20 +117,7 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
   const attrsValues = useWizardStore((s) => s.attrsValues)
   const setAttrValue = useWizardStore((s) => s.setAttrValue)
   const setAttrsValues = useWizardStore((s) => s.setAttrsValues)
-  const resetForm = useWizardStore((s) => s.resetForm)
   const storeApi = useWizardStoreApi()
-
-  // Disconnecting the wallet invalidates the ENS name, session, and every
-  // form entry tied to the old signer. Track the previous `authenticated`
-  // value so we only reset on an actual true→false transition (not on the
-  // initial false→false render before Privy finishes hydrating).
-  const wasAuthenticatedRef = useRef(authenticated)
-  useEffect(() => {
-    if (wasAuthenticatedRef.current && !authenticated) {
-      resetForm()
-    }
-    wasAuthenticatedRef.current = authenticated
-  }, [authenticated, resetForm])
 
   const ens = useVerifyEns()
   const socials = useSocialAccounts()
@@ -270,13 +256,16 @@ export function ComposeProvider({ config, schema, keyLabels, children }: Provide
     [requiredAttrs, attrsValues, arrayAttrSet],
   )
 
-  // Which platforms to show. Required ∪ optional; if neither is specified,
-  // fall back to the full catalog (the default "proof-only" flow).
+  // Which platforms to show. Required ∪ optional; if neither is specified
+  // AND no attributes were requested either (pure "proof-only" flow), fall
+  // back to the full catalog. When attrs are requested but platforms are
+  // deliberately empty, show nothing.
   const visiblePlatforms: Platform[] = useMemo(() => {
     const specified = [...requiredPlatforms, ...optionalPlatforms]
     if (specified.length > 0) return Array.from(new Set(specified))
-    return platformsRequested ? [] : ['com.x', 'org.telegram']
-  }, [requiredPlatforms, optionalPlatforms, platformsRequested])
+    const hasAnyConfig = platformsRequested || requestedAttrs.length > 0
+    return hasAnyConfig ? [] : ['com.x', 'org.telegram']
+  }, [requiredPlatforms, optionalPlatforms, platformsRequested, requestedAttrs])
 
   const requiredAccountsLinked = requiredPlatforms.every(socials.isLinked)
 
