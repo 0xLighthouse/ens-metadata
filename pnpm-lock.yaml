@@ -33,6 +33,49 @@ importers:
         specifier: ^2.5.5
         version: 2.5.5
 
+  apps/atst-playground:
+    dependencies:
+      '@ensdomains/ensjs':
+        specifier: ^4.2.2
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6))(zod@4.3.6)
+      '@ensmetadata/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      next:
+        specifier: 15.5.14
+        version: 15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18
+        version: 18.3.1
+      react-dom:
+        specifier: ^18
+        version: 18.3.1(react@18.3.1)
+      viem:
+        specifier: 2.47.6
+        version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6)
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.0.16
+        version: 4.1.11
+      '@types/node':
+        specifier: ^20
+        version: 20.19.9
+      '@types/react':
+        specifier: 18.3.23
+        version: 18.3.23
+      '@types/react-dom':
+        specifier: 18.3.7
+        version: 18.3.7(@types/react@18.3.23)
+      postcss:
+        specifier: ^8.4.47
+        version: 8.5.6
+      tailwindcss:
+        specifier: ^4.0.16
+        version: 4.1.15
+      typescript:
+        specifier: ^5
+        version: 5.8.3
+
   apps/docs:
     dependencies:
       '@web3icons/react':
@@ -59,13 +102,13 @@ importers:
         version: 18.3.1
       vocs:
         specifier: ^1.4.1
-        version: 1.4.1(@types/node@20.19.9)(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(jiti@2.6.1)(lightningcss@1.30.2)(next@15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.46.1)(tsx@4.21.0)(typescript@5.8.3)
+        version: 1.4.1(@types/node@20.19.9)(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(jiti@2.6.1)(lightningcss@1.30.2)(next@15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.46.1)(tsx@4.21.0)(typescript@5.8.3)
 
   apps/identity:
     dependencies:
       '@ensdomains/ensjs':
         specifier: ^4.2.2
-        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76))(zod@3.25.76)
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)
       '@ensmetadata/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -177,7 +220,7 @@ importers:
         version: 0.3.5
       '@ensdomains/ensjs':
         specifier: ^4.2.2
-        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76))(zod@3.25.76)
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)
       '@ensmetadata/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -396,7 +439,7 @@ importers:
     dependencies:
       '@ensdomains/ensjs':
         specifier: ^4.0.2
-        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76))(zod@3.25.76)
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6))(zod@4.3.6)
       '@ipld/dag-cbor':
         specifier: ^9.2.6
         version: 9.2.6
@@ -405,7 +448,7 @@ importers:
         version: 5.1.0
       viem:
         specifier: 2.47.6
-        version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
+        version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6)
     devDependencies:
       '@ensmetadata/schemas':
         specifier: workspace:*
@@ -427,10 +470,10 @@ importers:
     dependencies:
       '@ensdomains/ensjs':
         specifier: ^4.0.2
-        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76))(zod@3.25.76)
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6))(zod@4.3.6)
       viem:
         specifier: 2.47.6
-        version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
+        version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6)
     devDependencies:
       tsconfig:
         specifier: workspace:*
@@ -4846,10 +4889,6 @@ packages:
   detect-browser@5.3.0:
     resolution: {integrity: sha512-53rsFbGdwMwlF7qvCt0ypLM5V5/Mbl0szB7GPN8y9NCcbknYOeVVXdrXEq+90IwAfrrzt6Hd+u2E2ntakICU8w==}
 
-  detect-libc@2.0.4:
-    resolution: {integrity: sha512-3UDv+G9CsCKO1WKMGw9fwq/SWJYbI0c5Y7LU1AXYoDdbhE2AHQ6N6Nb34sG8Fj7T5APy8qXDCKuuIHd1BR0tVA==}
-    engines: {node: '>=8'}
-
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -4945,10 +4984,6 @@ packages:
 
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
-
-  enhanced-resolve@5.18.2:
-    resolution: {integrity: sha512-6Jw4sE1maoRJo3q8MsSIn2onJFbLTOjY9hlx4DZXmOKvLRd1Ok2kXmAGXaafL2+ijsJZ1ClYbl/pmqr9+k4iUQ==}
-    engines: {node: '>=10.13.0'}
 
   enhanced-resolve@5.19.0:
     resolution: {integrity: sha512-phv3E1Xl4tQOShqSte26C7Fl84EwUdZsyOuSSk9qtAGyyQs2s3jJzComh+Abf4g187lUUAvH+H26omrqia2aGg==}
@@ -5336,7 +5371,7 @@ packages:
   git-raw-commits@4.0.0:
     resolution: {integrity: sha512-ICsMM1Wk8xSGMowkOmPrzo2Fgmfo4bMHLNX6ytHjajRJUqvHOw/TFapQ+QG75c3X/tTDDhOSRPGC52dDbNM8FQ==}
     engines: {node: '>=16'}
-    deprecated: This package is no longer maintained. For the JavaScript API, please use @conventional-changelog/git-client instead.
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   github-slugger@2.0.0:
@@ -7703,10 +7738,6 @@ packages:
   tailwindcss@4.1.15:
     resolution: {integrity: sha512-k2WLnWkYFkdpRv+Oby3EBXIyQC8/s1HOFMBUViwtAh6Z5uAozeUSMQlIsn/c6Q2iJzqG6aJT3wdPaRNj70iYxQ==}
 
-  tapable@2.2.2:
-    resolution: {integrity: sha512-Re10+NauLTMCudc7T5WLFLAwDhQ0JWdrMK+9B2M8zR5hRExKmsRDCBA7/aV/pNJFltmBFO5BAMlQFi/vq3nKOg==}
-    engines: {node: '>=6'}
-
   tapable@2.3.0:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
@@ -9244,36 +9275,36 @@ snapshots:
       dns-packet: 5.6.1
       typescript-logging: 1.0.1
 
-  '@ensdomains/ensjs@4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76))(zod@3.25.76)':
-    dependencies:
-      '@adraffy/ens-normalize': 1.10.1
-      '@ensdomains/address-encoder': 1.1.3
-      '@ensdomains/content-hash': 3.1.0-rc.1
-      '@ensdomains/dnsprovejs': 0.5.1
-      abitype: 1.0.8(typescript@5.8.3)(zod@3.25.76)
-      dns-packet: 5.6.1
-      graphql: 16.11.0
-      graphql-request: 7.1.2(graphql@16.11.0)
-      pako: 2.1.0
-      ts-pattern: 5.9.0
-      viem: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
-    transitivePeerDependencies:
-      - typescript
-      - zod
-
   '@ensdomains/ensjs@4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6))(zod@4.3.6)':
     dependencies:
       '@adraffy/ens-normalize': 1.10.1
       '@ensdomains/address-encoder': 1.1.3
       '@ensdomains/content-hash': 3.1.0-rc.1
       '@ensdomains/dnsprovejs': 0.5.1
-      abitype: 1.0.8(typescript@5.8.3)(zod@4.3.6)
+      abitype: 1.2.3(typescript@5.8.3)(zod@4.3.6)
       dns-packet: 5.6.1
       graphql: 16.11.0
       graphql-request: 7.1.2(graphql@16.11.0)
       pako: 2.1.0
       ts-pattern: 5.9.0
       viem: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@4.3.6)
+    transitivePeerDependencies:
+      - typescript
+      - zod
+
+  '@ensdomains/ensjs@4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)':
+    dependencies:
+      '@adraffy/ens-normalize': 1.10.1
+      '@ensdomains/address-encoder': 1.1.3
+      '@ensdomains/content-hash': 3.1.0-rc.1
+      '@ensdomains/dnsprovejs': 0.5.1
+      abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
+      dns-packet: 5.6.1
+      graphql: 16.11.0
+      graphql-request: 7.1.2(graphql@16.11.0)
+      pako: 2.1.0
+      ts-pattern: 5.9.0
+      viem: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
     transitivePeerDependencies:
       - typescript
       - zod
@@ -12062,8 +12093,8 @@ snapshots:
   '@tailwindcss/node@4.1.11':
     dependencies:
       '@ampproject/remapping': 2.3.0
-      enhanced-resolve: 5.18.2
-      jiti: 2.5.1
+      enhanced-resolve: 5.19.0
+      jiti: 2.6.1
       lightningcss: 1.30.1
       magic-string: 0.30.21
       source-map-js: 1.2.1
@@ -12153,7 +12184,7 @@ snapshots:
 
   '@tailwindcss/oxide@4.1.11':
     dependencies:
-      detect-libc: 2.0.4
+      detect-libc: 2.1.2
       tar: 7.4.3
     optionalDependencies:
       '@tailwindcss/oxide-android-arm64': 4.1.11
@@ -13798,11 +13829,6 @@ snapshots:
       typescript: 5.8.3
       zod: 3.25.76
 
-  abitype@1.0.8(typescript@5.8.3)(zod@4.3.6):
-    optionalDependencies:
-      typescript: 5.8.3
-      zod: 4.3.6
-
   abitype@1.2.3(typescript@5.8.3)(zod@3.22.4):
     optionalDependencies:
       typescript: 5.8.3
@@ -14674,8 +14700,6 @@ snapshots:
 
   detect-browser@5.3.0: {}
 
-  detect-libc@2.0.4: {}
-
   detect-libc@2.1.2: {}
 
   detect-node-es@1.1.0: {}
@@ -14766,11 +14790,6 @@ snapshots:
   end-of-stream@1.4.5:
     dependencies:
       once: 1.4.0
-
-  enhanced-resolve@5.18.2:
-    dependencies:
-      graceful-fs: 4.2.11
-      tapable: 2.2.2
 
   enhanced-resolve@5.19.0:
     dependencies:
@@ -16816,6 +16835,30 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
+  next@15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      '@next/env': 15.5.14
+      '@swc/helpers': 0.5.15
+      caniuse-lite: 1.0.30001781
+      postcss: 8.4.31
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      styled-jsx: 5.1.6(@babel/core@7.29.0)(react@18.3.1)
+    optionalDependencies:
+      '@next/swc-darwin-arm64': 15.5.14
+      '@next/swc-darwin-x64': 15.5.14
+      '@next/swc-linux-arm64-gnu': 15.5.14
+      '@next/swc-linux-arm64-musl': 15.5.14
+      '@next/swc-linux-x64-gnu': 15.5.14
+      '@next/swc-linux-x64-musl': 15.5.14
+      '@next/swc-win32-arm64-msvc': 15.5.14
+      '@next/swc-win32-x64-msvc': 15.5.14
+      sharp: 0.34.5
+    transitivePeerDependencies:
+      - '@babel/core'
+      - babel-plugin-macros
+    optional: true
+
   no-case@2.3.2:
     dependencies:
       lower-case: 1.1.4
@@ -16873,12 +16916,12 @@ snapshots:
     dependencies:
       boolbase: 1.0.0
 
-  nuqs@2.8.8(next@15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.13.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1):
+  nuqs@2.8.8(next@15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.13.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1):
     dependencies:
       '@standard-schema/spec': 1.0.0
       react: 18.3.1
     optionalDependencies:
-      next: 15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      next: 15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-router: 7.13.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   object-assign@4.1.1: {}
@@ -18261,6 +18304,14 @@ snapshots:
     optionalDependencies:
       '@babel/core': 7.28.0
 
+  styled-jsx@5.1.6(@babel/core@7.29.0)(react@18.3.1):
+    dependencies:
+      client-only: 0.0.1
+      react: 18.3.1
+    optionalDependencies:
+      '@babel/core': 7.29.0
+    optional: true
+
   stylis@4.3.2: {}
 
   stylis@4.3.6: {}
@@ -18323,8 +18374,6 @@ snapshots:
   tailwindcss@4.1.11: {}
 
   tailwindcss@4.1.15: {}
-
-  tapable@2.2.2: {}
 
   tapable@2.3.0: {}
 
@@ -19050,7 +19099,7 @@ snapshots:
       - tsx
       - yaml
 
-  vocs@1.4.1(@types/node@20.19.9)(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(jiti@2.6.1)(lightningcss@1.30.2)(next@15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.46.1)(tsx@4.21.0)(typescript@5.8.3):
+  vocs@1.4.1(@types/node@20.19.9)(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(jiti@2.6.1)(lightningcss@1.30.2)(next@15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.46.1)(tsx@4.21.0)(typescript@5.8.3):
     dependencies:
       '@floating-ui/react': 0.27.17(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@hono/node-server': 1.19.9(hono@4.11.9)
@@ -19094,7 +19143,7 @@ snapshots:
       mdast-util-to-hast: 13.2.0
       mdast-util-to-markdown: 2.1.2
       minisearch: 7.2.0
-      nuqs: 2.8.8(next@15.5.14(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.13.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      nuqs: 2.8.8(next@15.5.14(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.13.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       ora: 7.0.1
       p-limit: 5.0.0
       picomatch: 4.0.3

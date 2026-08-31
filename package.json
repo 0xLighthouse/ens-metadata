@@ -6,6 +6,7 @@
     "build:identity": "turbo run build --filter=identity",
     "interface": "turbo run dev --filter=interface",
     "identity": "turbo run dev --filter=identity",
+    "playground": "turbo run dev --filter=atst-playground",
     "attester": "pnpm --dir workers/attester dev",
     "attester:deploy": "pnpm --dir workers/attester deploy",
     "dev": "turbo run dev",
