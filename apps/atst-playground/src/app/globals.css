@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fbfaf7;
+  --panel: #ffffff;
+  --ink: #17160f;
+  --muted: #6c6a60;
+  --rule: #e3e0d6;
+  --ok: #1f7a4d;
+  --fail: #b23a1e;
+  --accent: #2f52c8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0b09;
+    --panel: #141310;
+    --ink: #e9e6dc;
+    --muted: #918e83;
+    --rule: #272620;
+    --ok: #4fb987;
+    --fail: #e07a5f;
+    --accent: #8aa5f2;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-ok: var(--ok);
+  --color-fail: var(--fail);
+  --color-accent: var(--accent);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  padding: 5px 8px;
+  width: 100%;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
