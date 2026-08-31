@@ -1,0 +1,37 @@
+{
+  "name": "ATST Playground",
+  "description": "Verifies ENS social media account attestations and returns the full step-by-step verification trace.",
+  "specification": "https://atst.me/",
+  "provider": {
+    "organization": "Lighthouse",
+    "url": "https://lighthouse.cx/"
+  },
+  "documentation": "/llms.txt",
+  "skills": [
+    {
+      "id": "verify-ens-attestation",
+      "name": "Verify an ENS attestation",
+      "description": "Resolves the name's owner, reads the handle and envelope text records, reconstructs the signed DAG-CBOR payload, recovers the signer, and compares it to the attester's resolved address. Returns a step-by-step trace rather than a bare verdict.",
+      "transport": {
+        "type": "http-json",
+        "method": "POST",
+        "path": "/api/verify",
+        "request": {
+          "name": "ENS name to verify, for example 'nick.eth'.",
+          "platform": "Reverse-DNS platform identifier, for example 'com.x'.",
+          "attester": "ENS name of the attester whose signature is expected.",
+          "mode": "'handle' or 'uid'.",
+          "uid": "Required when mode is 'uid'; the spec leaves how a verifier obtains it out of scope."
+        },
+        "response": {
+          "valid": "boolean",
+          "reason": "Failure reason: missing, bad-signature, unsupported-version, decode-error, attester-not-resolved, owner-not-resolved, rpc-error, or invalid-name.",
+          "steps": "One entry per verification step, each with its status and the intermediate values it produced.",
+          "handoff": "Everything needed to replay the attestation locally, present once the envelope decoded."
+        }
+      }
+    }
+  ],
+  "readOnly": true,
+  "chains": ["eip155:1"]
+}

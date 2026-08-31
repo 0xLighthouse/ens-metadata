@@ -41,7 +41,9 @@ export function Playground() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
       <header className="mb-8">
-        <h1 className="text-base">ATST Playground</h1>
+        <h1 className="text-base">
+          ATST Playground <span className="text-muted">/əˈtɛst/</span>
+        </h1>
         <p className="mt-1 text-muted">
           Tools for learning how to create and verify ENS text record attestations.
         </p>
