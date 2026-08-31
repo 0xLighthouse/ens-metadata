@@ -70,13 +70,13 @@ function step(
 }
 
 const LABELS: Record<number, string> = {
-  1: 'Resolve the name owner',
-  2: 'Read the handle text record',
-  3: 'Read the envelope text record',
+  1: 'Resolve the address of the owner of the ENS name',
+  2: 'Read the value of the specified text record',
+  3: 'Retrieve the attestation envelope from the record stored on-chain',
   4: 'Reconstruct the payload as DAG-CBOR',
-  5: 'Hash and recover the signer',
-  6: 'Resolve the attester ENS name',
-  7: 'Compare recovered signer to attester',
+  5: 'Hash the payload and recover the address that was used to sign',
+  6: "Resolve the attester's address from their ENS name",
+  7: "Compare the address from the attestation to the attester's address",
 }
 
 /** Every step from `from` on, marked skipped, so the UI always shows all seven. */
@@ -144,7 +144,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
     step(1, LABELS[1], 'ok', [
       ['name (n)', name],
       ['namehash', namehash(name)],
-      ['owner (a)', owner],
+      ["owner's address (a)", owner],
     ]),
   )
 
@@ -153,7 +153,9 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
   if (req.mode === 'handle') {
     const handleRead = await read(() => getEnsText(client, { name, key: platform }))
     if (!handleRead.ok) {
-      steps.push(step(2, LABELS[2], 'fail', [['record key', platform], rpcRow], handleRead.error))
+      steps.push(
+        step(2, LABELS[2], 'fail', [['record key (k)', platform], rpcRow], handleRead.error),
+      )
       return { valid: false, reason: 'rpc-error', steps: [...steps, ...skipRest(3)] }
     }
     if (!handleRead.value) {
@@ -162,7 +164,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
           2,
           LABELS[2],
           'fail',
-          [['record key', platform]],
+          [['record key (k)', platform]],
           'No handle published for this platform, so the payload cannot be reconstructed.',
         ),
       )
@@ -171,9 +173,8 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
     identifier = handleRead.value
     steps.push(
       step(2, LABELS[2], 'ok', [
-        ['record key', platform],
-        ['handle (h)', identifier],
-        ['platform (p)', platform],
+        ['record key (k)', platform],
+        ['value (v)', identifier],
       ]),
     )
   } else {
@@ -212,7 +213,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
 
   const envRead = await read(() => getEnsText(client, { name, key: recordKey }))
   if (!envRead.ok) {
-    steps.push(step(3, LABELS[3], 'fail', [['record key', recordKey], rpcRow], envRead.error))
+    steps.push(step(3, LABELS[3], 'fail', [['attestation key', recordKey], rpcRow], envRead.error))
     return { valid: false, reason: 'rpc-error', steps: [...steps, ...skipRest(4)] }
   }
   if (!envRead.value) {
@@ -221,7 +222,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
         3,
         LABELS[3],
         'fail',
-        [['record key', recordKey]],
+        [['attestation key', recordKey]],
         'No envelope at this key for this platform and attester.',
       ),
     )
@@ -239,7 +240,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
         LABELS[3],
         'fail',
         [
-          ['record key', recordKey],
+          ['attestation key', recordKey],
           ['raw', envHex],
         ],
         err instanceof Error ? err.message : 'Envelope failed to decode.',
@@ -250,8 +251,8 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
 
   steps.push(
     step(3, LABELS[3], 'ok', [
-      ['record key', recordKey],
-      ['envelope', envHex],
+      ['attestation key', recordKey],
+      ['attestation envelope', envHex],
       ['version', String(envelope.version)],
       [
         'issuedAt (t)',
@@ -293,7 +294,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
   }
   steps.push(
     step(4, LABELS[4], 'ok', [
-      ['map keys', req.mode === 'handle' ? 'n, a, p, h, t' : 'n, a, p, u, t'],
+      ['payload field', req.mode === 'handle' ? 'n, a, k, v, t' : 'n, a, k, u, t'],
       ['bytes', bytesToHex(payload)],
       ['length', `${payload.length} bytes`],
     ]),
@@ -317,16 +318,10 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
     return { valid: false, reason: 'bad-signature', steps: [...steps, ...skipRest(6)], handoff }
   }
   steps.push(
-    step(
-      5,
-      LABELS[5],
-      'ok',
-      [
-        ['keccak256(payload)', digest],
-        ['recovered signer', recovered],
-      ],
-      'Signed with EIP-191, so the digest is wrapped before recovery.',
-    ),
+    step(5, LABELS[5], 'ok', [
+      ['keccak256(payload)', digest],
+      ['signer address', recovered],
+    ]),
   )
 
   // --- Step 6: resolve the attester's address ---
@@ -356,7 +351,7 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
   steps.push(
     step(6, LABELS[6], 'ok', [
       ['attester', attesterEns],
-      ['expected address', attesterAddress],
+      ['attester address', attesterAddress],
     ]),
   )
   handoff.expectedAttester = attesterAddress
@@ -369,8 +364,8 @@ export async function runVerification(req: VerifyRequest): Promise<VerifyTrace> 
       LABELS[7],
       valid ? 'ok' : 'fail',
       [
-        ['recovered', recovered],
-        ['expected', attesterAddress],
+        ['signer address', recovered],
+        ['attester address', attesterAddress],
       ],
       valid
         ? undefined

@@ -8,26 +8,27 @@ import { VerifyPanel } from './VerifyPanel'
 
 const TABS = [
   {
+    id: 'sign',
+    label: 'Attest',
+    blurb: 'Create an attestation and sign it with a signing key',
+  },
+  {
     id: 'verify',
     label: 'Verify',
-    blurb: 'Walk a live ENS name through Section 7, one step at a time.',
+    blurb: 'Verify an existing, on-chain attestation.',
   },
   {
     id: 'inspect',
     label: 'Inspect',
-    blurb: 'Take an envelope apart and change what the verifier reconstructs.',
-  },
-  {
-    id: 'sign',
-    label: 'Sign',
-    blurb: 'Act as an attester with a throwaway key and build an envelope.',
+    blurb:
+      'Enter an attestation envelope (including signature) and interactively work through the verification process.',
   },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
 export function Playground() {
-  const [tab, setTab] = useState<TabId>('verify')
+  const [tab, setTab] = useState<TabId>('sign')
   const [handoff, setHandoff] = useState<Handoff | null>(null)
 
   function openInInspector(next: Handoff) {
@@ -42,7 +43,7 @@ export function Playground() {
       <header className="mb-8">
         <h1 className="text-base">ATST Playground</h1>
         <p className="mt-1 text-muted">
-          ENS social media account attestations, taken apart. Reads mainnet; never writes.
+          Tools for learning how to create and verify ENS text record attestations.
         </p>
       </header>
 

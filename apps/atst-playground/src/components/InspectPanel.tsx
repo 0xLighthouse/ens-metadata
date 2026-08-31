@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  type ClaimMode,
-  type Reconstruction,
-  decodeEnvelopeHex,
-  reconstruct,
-} from '@/lib/reconstruct'
+import { type Reconstruction, decodeEnvelopeHex, reconstruct } from '@/lib/reconstruct'
 import type { Handoff } from '@/lib/trace'
 import { useEffect, useState } from 'react'
 import type { Hex } from 'viem'
@@ -13,7 +8,6 @@ import { Field, GhostButton, Panel, Rows, Verdict } from './ui'
 
 interface Draft {
   envelopeHex: string
-  mode: ClaimMode
   name: string
   addr: string
   platform: string
@@ -23,7 +17,6 @@ interface Draft {
 
 const EMPTY: Draft = {
   envelopeHex: '',
-  mode: 'handle',
   name: '',
   addr: '',
   platform: 'com.x',
@@ -34,7 +27,6 @@ const EMPTY: Draft = {
 function draftFrom(handoff: Handoff): Draft {
   return {
     envelopeHex: handoff.envelopeHex,
-    mode: handoff.mode,
     name: handoff.name,
     addr: handoff.addr,
     platform: handoff.platform,
@@ -82,7 +74,7 @@ export function InspectPanel({ incoming }: { incoming: Handoff | null }) {
     }
     reconstruct(
       {
-        mode: draft.mode,
+        mode: 'handle',
         name: draft.name,
         addr: draft.addr,
         platform: draft.platform,
@@ -104,7 +96,7 @@ export function InspectPanel({ incoming }: { incoming: Handoff | null }) {
     return () => {
       cancelled = true
     }
-  }, [sig, issuedAt, draft.mode, draft.name, draft.addr, draft.platform, draft.identifier])
+  }, [sig, issuedAt, draft.name, draft.addr, draft.platform, draft.identifier])
 
   const tampered = envelope !== null && issuedAt !== envelope.issuedAt
   const match =
@@ -115,6 +107,9 @@ export function InspectPanel({ incoming }: { incoming: Handoff | null }) {
   return (
     <div className="space-y-4">
       <Panel title="Envelope">
+        <p className="mb-3 text-muted">
+          Enter an envelope (signed attestation) in hex format to decode the CBOR format.
+        </p>
         <Field
           label="Envelope hex"
           hint="Tagged CBOR: 0xda 61 74 73 74, then [version, issuedAt, sig]."
@@ -148,32 +143,29 @@ export function InspectPanel({ incoming }: { incoming: Handoff | null }) {
         ) : null}
       </Panel>
 
-      <Panel title="Reconstruction">
+      <Panel title="Recreate payload">
         <p className="mb-3 text-muted">
-          None of these fields live in the envelope. The verifier rebuilds them, so changing one
-          here is the same as the underlying ENS data changing after issuance.
+          Other than the timestamp, none of these fields are provided in the envelope. Verifiers
+          must retrieve them from on-chain data to recreate the payload.
         </p>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Claim type">
-            <select value={draft.mode} onChange={(e) => set({ mode: e.target.value as ClaimMode })}>
-              <option value="handle">handle (h)</option>
-              <option value="uid">uid (u)</option>
-            </select>
-          </Field>
-          <Field label="Name (n)">
+          <Field label="User ENS name (n)">
             <input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
           </Field>
-          <Field label="Address (a)" hint="The manager address at verification time.">
+          <Field
+            label="address user's ENS name resolves to"
+            hint="The manager address at verification time."
+          >
             <input
               value={draft.addr}
               onChange={(e) => set({ addr: e.target.value })}
               placeholder="0x…"
             />
           </Field>
-          <Field label="Platform (p)">
+          <Field label="text record key (k)">
             <input value={draft.platform} onChange={(e) => set({ platform: e.target.value })} />
           </Field>
-          <Field label={draft.mode === 'handle' ? 'Handle (h)' : 'UID (u)'}>
+          <Field label="text record value (v)">
             <input value={draft.identifier} onChange={(e) => set({ identifier: e.target.value })} />
           </Field>
           <Field
@@ -196,20 +188,21 @@ export function InspectPanel({ incoming }: { incoming: Handoff | null }) {
         ) : null}
       </Panel>
 
-      <Panel title="Recovery">
+      <Panel title="attester's address from attestation">
         {error ? <p style={{ color: 'var(--fail)' }}>{error}</p> : null}
         {result ? (
           <Rows
             rows={[
               ['payload', result.payloadHex],
               ['keccak256', result.digest],
-              ['recovered', result.recovered],
+              ['signature', envelope?.sig ?? ''],
+              ['signature address', result.recovered],
             ]}
           />
         ) : null}
         {!result && !error ? <p className="text-muted">Paste an envelope to begin.</p> : null}
         <div className="mt-4">
-          <Field label="Expected attester address" hint="The addr record of the attester ENS name.">
+          <Field label="address attester's ENS name resolves to">
             <input
               value={expected}
               onChange={(e) => setExpected(e.target.value)}

@@ -1,14 +1,11 @@
 'use client'
 
-import type { ClaimMode } from '@/lib/reconstruct'
 import type { Handoff } from '@/lib/trace'
 import {
   defaultAttesterEnsForName,
   encodeEnvelope,
   handleAttestationRecordKey,
   signHandleClaim,
-  signUidClaim,
-  uidAttestationRecordKey,
 } from '@ensmetadata/sdk'
 import { useEffect, useState } from 'react'
 import { http, type Address, type Hex, bytesToHex, createWalletClient, isAddress } from 'viem'
@@ -25,24 +22,17 @@ interface Signed {
 
 export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void }) {
   const [privateKey, setPrivateKey] = useState<Hex | ''>('')
-  const [mode, setMode] = useState<ClaimMode>('handle')
-  const [name, setName] = useState('example.eth')
+  const [name, setName] = useState('user.eth')
   const [addr, setAddr] = useState('')
   const [platform, setPlatform] = useState('com.x')
   const [identifier, setIdentifier] = useState('')
-  const [attester, setAttester] = useState(defaultAttesterEnsForName('example.eth'))
+  const [attester, setAttester] = useState('atst.attester.eth')
   const [signed, setSigned] = useState<Signed | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  /**
-   * The subject's manager address defaults to the burner, so the tab can sign
-   * straight away. It means the attester is attesting about its own address,
-   * which no real issuance would do — override it with the manager you want.
-   */
   function newKey() {
     const key = generatePrivateKey()
     setPrivateKey(key)
-    setAddr(privateKeyToAccount(key).address)
   }
 
   // Generated after mount: a key produced during render would differ between
@@ -61,18 +51,12 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
       if (!isAddress(addr)) throw new Error('Address (a) must be a 20-byte hex address.')
       const wallet = createWalletClient({ account, chain: mainnet, transport: http() })
       const input = { name, addr: addr as Address, platform }
-      const envelope =
-        mode === 'handle'
-          ? await signHandleClaim({ ...input, handle: identifier }, wallet)
-          : await signUidClaim({ ...input, uid: identifier }, wallet)
+      const envelope = await signHandleClaim({ ...input, handle: identifier }, wallet)
 
       setSigned({
         envelopeHex: bytesToHex(encodeEnvelope(envelope)),
         issuedAt: envelope.issuedAt,
-        recordKey:
-          mode === 'handle'
-            ? handleAttestationRecordKey(platform, attester)
-            : uidAttestationRecordKey(platform, attester),
+        recordKey: handleAttestationRecordKey(platform, attester),
         signer: account.address,
       })
     } catch (err) {
@@ -82,29 +66,25 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
 
   return (
     <div className="space-y-4">
-      <Panel title="Attester key">
-        <p className="mb-3 text-muted">
-          A throwaway key held in this tab. It stands in for the attester's signing key, which in
-          production sits behind the OAuth flow of Section 5.
-        </p>
-        <Field label="Private key">
-          <input value={privateKey} onChange={(e) => setPrivateKey(e.target.value as Hex)} />
-        </Field>
-        <div className="mt-3 flex items-center gap-3">
+      <Panel>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Field label="Attester's private key">
+              <input value={privateKey} onChange={(e) => setPrivateKey(e.target.value as Hex)} />
+            </Field>
+          </div>
           <GhostButton onClick={newKey}>Generate new key</GhostButton>
-          {account ? <span className="break-all text-muted">{account.address}</span> : null}
+        </div>
+        <div className="mt-3">
+          <Field label="Attester's address">
+            <div className="break-all">{account?.address ?? ''}</div>
+          </Field>
         </div>
       </Panel>
 
       <Panel title="Payload">
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Claim type">
-            <select value={mode} onChange={(e) => setMode(e.target.value as ClaimMode)}>
-              <option value="handle">handle (h)</option>
-              <option value="uid">uid (u)</option>
-            </select>
-          </Field>
-          <Field label="Name (n)">
+          <Field label="User ENS Name (n)">
             <input
               value={name}
               onChange={(e) => {
@@ -117,28 +97,22 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
               }}
             />
           </Field>
-          <Field
-            label="Address (a)"
-            hint="The manager of the name at issuance. Prefilled with the burner address."
-          >
+          <Field label="User Address (a)">
             <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…" />
           </Field>
-          <Field label="Platform (p)">
+          <Field label="Text record key (Social media platform) (k)">
             <input value={platform} onChange={(e) => setPlatform(e.target.value)} />
           </Field>
-          <Field label={mode === 'handle' ? 'Handle (h)' : 'UID (u)'}>
+          <Field label="Attested Value (v)">
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} />
           </Field>
-          <Field
-            label="Attester ENS name"
-            hint="Names the record key. It is not part of the signed payload."
-          >
+          <Field label="Attester ENS Name">
             <input value={attester} onChange={(e) => setAttester(e.target.value)} />
           </Field>
         </div>
         <div className="mt-4">
           <Button onClick={sign} disabled={!account || identifier.trim().length === 0}>
-            Sign claim
+            Sign Attestation
           </Button>
         </div>
         {error ? (
@@ -149,7 +123,7 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
       </Panel>
 
       {signed ? (
-        <Panel title="Envelope">
+        <Panel title="Attestation">
           <Rows
             rows={[
               ['record key', signed.recordKey],
@@ -158,14 +132,14 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
                 `${signed.issuedAt} — ${new Date(signed.issuedAt * 1000).toISOString()}`,
               ],
               ['signer', signed.signer],
-              ['envelope', signed.envelopeHex],
+              ['attestation', signed.envelopeHex],
             ]}
           />
           <div className="mt-4 border-t border-rule pt-3">
             <Button
               onClick={() =>
                 onInspect({
-                  mode,
+                  mode: 'handle',
                   envelopeHex: signed.envelopeHex,
                   name,
                   addr,
@@ -179,7 +153,7 @@ export function SignPanel({ onInspect }: { onInspect: (handoff: Handoff) => void
               Open in inspector →
             </Button>
             <p className="mt-2 text-muted">
-              Publishing this would mean writing the envelope to the record key above on the
+              Publishing this would mean writing the attestation to the record key above on the
               subject's name.
             </p>
           </div>
