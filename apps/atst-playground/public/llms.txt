@@ -1,0 +1,37 @@
+# ATST Playground
+
+> Tools for learning how to create and verify ENS text record attestations.
+
+An ATST attestation is a signed claim that the owner of an ENS name also
+controls a particular social media account. The envelope holds only a version,
+a timestamp and a signature; every other field is reconstructed by the verifier
+from ENS at verification time, so any change to the underlying records breaks
+signature recovery. The playground makes each of those steps visible.
+
+## Pages
+
+- [Attest](/): Build a payload, sign it with a throwaway key, and get back the
+  envelope and the text record key it belongs under.
+- [Verify](/): Walk a live mainnet name through Section 7 of the spec one step
+  at a time, showing the resolved owner, the handle record, the decoded
+  envelope, the reconstructed payload, its digest, and the recovered signer.
+- [Inspect](/): Decode an envelope and edit any reconstructed field to see
+  recovery diverge, which is how the spec's failure modes present in practice.
+
+## Specification
+
+- [ATST format](https://atst.me/): The attestation format this app implements.
+- [ENSIP-27](https://docs.ens.domains/ensip/27): The related ENS improvement
+  proposal.
+
+## API
+
+- [POST /api/verify](/api/verify): Verify an on-chain attestation and return the
+  full step-by-step trace as JSON. Body: `name`, `platform`, `attester`, `mode`
+  (`handle` or `uid`), and `uid` when mode is `uid`. See
+  [/.well-known/agent-card.json](/.well-known/agent-card.json).
+
+## Notes
+
+The app reads Ethereum mainnet and never writes. Publishing an attestation means
+setting the text record yourself.
