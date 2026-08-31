@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     locale: 'en',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: TITLE,
     description: DESCRIPTION,
     creator: '@LighthouseGov',
