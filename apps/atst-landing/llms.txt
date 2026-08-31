@@ -1,0 +1,35 @@
+# ATST — ENS Social Media Account Attestation Format
+
+> A signed claim that the owner of an ENS name also controls a particular
+> social media account.
+
+An attestation binds six data points: the user's wallet address, their ENS
+name, the social media account identifier, the time of issuance, and the
+attester's ENS name and wallet address. The envelope published on chain carries
+only a version, a timestamp and a signature; every other field is reconstructed
+by the verifier from ENS at verification time. Any change to the underlying
+records after issuance breaks signature recovery, which is what makes the
+attestation self-invalidating rather than merely stale.
+
+## Specification
+
+- [Full text](/llms-full.txt): The complete format, in plain text. Sections
+  cover the claims, the DAG-CBOR payload, the CBOR envelope (tag 1635021684),
+  issuance, the text record keys attestations[platform][attester] and
+  uid[platform][attester], verification, failure modes, and the handle
+  persistence variant.
+- [Rendered spec](/): The same document as a web page.
+
+## Related
+
+- ATST Playground: Verify an attestation step by step, take an envelope apart,
+  or sign one with a throwaway key. Exposes a machine-callable verification
+  endpoint described by its own /.well-known/agent-card.json.
+- [ENSIP-27](https://docs.ens.domains/ensip/27): The related ENS improvement
+  proposal.
+- [Lighthouse](https://lighthouse.cx/): Runs this attestation service. The
+  attester's ENS name is atst.lighthousegov.eth.
+
+## Notes
+
+This host serves the specification only. It has no API.

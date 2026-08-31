@@ -1,64 +1,4 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ENS Social Media Account Attestation Format</title>
-    <meta
-      name="description"
-      content="A signed claim that the owner of an ENS name also controls a particular social media account."
-    />
-    <link rel="canonical" href="https://atst.me/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="ATST" />
-    <meta property="og:title" content="ENS Social Media Account Attestation Format" />
-    <meta
-      property="og:description"
-      content="A signed claim that the owner of an ENS name also controls a particular social media account."
-    />
-    <meta property="og:url" content="https://atst.me/" />
-    <meta property="og:image" content="https://atst.me/og-image.png" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:creator" content="@LighthouseGov" />
-    <meta name="twitter:title" content="ENS Social Media Account Attestation Format" />
-    <meta
-      name="twitter:description"
-      content="A signed claim that the owner of an ENS name also controls a particular social media account."
-    />
-    <meta name="twitter:image" content="https://atst.me/og-image.png" />
-    <style>
-      body {
-        margin: 0;
-        background: #fff;
-        color: #111;
-      }
-      .masthead {
-        display: block;
-        width: 420px;
-        max-width: calc(100% - 48px);
-        height: auto;
-        margin: 24px 24px 0;
-      }
-      pre {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 14px;
-        line-height: 1.5;
-        margin: 0;
-        padding: 24px;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-      }
-      @media (prefers-color-scheme: dark) {
-        body { background: #0a0a0a; color: #e5e5e5; }
-      }
-    </style>
-  </head>
-  <body>
-    <img class="masthead" src="atst-wordmark.png" alt="ATST" width="420" height="237" />
-    <pre>ENS Social Media Account Attestation Format
+ENS Social Media Account Attestation Format
 ===========================================
 
 Table of Contents
@@ -134,8 +74,8 @@ Table of Contents
 
       Tag(1635021684) [
          2,                ; envelope version
-         &lt;integer&gt;,        ; timestamp
-         &lt;bytes 65&gt;,       ; signature, EIP-191 over
+         <integer>,        ; timestamp
+         <bytes 65>,       ; signature, EIP-191 over
                            ;   keccak256(payload)
       ]
 
@@ -186,11 +126,11 @@ Table of Contents
    Once issued, an attestation is published by the user as a text
    record on their ENS name. The text record key has the form:
 
-      attestations[&lt;platform&gt;][&lt;attester ENS name&gt;]
+      attestations[<platform>][<attester ENS name>]
 
    This binds each attestation to a specific (user, platform,
    attester) triple, and is the location from which a verifier
-   retrieves the envelope. The &lt;platform&gt; value MUST match the
+   retrieves the envelope. The <platform> value MUST match the
    key under which the user's handle is published to their ENS
    name.
 
@@ -280,11 +220,11 @@ Table of Contents
    Extended attestations are instead published as text records
    under the key:
 
-      uid[&lt;platform&gt;][&lt;attester ENS name&gt;]
+      uid[<platform>][<attester ENS name>]
 
    The distinct prefix signals to a verifier that the envelope at
    this record carries the extended payload and can also attest to
-   the user's UID for &lt;platform&gt;.
+   the user's UID for <platform>.
 
    Issuance proceeds as in Section 5. The OAuth response is also
    used to obtain the user's UID u, which is included in the
@@ -311,6 +251,4 @@ References
 https://atst.me is run by the Lighthouse Labs social media attestation service.
 Our attester's ENS name is atst.lighthousegov.eth.
 
-Contact for more info: hello@lighthouse.cx</pre>
-  </body>
-</html>
+Contact for more info: hello@lighthouse.cx
