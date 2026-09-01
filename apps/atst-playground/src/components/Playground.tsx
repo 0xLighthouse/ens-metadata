@@ -56,6 +56,14 @@ export function Playground() {
         <p className="mt-1 text-muted">
           Tools for learning how to create and verify ENS text record attestations.
         </p>
+        <a
+          href="https://github.com/ensdomains/ensips/pull/85"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-block border border-accent px-3 py-2 text-accent hover:bg-accent hover:text-panel"
+        >
+          Text Record Attestations is a pending ENSIP — read the proposal →
+        </a>
       </header>
 
       <nav className="mb-6 flex border-b border-rule">

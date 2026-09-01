@@ -25,6 +25,8 @@ attestation self-invalidating rather than merely stale.
 - ATST Playground: Verify an attestation step by step, take an envelope apart,
   or sign one with a throwaway key. Exposes a machine-callable verification
   endpoint described by its own /.well-known/agent-card.json.
+- [Text Record Attestations](https://github.com/ensdomains/ensips/pull/85): This
+  format as a pending ENSIP, open for review at the time of writing.
 - [ENSIP-27](https://docs.ens.domains/ensip/27): The related ENS improvement
   proposal.
 - [Lighthouse](https://lighthouse.cx/): Runs this attestation service. The

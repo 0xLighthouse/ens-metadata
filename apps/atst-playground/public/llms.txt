@@ -21,6 +21,8 @@ signature recovery. The playground makes each of those steps visible.
 ## Specification
 
 - [ATST format](https://atst.me/): The attestation format this app implements.
+- [Text Record Attestations](https://github.com/ensdomains/ensips/pull/85): This
+  format as a pending ENSIP, open for review at the time of writing.
 - [ENSIP-27](https://docs.ens.domains/ensip/27): The related ENS improvement
   proposal.
 
