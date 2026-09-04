@@ -14,7 +14,14 @@ vi.mock('@duneanalytics/client-sdk', () => ({
 // still recorded so the cache key and TTL stay asserted.
 vi.mock('next/cache', () => ({ unstable_cache: unstableCache }))
 
+// Rows in the shape query 8607855 returns: lowercase hex `owner`, decimal-string `tokenId`,
+// and a Dune-formatted `issuedAt` timestamp.
 const resultWith = (rows: Record<string, unknown>[]) => ({ result: { rows } })
+const row = (owner: string, tokenId = '1', issuedAt = '2026-04-22 06:30:47.000 UTC') => ({
+  owner,
+  tokenId,
+  issuedAt,
+})
 
 // Captured at import time: `dune.ts` wraps its loader once, at module scope, and the hooks below
 // reset every mock before the first test runs.
@@ -50,75 +57,80 @@ describe('fetchBadgeholders', () => {
   it('maps rows onto badgeholders and lowercases every address', async () => {
     getLatestResult.mockResolvedValue(
       resultWith([
-        { address: '0xAbCdEf0000000000000000000000000000000001', token_id: 1 },
-        { address: '0x0000000000000000000000000000000000000002', token_id: 2 },
+        row('0xAbCdEf0000000000000000000000000000000001', '132'),
+        row('0x0000000000000000000000000000000000000002', '193'),
       ]),
     )
 
     await expect(fetchBadgeholders()).resolves.toEqual([
-      { address: '0xabcdef0000000000000000000000000000000001', tokenId: '1' },
-      { address: '0x0000000000000000000000000000000000000002', tokenId: '2' },
+      {
+        address: '0xabcdef0000000000000000000000000000000001',
+        tokenId: '132',
+        issuedAt: '2026-04-22T06:30:47.000Z',
+      },
+      {
+        address: '0x0000000000000000000000000000000000000002',
+        tokenId: '193',
+        issuedAt: '2026-04-22T06:30:47.000Z',
+      },
     ])
+  })
+
+  it('rewrites the Dune timestamp as ISO 8601 UTC', async () => {
+    getLatestResult.mockResolvedValue(
+      resultWith([
+        row('0xaaaa000000000000000000000000000000000001', '1', '2026-04-13 20:19:47.000 UTC'),
+      ]),
+    )
+
+    const [badgeholder] = await fetchBadgeholders()
+    expect(badgeholder.issuedAt).toBe('2026-04-13T20:19:47.000Z')
+    expect(new Date(badgeholder.issuedAt).toISOString()).toBe(badgeholder.issuedAt)
   })
 
   it('de-duplicates addresses that differ only in case', async () => {
     getLatestResult.mockResolvedValue(
       resultWith([
-        { address: '0xAAAA000000000000000000000000000000000001' },
-        { address: '0xaaaa000000000000000000000000000000000001' },
-        { address: '0xBBBB000000000000000000000000000000000002' },
+        row('0xAAAA000000000000000000000000000000000001', '1'),
+        row('0xaaaa000000000000000000000000000000000001', '2'),
+        row('0xBBBB000000000000000000000000000000000002', '3'),
       ]),
     )
 
-    await expect(fetchBadgeholders()).resolves.toEqual([
-      { address: '0xaaaa000000000000000000000000000000000001' },
-      { address: '0xbbbb000000000000000000000000000000000002' },
+    const badgeholders = await fetchBadgeholders()
+    expect(badgeholders.map((b) => b.address)).toEqual([
+      '0xaaaa000000000000000000000000000000000001',
+      '0xbbbb000000000000000000000000000000000002',
     ])
+    expect(badgeholders[0].tokenId).toBe('1')
   })
 
-  it('accepts the alternate column spellings', async () => {
-    getLatestResult.mockResolvedValue(
-      resultWith([{ Holder_Address: '0xCCCC000000000000000000000000000000000003', tokenId: '7' }]),
-    )
-
-    await expect(fetchBadgeholders()).resolves.toEqual([
-      { address: '0xcccc000000000000000000000000000000000003', tokenId: '7' },
-    ])
-  })
-
-  it('omits tokenId when the query exposes no token id column', async () => {
-    getLatestResult.mockResolvedValue(
-      resultWith([{ owner: '0xDDDD000000000000000000000000000000000004' }]),
-    )
-
-    await expect(fetchBadgeholders()).resolves.toEqual([
-      { address: '0xdddd000000000000000000000000000000000004' },
-    ])
-  })
-
-  it('skips rows whose address is missing or not a string', async () => {
+  it('skips rows whose owner is missing or not a string', async () => {
     getLatestResult.mockResolvedValue(
       resultWith([
-        { address: '0xEEEE000000000000000000000000000000000005' },
-        { address: null },
-        { address: '' },
+        row('0xEEEE000000000000000000000000000000000005'),
+        { ...row(''), owner: null },
+        row(''),
       ]),
     )
 
-    await expect(fetchBadgeholders()).resolves.toEqual([
-      { address: '0xeeee000000000000000000000000000000000005' },
+    const badgeholders = await fetchBadgeholders()
+    expect(badgeholders.map((b) => b.address)).toEqual([
+      '0xeeee000000000000000000000000000000000005',
     ])
   })
 
   // A mismatch throws rather than returning `[]` from inside the cached loader, so it takes the
   // same uncached retry path as an outage instead of pinning an empty list for the whole TTL.
-  it('returns an empty list and logs when no column resolves to an address', async () => {
-    getLatestResult.mockResolvedValue(resultWith([{ ens_name: 'nick.eth', count: 3 }]))
+  it('returns an empty list and logs when an expected column is missing', async () => {
+    getLatestResult.mockResolvedValue(
+      resultWith([{ owner: '0xaaaa000000000000000000000000000000000001', tokenId: '1' }]),
+    )
 
     await expect(fetchBadgeholders()).resolves.toEqual([])
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('Failed to fetch ETHSecurity badgeholders'),
-      expect.objectContaining({ message: expect.stringContaining('no address column') }),
+      expect.objectContaining({ message: expect.stringContaining('missing column(s) [issuedAt]') }),
     )
   })
 

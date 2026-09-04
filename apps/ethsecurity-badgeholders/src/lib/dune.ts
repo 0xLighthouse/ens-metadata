@@ -1,59 +1,48 @@
-import {
-  BADGEHOLDERS_CACHE_TTL_SECONDS,
-  BADGEHOLDERS_DUNE_QUERY_ID,
-  BADGEHOLDER_ADDRESS_COLUMNS,
-  BADGEHOLDER_TOKEN_ID_COLUMNS,
-} from '@/lib/constants'
+import { BADGEHOLDERS_CACHE_TTL_SECONDS, BADGEHOLDERS_DUNE_QUERY_ID } from '@/lib/constants'
 import type { Badgeholder } from '@/lib/types'
 import { DuneClient } from '@duneanalytics/client-sdk'
 import { unstable_cache } from 'next/cache'
 
+/** The columns query 8607855 returns. See `BADGEHOLDERS_DUNE_QUERY_ID`. */
+const COLUMNS = ['owner', 'tokenId', 'issuedAt'] as const
+
 type DuneRow = Record<string, unknown>
 
-/** Finds the first accepted column present on a row, matching keys case-insensitively. */
-const resolveColumn = (row: DuneRow, accepted: readonly string[]) => {
-  const keys = Object.keys(row)
-  for (const name of accepted) {
-    const key = keys.find((candidate) => candidate.toLowerCase() === name)
-    if (key) return key
-  }
-  return undefined
-}
+/** Dune serialises timestamps as `YYYY-MM-DD HH:mm:ss.SSS UTC`; rewrite that as ISO 8601. */
+const toIsoTimestamp = (value: string) => value.replace(' ', 'T').replace(' UTC', 'Z')
 
 /**
  * Maps Dune rows onto badgeholders: lowercased addresses, first occurrence wins. Throws when
- * no column resolves to an address, so a schema mismatch takes the same uncached path as an
+ * the expected columns are missing, so a schema change takes the same uncached path as an
  * outage instead of pinning an empty list for the whole TTL.
  */
 const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
   if (rows.length === 0) return []
 
-  const addressColumn = resolveColumn(rows[0], BADGEHOLDER_ADDRESS_COLUMNS)
-  if (!addressColumn) {
+  const missing = COLUMNS.filter((column) => !(column in rows[0]))
+  if (missing.length > 0) {
     throw new Error(
-      `Dune query ${BADGEHOLDERS_DUNE_QUERY_ID} returned no address column. Saw [${Object.keys(
+      `Dune query ${BADGEHOLDERS_DUNE_QUERY_ID} is missing column(s) [${missing.join(', ')}]. Saw [${Object.keys(
         rows[0],
-      ).join(', ')}], accepts [${BADGEHOLDER_ADDRESS_COLUMNS.join(', ')}].`,
+      ).join(', ')}].`,
     )
   }
-  const tokenIdColumn = resolveColumn(rows[0], BADGEHOLDER_TOKEN_ID_COLUMNS)
 
   const seen = new Set<string>()
   const badgeholders: Badgeholder[] = []
   for (const row of rows) {
-    const value = row[addressColumn]
-    if (typeof value !== 'string' || value === '') continue
+    const owner = row.owner
+    if (typeof owner !== 'string' || owner === '') continue
 
-    const address = value.toLowerCase()
+    const address = owner.toLowerCase()
     if (seen.has(address)) continue
     seen.add(address)
 
-    const tokenId = tokenIdColumn ? row[tokenIdColumn] : undefined
-    badgeholders.push(
-      tokenId === undefined || tokenId === null
-        ? { address }
-        : { address, tokenId: String(tokenId) },
-    )
+    badgeholders.push({
+      address,
+      tokenId: String(row.tokenId),
+      issuedAt: toIsoTimestamp(String(row.issuedAt)),
+    })
   }
   return badgeholders
 }

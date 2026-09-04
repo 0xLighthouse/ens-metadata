@@ -1,8 +1,9 @@
 /**
- * One holder of the ETHSecurity badge. `address` is always lowercase. `tokenId` is present
- * only when the Dune query exposes a token id column; later phases key on `address`.
+ * One holder of the ETHSecurity badge. `address` is always lowercase. `issuedAt` is an ISO 8601
+ * UTC timestamp of the block in which the holder received the badge. Later phases key on `address`.
  */
 export type Badgeholder = {
   address: string
-  tokenId?: string
+  tokenId: string
+  issuedAt: string
 }
