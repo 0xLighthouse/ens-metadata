@@ -28,11 +28,13 @@ const row = (owner: string, tokenId = '1', issuedAt = '2026-04-22 06:30:47.000 U
 const cacheCall = unstableCache.mock.calls[0]
 
 beforeEach(() => {
+  vi.stubEnv('DUNE_API_KEY', 'test-key')
   getLatestResult.mockReset()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
@@ -131,6 +133,17 @@ describe('fetchBadgeholders', () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('Failed to fetch ETHSecurity badgeholders'),
       expect.objectContaining({ message: expect.stringContaining('missing column(s) [issuedAt]') }),
+    )
+  })
+
+  it('returns an empty list and logs when DUNE_API_KEY is unset', async () => {
+    vi.stubEnv('DUNE_API_KEY', '')
+
+    await expect(fetchBadgeholders()).resolves.toEqual([])
+    expect(getLatestResult).not.toHaveBeenCalled()
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to fetch ETHSecurity badgeholders'),
+      expect.objectContaining({ message: 'DUNE_API_KEY is not set' }),
     )
   })
 

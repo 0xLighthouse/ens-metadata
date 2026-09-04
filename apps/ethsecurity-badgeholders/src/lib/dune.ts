@@ -55,7 +55,9 @@ const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
  */
 const loadBadgeholders = unstable_cache(
   async (): Promise<Badgeholder[]> => {
-    const dune = new DuneClient(process.env.DUNE_API_KEY!)
+    const apiKey = process.env.DUNE_API_KEY
+    if (!apiKey) throw new Error('DUNE_API_KEY is not set')
+    const dune = new DuneClient(apiKey)
     const response = await dune.getLatestResult({ queryId: BADGEHOLDERS_DUNE_QUERY_ID })
     if (response.error) {
       throw new Error(`Dune returned an error: ${JSON.stringify(response.error)}`)
