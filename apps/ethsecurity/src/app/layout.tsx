@@ -32,7 +32,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="flex min-h-screen flex-col">
             <SiteHeader />
-            <main className="flex flex-1 flex-col gap-4 p-4">{children}</main>
+            <main className="flex flex-1 flex-col gap-4 py-4">{children}</main>
           </div>
         </ThemeProvider>
       </body>
