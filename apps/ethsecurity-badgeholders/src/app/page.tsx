@@ -5,14 +5,12 @@ import { PageInset } from './components/containers'
 export default function HomePage() {
   return (
     <PageInset>
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-h1">ETHSecurity Badgeholders</h1>
-        <p className="text-body-lg text-neutral-500 dark:text-neutral-400">
-          Everyone holding the ETHSecurity badge, alongside the ENS metadata they publish on-chain.
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">ETHSecurity Badgeholders</h1>
+      <p className="text-body-sm text-neutral-500 dark:text-neutral-400">
+        Everyone holding the ETHSecurity badge, alongside the ENS metadata they publish on-chain.
+      </p>
 
-      <Card className="shadow-none">
+      <Card className="mt-3 shadow-none">
         <CardHeader>
           <CardTitle>No badgeholders yet</CardTitle>
           <CardDescription>

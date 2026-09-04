@@ -4,7 +4,9 @@ import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import React, { useCallback, useEffect, useState } from 'react'
 
-import { Button } from './button'
+import { cn } from '@/lib/utils'
+
+import { IconButton } from './icon-button'
 
 /**
  * ThemeToggle component
@@ -26,22 +28,13 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className }) => 
   }, [isDark, setTheme])
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className={className}
-      onClick={handleToggle}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {mounted ? (
-        isDark ? (
-          <Moon className="h-5 w-5" />
-        ) : (
-          <Sun className="h-5 w-5" />
-        )
-      ) : (
-        <span className="h-5 w-5" />
-      )}
-    </Button>
+    <div className={cn('flex items-center justify-center', className)}>
+      <IconButton
+        onClick={handleToggle}
+        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {mounted ? isDark ? <Moon /> : <Sun /> : <span className="size-6" />}
+      </IconButton>
+    </div>
   )
 }
