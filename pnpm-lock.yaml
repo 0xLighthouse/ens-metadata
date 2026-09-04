@@ -33,6 +33,8 @@ importers:
         specifier: ^2.5.5
         version: 2.5.5
 
+  apps/atst-landing: {}
+
   apps/atst-playground:
     dependencies:
       '@ensdomains/ensjs':
