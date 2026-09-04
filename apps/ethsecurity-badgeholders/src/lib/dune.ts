@@ -20,18 +20,21 @@ const resolveColumn = (row: DuneRow, accepted: readonly string[]) => {
   return undefined
 }
 
-/** Maps Dune rows onto badgeholders: lowercased addresses, first occurrence wins. */
+/**
+ * Maps Dune rows onto badgeholders: lowercased addresses, first occurrence wins. Throws when
+ * no column resolves to an address, so a schema mismatch takes the same uncached path as an
+ * outage instead of pinning an empty list for the whole TTL.
+ */
 const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
   if (rows.length === 0) return []
 
   const addressColumn = resolveColumn(rows[0], BADGEHOLDER_ADDRESS_COLUMNS)
   if (!addressColumn) {
-    console.error(
+    throw new Error(
       `Dune query ${BADGEHOLDERS_DUNE_QUERY_ID} returned no address column. Saw [${Object.keys(
         rows[0],
       ).join(', ')}], accepts [${BADGEHOLDER_ADDRESS_COLUMNS.join(', ')}].`,
     )
-    return []
   }
   const tokenIdColumn = resolveColumn(rows[0], BADGEHOLDER_TOKEN_ID_COLUMNS)
 
@@ -58,7 +61,8 @@ const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
 /**
  * Reads the last stored execution of the badgeholder query. Wrapped in `unstable_cache` so a
  * second call inside the TTL is served from Next's data cache without a second Dune request;
- * a throw is not cached, so an outage does not pin an empty list for the whole TTL.
+ * a throw is not cached, so neither an outage nor a schema mismatch pins an empty list for the
+ * whole TTL.
  */
 const loadBadgeholders = unstable_cache(
   async (): Promise<Badgeholder[]> => {
@@ -75,8 +79,8 @@ const loadBadgeholders = unstable_cache(
 
 /**
  * The current ETHSecurity badgeholders, lowercased and de-duplicated. Server-only: it reads
- * `DUNE_API_KEY`. A Dune outage yields an empty list and a logged error rather than a throw,
- * so callers decide how to present it.
+ * `DUNE_API_KEY`. A Dune outage or an unrecognised result schema yields an empty list and a
+ * logged error rather than a throw, so callers decide how to present it.
  */
 export async function fetchBadgeholders(): Promise<Badgeholder[]> {
   try {

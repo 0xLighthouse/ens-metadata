@@ -1,19 +1,24 @@
-import { BADGEHOLDERS_DUNE_QUERY_ID } from '@/lib/constants'
 import { fetchBadgeholders } from '@/lib/dune'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getLatestResult } = vi.hoisted(() => ({ getLatestResult: vi.fn() }))
+const { getLatestResult, unstableCache } = vi.hoisted(() => ({
+  getLatestResult: vi.fn(),
+  unstableCache: vi.fn((fn: () => unknown) => fn),
+}))
 
 vi.mock('@duneanalytics/client-sdk', () => ({
   DuneClient: vi.fn(() => ({ getLatestResult })),
 }))
 
-// `unstable_cache` needs a Next runtime; pass the loader straight through instead.
-vi.mock('next/cache', () => ({
-  unstable_cache: (fn: () => unknown) => fn,
-}))
+// `unstable_cache` needs a Next runtime; pass the loader straight through instead. The call is
+// still recorded so the cache key and TTL stay asserted.
+vi.mock('next/cache', () => ({ unstable_cache: unstableCache }))
 
 const resultWith = (rows: Record<string, unknown>[]) => ({ result: { rows } })
+
+// Captured at import time: `dune.ts` wraps its loader once, at module scope, and the hooks below
+// reset every mock before the first test runs.
+const cacheCall = unstableCache.mock.calls[0]
 
 beforeEach(() => {
   getLatestResult.mockReset()
@@ -25,11 +30,21 @@ afterEach(() => {
 })
 
 describe('fetchBadgeholders', () => {
-  it('reads the latest result of the badgeholder query', async () => {
+  // Literals, not the constants the code reads: asserting against the same constant cannot
+  // catch a wrong constant, and both values are acceptance criteria for ENS-4.
+  it('reads the latest result of Dune query 8607855', async () => {
     getLatestResult.mockResolvedValue(resultWith([]))
 
     await expect(fetchBadgeholders()).resolves.toEqual([])
-    expect(getLatestResult).toHaveBeenCalledWith({ queryId: BADGEHOLDERS_DUNE_QUERY_ID })
+    expect(getLatestResult).toHaveBeenCalledWith({ queryId: 8607855 })
+  })
+
+  it('caches the loader under a stable key for one hour', () => {
+    expect(cacheCall).toEqual([
+      expect.any(Function),
+      ['ethsecurity-badgeholders'],
+      { revalidate: 3600 },
+    ])
   })
 
   it('maps rows onto badgeholders and lowercases every address', async () => {
@@ -95,11 +110,16 @@ describe('fetchBadgeholders', () => {
     ])
   })
 
+  // A mismatch throws rather than returning `[]` from inside the cached loader, so it takes the
+  // same uncached retry path as an outage instead of pinning an empty list for the whole TTL.
   it('returns an empty list and logs when no column resolves to an address', async () => {
     getLatestResult.mockResolvedValue(resultWith([{ ens_name: 'nick.eth', count: 3 }]))
 
     await expect(fetchBadgeholders()).resolves.toEqual([])
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no address column'))
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to fetch ETHSecurity badgeholders'),
+      expect.objectContaining({ message: expect.stringContaining('no address column') }),
+    )
   })
 
   it('returns an empty list and logs when the Dune request rejects', async () => {

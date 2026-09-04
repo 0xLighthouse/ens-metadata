@@ -10,4 +10,4 @@ export NEXT_PUBLIC_RPC_URL=<MAINNET_RPC>
 export DUNE_API_KEY=
 
 # [apps/ethsecurity-badgeholders]
-export DUNE_API_KEY=
+# Reuses DUNE_API_KEY from [apps/interface] above.
