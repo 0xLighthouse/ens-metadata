@@ -1,11 +1,13 @@
 /**
  * Typography system
  *
- * Mirrors the `.text-*` component classes declared in `src/app/globals.css`, so
- * markup can pick a variant either with the class or with `typography('h1')`.
+ * The type scale is defined once, as the `.text-*` component classes in
+ * `src/app/globals.css`. This helper only names those classes, so markup can
+ * pick a variant with the class directly or with `typography('h1')`.
  */
 
 export type TypographyVariant =
+  | 'display'
   | 'h1'
   | 'h2'
   | 'h3'
@@ -15,74 +17,8 @@ export type TypographyVariant =
   | 'body-sm'
   | 'caption'
   | 'mono'
-  | 'display'
 
 export type TypographyWeights = 'normal' | 'medium' | 'semibold' | 'bold'
-
-interface TypographyStyles {
-  fontSize: string
-  lineHeight: string
-  fontWeight: string
-  fontFamily?: string
-  letterSpacing?: string
-}
-
-export const typographyDefinitions: Record<TypographyVariant, TypographyStyles> = {
-  display: {
-    fontSize: 'text-5xl md:text-6xl',
-    lineHeight: 'leading-tight',
-    fontWeight: 'font-bold',
-    letterSpacing: 'tracking-tight',
-  },
-  h1: {
-    fontSize: 'text-3xl md:text-4xl',
-    lineHeight: 'leading-tight',
-    fontWeight: 'font-bold',
-    letterSpacing: 'tracking-tight',
-  },
-  h2: {
-    fontSize: 'text-2xl md:text-3xl',
-    lineHeight: 'leading-tight',
-    fontWeight: 'font-semibold',
-    letterSpacing: 'tracking-tight',
-  },
-  h3: {
-    fontSize: 'text-xl md:text-2xl',
-    lineHeight: 'leading-snug',
-    fontWeight: 'font-semibold',
-  },
-  h4: {
-    fontSize: 'text-lg md:text-xl',
-    lineHeight: 'leading-snug',
-    fontWeight: 'font-semibold',
-  },
-  'body-lg': {
-    fontSize: 'text-lg',
-    lineHeight: 'leading-normal',
-    fontWeight: 'font-normal',
-  },
-  body: {
-    fontSize: 'text-base',
-    lineHeight: 'leading-normal',
-    fontWeight: 'font-normal',
-  },
-  'body-sm': {
-    fontSize: 'text-sm',
-    lineHeight: 'leading-normal',
-    fontWeight: 'font-normal',
-  },
-  caption: {
-    fontSize: 'text-xs',
-    lineHeight: 'leading-tight',
-    fontWeight: 'font-normal',
-  },
-  mono: {
-    fontSize: 'text-sm',
-    lineHeight: 'leading-normal',
-    fontWeight: 'font-normal',
-    fontFamily: 'font-mono',
-  },
-}
 
 export const fontWeights: Record<TypographyWeights, string> = {
   normal: 'font-normal',
@@ -92,48 +28,8 @@ export const fontWeights: Record<TypographyWeights, string> = {
 }
 
 /**
- * Helper function to get typography classes
- *
- * @param variant The typography variant
- * @param weight Optional custom weight to override the default
- * @returns A string of Tailwind classes
+ * Returns the type scale class for a variant, with an optional weight override.
  */
 export function typography(variant: TypographyVariant, weight?: TypographyWeights): string {
-  const definition = typographyDefinitions[variant]
-  const classes = [
-    definition.fontSize,
-    definition.lineHeight,
-    weight ? fontWeights[weight] : definition.fontWeight,
-  ]
-
-  if (definition.letterSpacing) {
-    classes.push(definition.letterSpacing)
-  }
-
-  if (definition.fontFamily) {
-    classes.push(definition.fontFamily)
-  }
-
-  return classes.join(' ')
-}
-
-/**
- * Color system
- *
- * Literal neutral scale classes — this app deliberately has no semantic CSS
- * variable palette.
- */
-export const colorSystem = {
-  text: {
-    primary: 'text-neutral-900 dark:text-neutral-50',
-    secondary: 'text-neutral-700 dark:text-neutral-300',
-    tertiary: 'text-neutral-500 dark:text-neutral-400',
-    subtle: 'text-neutral-400 dark:text-neutral-500',
-    danger: 'text-red-500 dark:text-red-400',
-  },
-  bg: {
-    primary: 'bg-white dark:bg-neutral-950',
-    secondary: 'bg-neutral-100 dark:bg-neutral-900',
-    tertiary: 'bg-neutral-200 dark:bg-neutral-800',
-  },
+  return weight ? `text-${variant} ${fontWeights[weight]}` : `text-${variant}`
 }

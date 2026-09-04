@@ -1,4 +1,8 @@
-import { TypographyVariant, TypographyWeights, typography as typographyFn } from '@/config/theme'
+import {
+  type TypographyVariant,
+  type TypographyWeights,
+  typography as typographyFn,
+} from '@/config/theme'
 import { cn } from '@/lib/utils'
 import React from 'react'
 
