@@ -1,8 +1,13 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
+import { BadgeholderList } from '@/components/badgeholder-list'
+import { loadBadgeholderRows } from '@/lib/badgeholders'
 import { PageInset } from './components/containers'
 
-export default function HomePage() {
+/** Rendered on demand: the fetchers cache, and the list must never be baked into the build. */
+export const dynamic = 'force-dynamic'
+
+export default async function HomePage() {
+  const rows = await loadBadgeholderRows()
+
   return (
     <PageInset>
       <h1 className="text-2xl font-bold">ETHSecurity Badgeholders</h1>
@@ -10,18 +15,9 @@ export default function HomePage() {
         Everyone holding the ETHSecurity badge, alongside the ENS metadata they publish on-chain.
       </p>
 
-      <Card className="mt-3 shadow-none">
-        <CardHeader>
-          <CardTitle>No badgeholders yet</CardTitle>
-          <CardDescription>
-            This page is a placeholder. It will list each badgeholder and their ENS records once the
-            data is wired up.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-body-sm text-neutral-500 dark:text-neutral-400">Nothing to show.</p>
-        </CardContent>
-      </Card>
+      <div className="mt-3">
+        <BadgeholderList rows={rows} />
+      </div>
     </PageInset>
   )
 }
