@@ -13,3 +13,7 @@ export DUNE_API_KEY=
 # Reuses DUNE_API_KEY from [apps/interface] above.
 # rcrds.xyz read API key (https://rcrds.xyz/v1/docs). Server-side only.
 export RCRDS_API_KEY=
+# Privy app for the wallet connect button. The id is read server-side and passed to the client.
+# The secret is reserved for server-side token verification and is not read yet.
+export ESB_PRIVY_APP_ID=
+export ESB_PRIVY_APP_SECRET=

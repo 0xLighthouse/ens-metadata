@@ -13,7 +13,7 @@ panel, and a footer, with the same type scale and color tokens. The UI
 primitives under `src/components/ui/` are copied from there and from
 `apps/interface`, not imported from a shared package.
 
-The app has no login. Every visitor sees the same page.
+Every visitor sees the same page. Connecting a wallet only shows it in the header.
 
 ## Environment
 
@@ -24,7 +24,13 @@ every badgeholder has no ENS name and empty records.
 ```sh
 export DUNE_API_KEY=
 export RCRDS_API_KEY=
+export ESB_PRIVY_APP_ID=
+export ESB_PRIVY_APP_SECRET=
 ```
+
+`ESB_PRIVY_APP_ID` enables the wallet connect button in the header; without it
+the button is not rendered. `ESB_PRIVY_APP_SECRET` is reserved for server-side
+token verification and is not read yet.
 
 ## Running it
 
