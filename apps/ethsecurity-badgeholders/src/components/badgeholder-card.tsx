@@ -1,22 +1,13 @@
+import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { type RecordState, RecordStatus } from '@/components/record-status'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { BadgeholderRow, HandleField } from '@/lib/types'
-import { resolveAvatar, shortenAddress } from '@/lib/utils'
+import { shortenAddress } from '@/lib/utils'
+import Link from 'next/link'
 
 export type ListView = 'list' | 'grid'
 
 const handleState = (field: HandleField): RecordState =>
   field.state === 'empty' ? 'empty' : field.state === 'attested' ? 'attested' : 'populated'
-
-const handleHref = (field: HandleField, base: string): string | undefined =>
-  field.state === 'empty' ? undefined : `${base}${field.handle.replace(/^@/, '')}`
-
-const BadgeholderAvatar = ({ row, name }: { row: BadgeholderRow; name: string }) => (
-  <Avatar className="size-12 rounded-lg">
-    <AvatarImage src={row.records.avatar ?? resolveAvatar(row.address, 96)} alt={name} />
-    <AvatarFallback className="rounded-lg text-xs">{name.slice(0, 2)}</AvatarFallback>
-  </Avatar>
-)
 
 const Chips = ({ row }: { row: BadgeholderRow }) => {
   const { name, description, avatar, x, telegram } = row.records
@@ -25,12 +16,8 @@ const Chips = ({ row }: { row: BadgeholderRow }) => {
       <RecordStatus label="Name" state={name ? 'populated' : 'empty'} />
       <RecordStatus label="Description" state={description ? 'populated' : 'empty'} />
       <RecordStatus label="Avatar" state={avatar ? 'populated' : 'empty'} />
-      <RecordStatus label="X" state={handleState(x)} href={handleHref(x, 'https://x.com/')} />
-      <RecordStatus
-        label="Telegram"
-        state={handleState(telegram)}
-        href={handleHref(telegram, 'https://t.me/')}
-      />
+      <RecordStatus label="X" state={handleState(x)} />
+      <RecordStatus label="Telegram" state={handleState(telegram)} />
     </div>
   )
 }
@@ -46,9 +33,12 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
 
   if (view === 'grid') {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <Link
+        href={`/view/${row.address}`}
+        className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+      >
         <div className="flex items-center gap-3">
-          <BadgeholderAvatar row={row} name={name} />
+          <BadgeholderAvatar row={row} size={96} className="size-12" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
               {name}
@@ -62,14 +52,17 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
         <div className="flex items-center justify-between border-neutral-100 border-t pt-1 dark:border-neutral-800">
           <BadgeLabel row={row} />
         </div>
-      </div>
+      </Link>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:px-5 dark:border-neutral-800 dark:bg-neutral-900">
+    <Link
+      href={`/view/${row.address}`}
+      className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-4 transition-colors hover:border-neutral-300 sm:flex-row sm:items-center sm:px-5 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+    >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <BadgeholderAvatar row={row} name={name} />
+        <BadgeholderAvatar row={row} size={96} className="size-12" />
         <div className="min-w-0 flex-1">
           <p className="mb-0.5 truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
             {name}
@@ -81,6 +74,6 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
       <div className="shrink-0 sm:min-w-[72px] sm:text-right">
         <BadgeLabel row={row} />
       </div>
-    </div>
+    </Link>
   )
 }

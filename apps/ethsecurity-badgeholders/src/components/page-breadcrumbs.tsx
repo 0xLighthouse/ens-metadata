@@ -11,15 +11,17 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { shortenAddress } from '@/lib/utils'
 
 /**
- * Derives a page title from the last path segment, e.g. `/some-page` → "Some Page".
- * Returns an empty string for the root path.
+ * Derives a page title from the last path segment, e.g. `/some-page` → "Some Page". An
+ * address segment is shortened instead. Returns an empty string for the root path.
  */
 export function pageTitleFromPath(pathname: string): string {
   const segments = pathname.split('/').filter(Boolean)
   const last = segments[segments.length - 1]
   if (!last) return ''
+  if (/^0x[0-9a-f]{40}$/i.test(last)) return shortenAddress(last)
   return decodeURIComponent(last)
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
