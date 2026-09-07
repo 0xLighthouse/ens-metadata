@@ -1,10 +1,20 @@
 import { Compass, Github } from 'lucide-react'
 import Link from 'next/link'
 
+import { ConnectButton } from '@/components/connect-button'
+import { ContractsDialog } from '@/components/contracts-dialog'
 import { PageBreadcrumbs } from '@/components/page-breadcrumbs'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 
-export default function DefaultLayout({ children }: { children: React.ReactNode }) {
+export default function DefaultLayout({
+  children,
+  walletEnabled,
+  badgeholderCount,
+}: {
+  children: React.ReactNode
+  walletEnabled: boolean
+  badgeholderCount: number
+}) {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-50">
       <header className="relative isolate z-[60] flex h-16 shrink-0 items-center bg-white px-4 sm:px-8 dark:bg-neutral-950">
@@ -20,7 +30,11 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
           <div className="flex flex-1 justify-center">
             <span className="text-sm font-medium">ETHSecurity Badgeholders</span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <ContractsDialog badgeholderCount={badgeholderCount} />
+            <ThemeToggle />
+            {walletEnabled && <ConnectButton compact />}
+          </div>
         </div>
 
         {/* Desktop layout */}
@@ -28,7 +42,9 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
           <PageBreadcrumbs />
         </div>
         <div className="hidden flex-1 items-center justify-end gap-2 sm:flex">
+          <ContractsDialog badgeholderCount={badgeholderCount} />
           <ThemeToggle />
+          {walletEnabled && <ConnectButton />}
         </div>
       </header>
 
