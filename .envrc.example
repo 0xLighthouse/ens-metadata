@@ -11,3 +11,5 @@ export DUNE_API_KEY=
 
 # [apps/ethsecurity-badgeholders]
 # Reuses DUNE_API_KEY from [apps/interface] above.
+# rcrds.xyz read API key (https://rcrds.xyz/v1/docs). Server-side only.
+export RCRDS_API_KEY=

@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["DUNE_API_KEY"],
+      "env": ["DUNE_API_KEY", "RCRDS_API_KEY"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "test": {

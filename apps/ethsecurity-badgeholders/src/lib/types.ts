@@ -7,3 +7,30 @@ export type Badgeholder = {
   tokenId: string
   issuedAt: string
 }
+
+/**
+ * A social handle record: unset, set but backed by no valid attestation from the trusted
+ * attester, or set and attested.
+ */
+export type HandleField =
+  | { state: 'empty' }
+  | { state: 'unattested'; handle: string }
+  | { state: 'attested'; handle: string }
+
+/** The five tracked text records. Text fields are `null` when unset or whitespace-only. */
+export type BadgeholderRecords = {
+  name: string | null
+  description: string | null
+  avatar: string | null
+  x: HandleField
+  telegram: HandleField
+}
+
+/** What rcrds.xyz knows about one badgeholder. `ensName` is `null` when the address has no primary name. */
+export type BadgeholderProfile = {
+  ensName: string | null
+  records: BadgeholderRecords
+}
+
+/** One row of the badgeholder table: the Dune badge data joined with the rcrds.xyz profile. */
+export type BadgeholderRow = Badgeholder & BadgeholderProfile
