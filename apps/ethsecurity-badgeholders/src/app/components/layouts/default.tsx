@@ -59,7 +59,7 @@ export default function DefaultLayout({
           © {new Date().getFullYear()} Lighthouse Labs
         </p>
         <a
-          href="https://github.com/0xLighthouse"
+          href="https://github.com/0xLighthouse/ens-metadata/tree/develop/apps/ethsecurity-badgeholders"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 text-xs text-neutral-400 transition-colors hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
