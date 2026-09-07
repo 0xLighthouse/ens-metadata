@@ -1,6 +1,4 @@
-import { fetchBadgeholders } from '@/lib/dune'
-import { EMPTY_PROFILE, fetchBadgeholderRecords } from '@/lib/rcrds'
-import type { BadgeholderRow } from '@/lib/types'
+import { loadBadgeholderRows } from '@/lib/badgeholders'
 import { NextResponse } from 'next/server'
 
 /**
@@ -11,12 +9,5 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const badgeholders = await fetchBadgeholders()
-  const profiles = await fetchBadgeholderRecords(badgeholders.map((b) => b.address))
-
-  const rows: BadgeholderRow[] = badgeholders.map((badgeholder) => ({
-    ...badgeholder,
-    ...(profiles.get(badgeholder.address) ?? EMPTY_PROFILE),
-  }))
-  return NextResponse.json(rows)
+  return NextResponse.json(await loadBadgeholderRows())
 }
