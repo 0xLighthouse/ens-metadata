@@ -105,17 +105,12 @@ export function BadgeholderProfile({ row }: { row: BadgeholderRow }) {
         </div>
         {records.avatar ? (
           <div className="p-4">
-            <BadgeholderAvatar
-              row={row}
-              size={512}
-              className="aspect-square h-auto w-full rounded-xl"
-            />
+            <BadgeholderAvatar row={row} className="aspect-square h-auto w-full rounded-xl" />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 px-4 py-10">
             <BadgeholderAvatar
               row={row}
-              size={96}
               className="size-24 rounded-xl [image-rendering:pixelated]"
             />
             <p className="text-neutral-400 text-sm italic dark:text-neutral-500">

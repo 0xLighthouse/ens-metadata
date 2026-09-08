@@ -31,3 +31,25 @@ export const RCRDS_BATCH_SIZE = 50
  * handle attestations count as verified. Pinned so verification needs no name resolution.
  */
 export const ATTESTER_ADDRESS = '0xf82A259381f5632A0b12E6720C8C216B7c659783'
+
+/**
+ * Pixels requested from stamp.fyi for every badgeholder avatar. One size for every surface keeps
+ * a single cached image per address; 96 covers the list thumbnails at their rendered 48px and is
+ * upscaled on the profile page, which is an accepted trade for the smaller list payload.
+ *
+ * Must stay within 1..500: stamp resets an out-of-range `s` to 64 rather than clamping it.
+ */
+export const AVATAR_SIZE = 96
+
+/** How long a cached avatar is served before Next revalidates it upstream, in seconds. */
+export const AVATAR_CACHE_TTL_SECONDS = 60 * 60 * 12
+
+/**
+ * How long a browser may reuse an avatar, in seconds. Deliberately short: an on-demand refresh
+ * clears our cache but cannot reach a browser that already holds the image, so this bounds how
+ * long a stale avatar can linger on screen.
+ */
+export const AVATAR_BROWSER_TTL_SECONDS = 5 * 60
+
+/** How long a browser may serve a stale avatar while refetching in the background, in seconds. */
+export const AVATAR_STALE_TTL_SECONDS = 60 * 60 * 24

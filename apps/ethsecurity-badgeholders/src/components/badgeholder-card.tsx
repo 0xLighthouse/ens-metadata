@@ -38,7 +38,7 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
         className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
       >
         <div className="flex items-center gap-3">
-          <BadgeholderAvatar row={row} size={96} className="size-12" />
+          <BadgeholderAvatar row={row} className="size-12" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
               {name}
@@ -62,7 +62,7 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
       className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-4 transition-colors hover:border-neutral-300 sm:flex-row sm:items-center sm:px-5 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <BadgeholderAvatar row={row} size={96} className="size-12" />
+        <BadgeholderAvatar row={row} className="size-12" />
         <div className="min-w-0 flex-1">
           <p className="mb-0.5 truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
             {name}
