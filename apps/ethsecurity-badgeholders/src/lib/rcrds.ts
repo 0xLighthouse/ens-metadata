@@ -14,10 +14,18 @@ import {
 import { unstable_cache } from 'next/cache'
 import { type Address, type Hex, hexToBytes } from 'viem'
 
-/** One row of `POST /v1/names`. `name` echoes the input address, checksummed. */
-type BatchRow =
-  | { name: string; ok: true; data: { name: string | null; records?: Record<string, string> } }
-  | { name: string; ok: false; error: { code: string; message: string } }
+/**
+ * One row of `POST /v1/names`: the flat envelope the single-name endpoints return. For an
+ * address query `address` echoes the input, EIP-55 checksummed, and `name` is the primary
+ * name it reverse-resolves to. A failed row carries `error` (an error name such as
+ * `primary_name_not_set`) and omits `name` and `records`.
+ */
+type BatchRow = {
+  address?: string
+  name?: string | null
+  records?: Record<string, string>
+  error?: string
+}
 
 const EMPTY_RECORDS: BadgeholderRecords = {
   name: null,
@@ -102,7 +110,8 @@ const toProfile = async (
 
 /**
  * Resolves one batch of addresses to profiles, keyed by lowercased address. Addresses with no
- * primary name come back `ok: false` from the API and are omitted here; the caller fills them.
+ * primary name come back as an `{ address, error }` row and are omitted here; the caller
+ * fills them.
  * Throws on a missing key, a non-2xx response, or a malformed body, so a failure is never
  * cached. Each batch caches separately: `unstable_cache` keys on its arguments.
  */
@@ -125,9 +134,9 @@ const loadBatch = unstable_cache(
 
     const profiles: [string, BadgeholderProfile][] = []
     for (const row of results) {
-      if (!row.ok || !row.data.name) continue
-      const address = row.name.toLowerCase() as Address
-      profiles.push([address, await toProfile(address, row.data.name, row.data.records ?? {})])
+      if (row.error || !row.address || !row.name) continue
+      const address = row.address.toLowerCase() as Address
+      profiles.push([address, await toProfile(address, row.name, row.records ?? {})])
     }
     return profiles
   },
