@@ -2,6 +2,7 @@ import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { HandlePill } from '@/components/handle-pill'
 import { ShareButton } from '@/components/share-button'
 import { BADGE_CONTRACT_ADDRESS } from '@/lib/constants'
+import { rowLabel } from '@/lib/identity'
 import type { BadgeholderRow } from '@/lib/types'
 import { shortenAddress } from '@/lib/utils'
 import { ExternalLink } from 'lucide-react'
@@ -28,7 +29,7 @@ const Value = ({ value }: { value: string | null }) =>
 
 /** One badgeholder's profile, laid out after the platform delegate page. */
 export function BadgeholderProfile({ row }: { row: BadgeholderRow }) {
-  const name = row.ensName ?? shortenAddress(row.address)
+  const { primary, secondary } = rowLabel(row)
   const { records } = row
 
   return (
@@ -38,7 +39,13 @@ export function BadgeholderProfile({ row }: { row: BadgeholderRow }) {
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex min-w-0 flex-col gap-0.5">
               <h1 className="truncate font-bold text-base text-neutral-900 dark:text-neutral-50">
-                {name}
+                {primary}
+                {secondary && (
+                  <span className="font-normal text-neutral-500 dark:text-neutral-400">
+                    {' '}
+                    ({secondary})
+                  </span>
+                )}
               </h1>
               <span className="font-mono text-neutral-400 text-xs dark:text-neutral-500">
                 {shortenAddress(row.address)}

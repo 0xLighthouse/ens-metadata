@@ -4,7 +4,7 @@ import {
   RCRDS_API_URL,
   RCRDS_BATCH_SIZE,
 } from '@/lib/constants'
-import type { BadgeholderProfile, BadgeholderRecords, ContactField, HandleField } from '@/lib/types'
+import type { BadgeholderProfile, BadgeholderRecords, HandleField, PlainField } from '@/lib/types'
 import { isValidEmail, isValidTelegramHandle, isValidXHandle } from '@/lib/validation'
 import {
   DEFAULT_ATTESTER_ENS,
@@ -77,7 +77,7 @@ const toHandleField = async (
   }
 }
 
-const toContactField = (value: string | null): ContactField =>
+const toPlainField = (value: string | null): PlainField =>
   value === null ? { state: 'empty' } : { state: 'unverifiable', handle: value }
 
 const toProfile = async (
@@ -99,7 +99,7 @@ const toProfile = async (
       name: text('name'),
       description: text('description'),
       avatar: text('avatar'),
-      email: toContactField(valid(text('email'), isValidEmail)),
+      email: toPlainField(valid(text('email'), isValidEmail)),
       // rcrds serves the legacy `com.twitter` as `com.x` in its profile dataset; mirror that here.
       x: await toHandleField(
         'com.x',

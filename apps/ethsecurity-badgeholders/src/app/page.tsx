@@ -12,7 +12,7 @@ export default async function HomePage() {
     <PageInset>
       <h1 className="text-2xl font-bold">ETHSecurity Badgeholders</h1>
       <p className="text-body-sm text-neutral-500 dark:text-neutral-400">
-        Everyone holding the ETHSecurity badge, alongside the ENS metadata they publish on-chain.
+        A directory of badgeholders and the identity information they have published on-chain.
       </p>
 
       <div className="mt-3">

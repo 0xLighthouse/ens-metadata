@@ -3,14 +3,15 @@
 import { TelegramIcon } from '@/components/icons/telegram'
 import { XIcon } from '@/components/icons/x'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { ContactField, HandleField } from '@/lib/types'
+import { BADGE_CONTRACT_ADDRESS } from '@/lib/constants'
+import type { HandleField, PlainField } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { Mail, TriangleAlert } from 'lucide-react'
+import { Award, Mail, TriangleAlert } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 
-export type HandlePlatform = 'x' | 'telegram' | 'email'
+export type HandlePlatform = 'x' | 'telegram' | 'email' | 'badge'
 
-type PillField = HandleField | ContactField
+type PillField = HandleField | PlainField
 
 const PLATFORMS: Record<
   HandlePlatform,
@@ -32,6 +33,14 @@ const PLATFORMS: Record<
     verifiable: true,
   },
   email: { label: 'Email', icon: Mail, base: 'mailto:', prefix: '', verifiable: false },
+  badge: {
+    label: 'Badge',
+    icon: Award,
+    // Etherscan addresses a single ERC-721 by token id in `?a=`, so the id completes the URL.
+    base: `https://etherscan.io/token/${BADGE_CONTRACT_ADDRESS}?a=`,
+    prefix: 'Badge #',
+    verifiable: false,
+  },
 }
 
 const SET =
@@ -86,7 +95,8 @@ export function HandlePill({
   const content = (
     <>
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span className="sr-only">{`${label}: `}</span>
+      {/* The mark is aria-hidden, so name the platform — unless the value already does. */}
+      {!prefix.includes(label) && <span className="sr-only">{`${label}: `}</span>}
       {/* Only the handle gives ground when the row runs out of width. */}
       <span className="min-w-0 truncate">{handle === null ? 'Unknown' : `${prefix}${handle}`}</span>
       {field.state === 'unattested' &&

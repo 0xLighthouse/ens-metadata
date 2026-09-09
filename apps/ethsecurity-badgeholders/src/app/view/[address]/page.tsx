@@ -1,6 +1,6 @@
 import { BadgeholderProfile } from '@/components/badgeholder-profile'
 import { findBadgeholderRow } from '@/lib/badgeholders'
-import { shortenAddress } from '@/lib/utils'
+import { rowLabel } from '@/lib/identity'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { PageInset } from '../../components/containers'
@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { address } = await params
   const row = await findBadgeholderRow(address)
   if (!row) return { title: 'Not a badgeholder' }
-  return { title: `${row.ensName ?? shortenAddress(row.address)} · ETHSecurity Badgeholders` }
+  return { title: `${rowLabel(row).primary} · ETHSecurity Badgeholders` }
 }
 
 export default async function BadgeholderPage({ params }: Props) {
