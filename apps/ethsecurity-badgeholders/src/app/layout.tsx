@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { Web3Provider } from '@/components/web3-provider'
 import { fetchBadgeholders } from '@/lib/dune'
 
@@ -32,7 +33,9 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {privyAppId ? <Web3Provider appId={privyAppId}>{layout}</Web3Provider> : layout}
+          <TooltipProvider delayDuration={200}>
+            {privyAppId ? <Web3Provider appId={privyAppId}>{layout}</Web3Provider> : layout}
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

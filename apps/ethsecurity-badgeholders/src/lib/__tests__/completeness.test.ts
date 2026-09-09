@@ -7,6 +7,7 @@ const EMPTY: BadgeholderRecords = {
   name: null,
   description: null,
   avatar: null,
+  email: { state: 'empty' },
   x: { state: 'empty' },
   telegram: { state: 'empty' },
 }
@@ -23,6 +24,7 @@ const FULL: BadgeholderRecords = {
   name: 'Alice',
   description: 'Auditor',
   avatar: 'https://example.com/a.png',
+  email: { state: 'unverifiable', handle: 'alice@example.com' },
   x: { state: 'attested', handle: 'alice' },
   telegram: { state: 'attested', handle: 'alice' },
 }

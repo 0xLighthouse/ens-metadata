@@ -4,7 +4,8 @@ import {
   RCRDS_API_URL,
   RCRDS_BATCH_SIZE,
 } from '@/lib/constants'
-import type { BadgeholderProfile, BadgeholderRecords, HandleField } from '@/lib/types'
+import type { BadgeholderProfile, BadgeholderRecords, ContactField, HandleField } from '@/lib/types'
+import { isValidEmail, isValidTelegramHandle, isValidXHandle } from '@/lib/validation'
 import {
   DEFAULT_ATTESTER_ENS,
   decodeEnvelope,
@@ -31,6 +32,7 @@ const EMPTY_RECORDS: BadgeholderRecords = {
   name: null,
   description: null,
   avatar: null,
+  email: { state: 'empty' },
   x: { state: 'empty' },
   telegram: { state: 'empty' },
 }
@@ -75,6 +77,9 @@ const toHandleField = async (
   }
 }
 
+const toContactField = (value: string | null): ContactField =>
+  value === null ? { state: 'empty' } : { state: 'unverifiable', handle: value }
+
 const toProfile = async (
   address: Address,
   ensName: string,
@@ -83,23 +88,29 @@ const toProfile = async (
   // A whitespace-only record reads as unset.
   const text = (key: string): string | null => records[key]?.trim() || null
 
+  // A malformed value is dropped rather than repaired: guessing at what the owner meant would
+  // show a handle they never published, and an attestation covers the exact record value.
+  const valid = (value: string | null, check: (v: string) => boolean) =>
+    value !== null && check(value) ? value : null
+
   return {
     ensName,
     records: {
       name: text('name'),
       description: text('description'),
       avatar: text('avatar'),
+      email: toContactField(valid(text('email'), isValidEmail)),
       // rcrds serves the legacy `com.twitter` as `com.x` in its profile dataset; mirror that here.
       x: await toHandleField(
         'com.x',
-        text('com.x') ?? text('com.twitter'),
+        valid(text('com.x') ?? text('com.twitter'), isValidXHandle),
         ensName,
         address,
         records,
       ),
       telegram: await toHandleField(
         'org.telegram',
-        text('org.telegram'),
+        valid(text('org.telegram'), isValidTelegramHandle),
         ensName,
         address,
         records,

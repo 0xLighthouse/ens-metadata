@@ -12,7 +12,7 @@ const STAMP_CACHE_NAMESPACE = 'esb-ens'
  * A stamp.fyi avatar URL for `address`, restricted to the ENS avatar record.
  *
  * `resolver=ens` pins the source.
- * 
+ *
  * The `cb` parameter ensures we always get ENS avatars by preventing stamp.fyi from returning a cached image from another source.
  *
  * An address with no primary ENS name, or a name with no avatar record, gets stamp's generated
