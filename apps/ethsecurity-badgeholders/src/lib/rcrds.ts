@@ -24,7 +24,7 @@ type BatchRow = {
 }
 
 const EMPTY_RECORDS: BadgeholderRecords = {
-  name: null,
+  alias: null,
   description: null,
   avatar: null,
   email: { state: 'empty' },
@@ -75,7 +75,7 @@ const toProfile = async (
   return {
     ensName,
     records: {
-      name: text('name'),
+      alias: text('alias'),
       description: text('description'),
       avatar: text('avatar'),
       email: toPlainField(valid(text('email'), isValidEmail)),

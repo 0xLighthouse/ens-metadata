@@ -1,4 +1,9 @@
-import { KEEP_ALL_SOCIALS, type ProfileForm, type SocialDrafts } from '@/lib/profile-records'
+import {
+  KEEP_ALL_SOCIALS,
+  PROFILE_TEXT_KEYS,
+  type ProfileForm,
+  type SocialDrafts,
+} from '@/lib/profile-records'
 import { SOCIAL_PLATFORMS, type SocialPlatform } from '@/lib/social'
 
 /**
@@ -39,19 +44,12 @@ export function parseDraft(raw: string | null, now = Date.now()): EditDraft | nu
     if (!value || typeof value !== 'object') return null
     const { form, socials, pendingLink, savedAt } = value
     if (typeof savedAt !== 'number' || now - savedAt > DRAFT_TTL_MS) return null
-    if (!form || ![form.name, form.description, form.avatar, form.email].every(isString)) {
-      return null
-    }
+    if (!form || !PROFILE_TEXT_KEYS.every((key) => isString(form[key]))) return null
     const validPending =
       pendingLink === null || SOCIAL_PLATFORMS.includes(pendingLink as SocialPlatform)
     if (pendingLink === undefined || !validPending) return null
     return {
-      form: {
-        name: form.name,
-        description: form.description,
-        avatar: form.avatar,
-        email: form.email,
-      },
+      form: Object.fromEntries(PROFILE_TEXT_KEYS.map((key) => [key, form[key]])) as ProfileForm,
       socials: isSocialDrafts(socials) ? socials : KEEP_ALL_SOCIALS,
       pendingLink: pendingLink as SocialPlatform | null,
       savedAt,

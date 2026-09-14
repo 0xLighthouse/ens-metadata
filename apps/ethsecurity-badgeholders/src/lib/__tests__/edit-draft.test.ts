@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 const NOW = 1_700_000_000_000
 
 const draft: EditDraft = {
-  form: { name: 'Alice', description: '', avatar: '', email: 'a@b.co' },
+  form: { alias: 'Alice', description: '', avatar: '', email: 'a@b.co' },
   socials: { ...KEEP_ALL_SOCIALS, 'org.telegram': { kind: 'remove' } },
   pendingLink: 'com.x',
   savedAt: NOW,

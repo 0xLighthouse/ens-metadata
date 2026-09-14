@@ -15,15 +15,16 @@ import { computeDelta, hasChanges } from '@ensmetadata/sdk/delta'
  * Pure logic behind the profile editor: what the form holds, what is pending for each social
  * platform, and how those become the text records one transaction writes.
  *
- * Record maps follow the SDK's two conventions. A *state* map (`RecordState`) only has keys
- * that are set on-chain. A *changes* map has `''` for "delete this key"; a key that is absent
- * is left alone.
+ * Every key the editor touches is either a Person schema property or a social record. Record
+ * maps follow the SDK's two conventions: a *state* map (`RecordState`) only has keys that are
+ * set on-chain; a *changes* map has `''` for "delete this key", and an absent key is left alone.
  */
 
 /** Text records currently set on a name, as the SDK reader returns them. */
 export type RecordState = Record<string, string>
 
-export const PROFILE_TEXT_KEYS = ['name', 'description', 'avatar', 'email'] as const
+/** The Person schema properties the form edits. */
+export const PROFILE_TEXT_KEYS = ['alias', 'description', 'avatar', 'email'] as const
 export type ProfileTextKey = (typeof PROFILE_TEXT_KEYS)[number]
 
 export type ProfileForm = Record<ProfileTextKey, string>
@@ -45,17 +46,14 @@ export const KEEP_ALL_SOCIALS: SocialDrafts = {
 }
 
 /**
- * Every key the editor reads that the Person schema does not declare, so a single
- * `getMetadata` call returns the whole picture.
+ * The social keys the Person schema does not declare: each platform's handle and attestation
+ * records, plus the legacy X key. `getMetadata` reads these alongside the schema's own keys.
  */
-export const PROFILE_EXTRA_KEYS: readonly string[] = [
-  'name',
-  X_PLATFORM,
+export const SOCIAL_RECORD_KEYS: readonly string[] = [
   LEGACY_TWITTER_KEY,
-  'org.telegram',
   ...SOCIAL_PLATFORMS.flatMap((platform) => {
     const keys = attestationKeys(platform)
-    return [keys.handle, keys.uid]
+    return [platform, keys.handle, keys.uid]
   }),
 ]
 
@@ -65,12 +63,8 @@ const nonEmpty = (value: string | undefined): string | null => {
 }
 
 /** The form as it should open: one input per text record, empty when unset. */
-export const formFromRecords = (existing: RecordState): ProfileForm => ({
-  name: existing.name ?? '',
-  description: existing.description ?? '',
-  avatar: existing.avatar ?? '',
-  email: existing.email ?? '',
-})
+export const formFromRecords = (existing: RecordState): ProfileForm =>
+  Object.fromEntries(PROFILE_TEXT_KEYS.map((key) => [key, existing[key] ?? ''])) as ProfileForm
 
 /** The handle currently on-chain for `platform`, honouring the legacy X key. */
 export const onChainHandle = (existing: RecordState, platform: SocialPlatform): string | null =>
@@ -95,11 +89,8 @@ export function validateProfileForm(form: ProfileForm): FormErrors {
 }
 
 /** The text-field part of the desired state, trimmed so whitespace-only input deletes. */
-const desiredTextRecords = (form: ProfileForm): Record<string, string> => {
-  const desired: Record<string, string> = {}
-  for (const key of PROFILE_TEXT_KEYS) desired[key] = form[key].trim()
-  return desired
-}
+const desiredTextRecords = (form: ProfileForm): Record<string, string> =>
+  Object.fromEntries(PROFILE_TEXT_KEYS.map((key) => [key, form[key].trim()]))
 
 /**
  * Whether saving would change anything the user controls. `class` and `schema` are excluded
@@ -150,30 +141,30 @@ export function buildDesiredRecords(args: {
 }
 
 export type WriteMap = {
-  /** Changes the SDK validates against the Person schema. */
-  userRecords: Record<string, string>
-  /** Changes outside the schema, merged in after validation. */
-  bypassRecords: Record<string, string>
+  /** Person schema properties, which the SDK validates. */
+  schemaRecords: Record<string, string>
+  /** Social handles and attestations, which the schema does not declare. */
+  socialRecords: Record<string, string>
   hasChanges: boolean
 }
 
 /**
  * Diffs `desired` against what is on-chain and splits the result by whether the Person schema
- * knows the key. Deletions of keys that are not set drop out here, so a `remove` on a platform
- * with no attestation writes nothing for the attestation keys.
+ * declares the key. Deletions of keys that are not set drop out here, so a `remove` on a
+ * platform with no attestation writes nothing for the attestation keys.
  */
 export function splitWriteMap(existing: RecordState, desired: Record<string, string>): WriteMap {
   const delta = computeDelta(existing, desired)
   const write: Record<string, string> = { ...delta.changes }
   for (const key of delta.deleted) write[key] = ''
 
-  const userRecords: Record<string, string> = {}
-  const bypassRecords: Record<string, string> = {}
+  const schemaRecords: Record<string, string> = {}
+  const socialRecords: Record<string, string> = {}
   for (const [key, value] of Object.entries(write)) {
-    if (PERSON_SCHEMA_KEYS.has(key)) userRecords[key] = value
-    else bypassRecords[key] = value
+    if (PERSON_SCHEMA_KEYS.has(key)) schemaRecords[key] = value
+    else socialRecords[key] = value
   }
-  return { userRecords, bypassRecords, hasChanges: Object.keys(write).length > 0 }
+  return { schemaRecords, socialRecords, hasChanges: Object.keys(write).length > 0 }
 }
 
 /**

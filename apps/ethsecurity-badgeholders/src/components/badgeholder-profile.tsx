@@ -103,7 +103,7 @@ export function BadgeholderProfile({
       <div className={`${CARD} overflow-hidden`}>
         <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
           <Row label="Name">
-            <Value value={records.name} />
+            <Value value={records.alias} />
           </Row>
           <Row label="Bio">
             <Value value={records.description} />
@@ -118,12 +118,13 @@ export function BadgeholderProfile({
             <HandleValue name="Telegram" field={records.telegram} />
           </Row>
         </div>
-        {editEnabled && (
-          <div className="flex justify-end border-neutral-100 border-t px-6 py-3 dark:border-neutral-800">
-            <EditProfileButton row={row} />
-          </div>
-        )}
       </div>
+
+      {editEnabled && (
+        <div className="-mt-1 flex justify-end px-6">
+          <EditProfileButton row={row} />
+        </div>
+      )}
     </div>
   )
 }

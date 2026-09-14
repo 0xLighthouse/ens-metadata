@@ -2,7 +2,7 @@
 
 import { isHandleAttested } from '@/lib/attestation-state'
 import { PERSON_SCHEMA } from '@/lib/person-schema'
-import { PROFILE_EXTRA_KEYS, type RecordState, onChainHandle } from '@/lib/profile-records'
+import { type RecordState, SOCIAL_RECORD_KEYS, onChainHandle } from '@/lib/profile-records'
 import { SOCIAL_PLATFORMS, type SocialPlatform, isValidHandle } from '@/lib/social'
 import { publicClient } from '@/lib/viem'
 import { metadataReader } from '@ensmetadata/sdk'
@@ -48,7 +48,7 @@ export function useProfileRecords(args: {
       const { properties } = await reader.getMetadata({
         name: ensName,
         schema: PERSON_SCHEMA,
-        keys: [...PROFILE_EXTRA_KEYS],
+        keys: [...SOCIAL_RECORD_KEYS],
       })
       const socials = {} as OnChainSocials
       for (const platform of SOCIAL_PLATFORMS) {

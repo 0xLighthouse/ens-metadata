@@ -3,11 +3,11 @@ import { shortenAddress } from '@/lib/utils'
 
 /** The string the name sort orders on: the display name, else the ENS name, else the address. */
 export const sortIdentity = (row: BadgeholderRow): string =>
-  row.records.name ?? row.ensName ?? row.address
+  row.records.alias ?? row.ensName ?? row.address
 
 /** True when the row has neither a display name nor an ENS name. */
 export const isAddressOnly = (row: BadgeholderRow): boolean =>
-  row.records.name === null && row.ensName === null
+  row.records.alias === null && row.ensName === null
 
 /**
  * How a row identifies itself on screen. `secondary` is the ENS name only when a display name
@@ -15,6 +15,6 @@ export const isAddressOnly = (row: BadgeholderRow): boolean =>
  * `secondary` in parentheses after the primary.
  */
 export const rowLabel = (row: BadgeholderRow): { primary: string; secondary: string | null } => ({
-  primary: row.records.name ?? row.ensName ?? shortenAddress(row.address),
-  secondary: row.records.name ? row.ensName : null,
+  primary: row.records.alias ?? row.ensName ?? shortenAddress(row.address),
+  secondary: row.records.alias ? row.ensName : null,
 })

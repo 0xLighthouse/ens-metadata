@@ -1,10 +1,12 @@
 import type { AttestationEntry } from '@/lib/attester-client'
 import { PERSON_CLASS, PERSON_SCHEMA_URI } from '@/lib/constants'
+import { PERSON_SCHEMA_KEYS } from '@/lib/person-schema'
 import {
   KEEP_ALL_SOCIALS,
-  PROFILE_EXTRA_KEYS,
+  PROFILE_TEXT_KEYS,
   type ProfileForm,
   type RecordState,
+  SOCIAL_RECORD_KEYS,
   buildDesiredRecords,
   existingForWriter,
   formFromRecords,
@@ -22,7 +24,7 @@ const TG_KEYS = attestationKeys('org.telegram')
 const EXISTING: RecordState = {
   class: PERSON_CLASS,
   schema: PERSON_SCHEMA_URI,
-  name: 'Alice',
+  alias: 'Alice',
   description: 'Builds things',
   email: 'alice@example.com',
   'com.x': 'alice_x',
@@ -46,13 +48,43 @@ const xEntry: AttestationEntry = {
   },
 }
 
+describe('record keys', () => {
+  it('edits only Person schema properties', () => {
+    for (const key of PROFILE_TEXT_KEYS) expect(PERSON_SCHEMA_KEYS.has(key)).toBe(true)
+  })
+
+  it('reads only social keys beyond the schema, none of them a schema property', () => {
+    expect([...SOCIAL_RECORD_KEYS].sort()).toEqual(
+      [
+        'com.x',
+        'com.twitter',
+        'org.telegram',
+        X_KEYS.handle,
+        X_KEYS.uid,
+        TG_KEYS.handle,
+        TG_KEYS.uid,
+      ].sort(),
+    )
+    for (const key of SOCIAL_RECORD_KEYS) expect(PERSON_SCHEMA_KEYS.has(key)).toBe(false)
+  })
+})
+
 describe('formFromRecords', () => {
-  it('maps the four text records and blanks the unset ones', () => {
+  it('maps the text records and blanks the unset ones', () => {
     expect(formFromRecords(EXISTING)).toEqual({
-      name: 'Alice',
+      alias: 'Alice',
       description: 'Builds things',
       avatar: '',
       email: 'alice@example.com',
+    })
+  })
+
+  it('ignores the non-schema name record', () => {
+    expect(formFromRecords({ name: 'Legacy' })).toEqual({
+      alias: '',
+      description: '',
+      avatar: '',
+      email: '',
     })
   })
 })
@@ -85,7 +117,7 @@ describe('hasPendingChanges', () => {
   })
 
   it('is true for a text edit or a social draft alone', () => {
-    expect(hasPendingChanges(EXISTING, form({ name: 'Alicia' }), KEEP_ALL_SOCIALS)).toBe(true)
+    expect(hasPendingChanges(EXISTING, form({ alias: 'Alicia' }), KEEP_ALL_SOCIALS)).toBe(true)
     expect(
       hasPendingChanges(EXISTING, form(), {
         ...KEEP_ALL_SOCIALS,
@@ -105,33 +137,33 @@ describe('buildDesiredRecords + splitWriteMap', () => {
 
   it('writes nothing when everything already matches', () => {
     const result = splitWriteMap(EXISTING, build())
-    expect(result).toEqual({ userRecords: {}, bypassRecords: {}, hasChanges: false })
+    expect(result).toEqual({ schemaRecords: {}, socialRecords: {}, hasChanges: false })
   })
 
-  it('routes schema fields to userRecords and name to bypassRecords', () => {
+  it('routes every text field, alias included, through the schema', () => {
     const result = splitWriteMap(
       EXISTING,
-      build({ form: form({ name: 'Alicia', description: 'New bio' }) }),
+      build({ form: form({ alias: 'Alicia', description: 'New bio' }) }),
     )
-    expect(result.userRecords).toEqual({ description: 'New bio' })
-    expect(result.bypassRecords).toEqual({ name: 'Alicia' })
+    expect(result.schemaRecords).toEqual({ alias: 'Alicia', description: 'New bio' })
+    expect(result.socialRecords).toEqual({})
     expect(result.hasChanges).toBe(true)
   })
 
   it('deletes a cleared or whitespace-only field that is set on-chain', () => {
     const result = splitWriteMap(EXISTING, build({ form: form({ email: '  ' }) }))
-    expect(result.userRecords).toEqual({ email: '' })
+    expect(result.schemaRecords).toEqual({ email: '' })
   })
 
   it('adds class and schema when missing and replaces them when different', () => {
     const { class: _c, schema: _s, ...noSchema } = EXISTING
-    expect(splitWriteMap(noSchema, build()).userRecords).toEqual({
+    expect(splitWriteMap(noSchema, build()).schemaRecords).toEqual({
       class: PERSON_CLASS,
       schema: PERSON_SCHEMA_URI,
     })
     expect(
       splitWriteMap({ ...EXISTING, class: 'Delegate', schema: 'ipfs://other' }, build())
-        .userRecords,
+        .schemaRecords,
     ).toEqual({ class: PERSON_CLASS, schema: PERSON_SCHEMA_URI })
   })
 
@@ -143,8 +175,8 @@ describe('buildDesiredRecords + splitWriteMap', () => {
         attestations: [xEntry],
       }),
     )
-    expect(result.userRecords).toEqual({})
-    expect(result.bypassRecords).toEqual({
+    expect(result.schemaRecords).toEqual({})
+    expect(result.socialRecords).toEqual({
       'com.x': 'alice_new',
       [X_KEYS.handle]: '0xda61747374c1',
       [X_KEYS.uid]: '0xda61747374c2',
@@ -159,7 +191,7 @@ describe('buildDesiredRecords + splitWriteMap', () => {
         attestations: [{ ...xEntry, handle: 'alice_x' }],
       }),
     )
-    expect(Object.keys(result.bypassRecords).sort()).toEqual([X_KEYS.handle, X_KEYS.uid].sort())
+    expect(Object.keys(result.socialRecords).sort()).toEqual([X_KEYS.handle, X_KEYS.uid].sort())
   })
 
   it('throws when a link has no matching attestation', () => {
@@ -175,7 +207,7 @@ describe('buildDesiredRecords + splitWriteMap', () => {
       { ...EXISTING, 'com.twitter': 'alice_old' },
       build({ socials: { ...KEEP_ALL_SOCIALS, 'com.x': { kind: 'remove' } } }),
     )
-    expect(result.bypassRecords).toEqual({
+    expect(result.socialRecords).toEqual({
       'com.x': '',
       'com.twitter': '',
       [X_KEYS.handle]: '',
@@ -188,35 +220,25 @@ describe('buildDesiredRecords + splitWriteMap', () => {
       { ...EXISTING, 'org.telegram': 'alice_tg' },
       build({ socials: { ...KEEP_ALL_SOCIALS, 'org.telegram': { kind: 'remove' } } }),
     )
-    expect(result.bypassRecords).toEqual({ 'org.telegram': '' })
-    expect(TG_KEYS.handle in result.bypassRecords).toBe(false)
+    expect(result.socialRecords).toEqual({ 'org.telegram': '' })
+    expect(TG_KEYS.handle in result.socialRecords).toBe(false)
+  })
+
+  it('never writes the non-schema name record', () => {
+    const result = splitWriteMap({ ...EXISTING, name: 'Legacy' }, build())
+    expect('name' in result.schemaRecords).toBe(false)
+    expect('name' in result.socialRecords).toBe(false)
   })
 })
 
 describe('existingForWriter', () => {
   it('keeps only Person schema keys', () => {
-    expect(existingForWriter(EXISTING)).toEqual({
+    expect(existingForWriter({ ...EXISTING, name: 'Legacy' })).toEqual({
       class: PERSON_CLASS,
       schema: PERSON_SCHEMA_URI,
+      alias: 'Alice',
       description: 'Builds things',
       email: 'alice@example.com',
     })
-  })
-})
-
-describe('PROFILE_EXTRA_KEYS', () => {
-  it('covers name, both platforms, the legacy key and every attestation key', () => {
-    expect([...PROFILE_EXTRA_KEYS].sort()).toEqual(
-      [
-        'name',
-        'com.x',
-        'com.twitter',
-        'org.telegram',
-        X_KEYS.handle,
-        X_KEYS.uid,
-        TG_KEYS.handle,
-        TG_KEYS.uid,
-      ].sort(),
-    )
   })
 })

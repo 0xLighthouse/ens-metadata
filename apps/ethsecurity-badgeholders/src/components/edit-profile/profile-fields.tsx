@@ -3,21 +3,22 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { FormErrors, ProfileForm, ProfileTextKey } from '@/lib/profile-records'
+import {
+  type FormErrors,
+  PROFILE_TEXT_KEYS,
+  type ProfileForm,
+  type ProfileTextKey,
+} from '@/lib/profile-records'
 
-const FIELDS: { key: ProfileTextKey; label: string; placeholder: string; multiline?: boolean }[] = [
-  { key: 'name', label: 'Name', placeholder: 'How you want to be listed' },
+const FIELDS: Record<ProfileTextKey, { label: string; placeholder: string; multiline?: boolean }> =
   {
-    key: 'description',
-    label: 'Description',
-    placeholder: 'A sentence or two about you',
-    multiline: true,
-  },
-  { key: 'avatar', label: 'Avatar URL', placeholder: 'https://… or ipfs://…' },
-  { key: 'email', label: 'Email', placeholder: 'you@example.com' },
-]
+    alias: { label: 'Name', placeholder: 'Your real name or display name' },
+    description: { label: 'Bio', placeholder: 'A sentence or two about you', multiline: true },
+    avatar: { label: 'Avatar URL', placeholder: 'https://… or ipfs://…' },
+    email: { label: 'Email', placeholder: 'you@example.com' },
+  }
 
-/** The four text records as labelled inputs, with the validation error under each. */
+/** The editable text records as labelled inputs, with the validation error under each. */
 export function ProfileFields({
   form,
   errors,
@@ -31,7 +32,8 @@ export function ProfileFields({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      {FIELDS.map(({ key, label, placeholder, multiline }) => {
+      {PROFILE_TEXT_KEYS.map((key) => {
+        const { label, placeholder, multiline } = FIELDS[key]
         const id = `profile-${key}`
         const error = errors[key]
         const shared = {

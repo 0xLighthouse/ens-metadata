@@ -135,17 +135,17 @@ export function usePublishProfile(row: BadgeholderRow) {
           socials: input.socials,
           attestations,
         })
-        const { userRecords, bypassRecords, hasChanges } = splitWriteMap(input.existing, desired)
+        const { schemaRecords, socialRecords, hasChanges } = splitWriteMap(input.existing, desired)
         if (!hasChanges) throw new Error('Nothing to publish: every record already matches.')
 
         setPhase('writing')
         const writer = metadataWriter({ publicClient })(walletClient)
-        // The SDK validates the projected state against the schema, which knows nothing about
-        // `name` or the social and attestation keys. Validate the Person fields alone, then
-        // merge the rest into the same transaction.
+        // The SDK validates the projected state against the Person schema, which does not
+        // declare the social keys. Validate the schema records alone, then merge the social
+        // records into the same transaction.
         const prepared = await writer.prepareSetMetadata({
           name,
-          desired: userRecords,
+          desired: schemaRecords,
           existing: existingForWriter(input.existing),
           schema: PERSON_SCHEMA,
           ignoreMissing: true,
@@ -154,7 +154,7 @@ export function usePublishProfile(row: BadgeholderRow) {
         if (validation && !validation.success) {
           throw new MetadataValidationFailedError(validation.errors)
         }
-        for (const [key, value] of Object.entries(bypassRecords)) {
+        for (const [key, value] of Object.entries(socialRecords)) {
           prepared.changePreview.changes[key] = value
         }
         prepared.changePreview.validation = null

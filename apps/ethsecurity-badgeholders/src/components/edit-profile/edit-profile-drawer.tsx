@@ -132,8 +132,9 @@ export function EditProfileDrawer({
     pendingLink === null &&
     !publish.busy &&
     !done
-  const fieldsDisabled = publish.busy || done
-  const socialDisabled = fieldsDisabled || walletState !== 'ok'
+  // A wallet that cannot publish should not be able to draft edits it has no way to save.
+  const fieldsDisabled = publish.busy || done || walletState !== 'ok'
+  const socialDisabled = fieldsDisabled
 
   const close = () => {
     clearEditDraft(row.address)
@@ -254,8 +255,8 @@ export function EditProfileDrawer({
                       Social accounts
                     </h3>
                     <p className="text-neutral-500 text-xs dark:text-neutral-400">
-                      Connect an account to publish a handle the attester has verified. Only the
-                      handle is made public.
+                      Connect your accounts to publish a verifiable proof of ownership to your ENS
+                      name.
                     </p>
                     <div className="divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-950">
                       {SOCIAL_PLATFORMS.map((platform) => (
@@ -286,9 +287,7 @@ export function EditProfileDrawer({
             </div>
 
             <div className="mt-6 flex flex-col gap-3 border-neutral-200 border-t pt-4 dark:border-neutral-700">
-              {!done && (
-                <PublishNotice state={walletState} expected={row.address} onConnect={login} />
-              )}
+              {!done && <PublishNotice state={walletState} onConnect={login} />}
               {publish.error && (
                 <p className="text-red-600 text-sm dark:text-red-400">{publish.error}</p>
               )}
