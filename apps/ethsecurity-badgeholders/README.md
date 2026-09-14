@@ -46,6 +46,7 @@ every badgeholder has no ENS name and empty records.
 
 ```sh
 export DUNE_API_KEY=
+export DUNE_BADGELIST_QUERY_ID=    # optional numeric Dune query id (default 8607855)
 export RCRDS_API_KEY=
 export ESB_PRIVY_APP_ID=
 export ESB_PRIVY_APP_SECRET=

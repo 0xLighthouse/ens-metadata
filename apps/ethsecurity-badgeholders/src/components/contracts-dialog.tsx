@@ -9,27 +9,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { IconButton } from '@/components/ui/icon-button'
-import {
-  BADGEHOLDERS_CACHE_TTL_SECONDS,
-  BADGEHOLDERS_DUNE_QUERY_ID,
-  BADGE_CONTRACT_ADDRESS,
-} from '@/lib/constants'
-import { Check, Copy, ExternalLink, FileText, SlidersHorizontal } from 'lucide-react'
+import { BADGE_CONTRACT_ADDRESS } from '@/lib/constants'
+import { Check, Copy, ExternalLink, FileText } from 'lucide-react'
 import { useState } from 'react'
 
 const SectionTitle = ({ icon: Icon, children }: { icon: typeof FileText; children: string }) => (
   <div className="flex items-center gap-2">
     <Icon className="size-4 text-neutral-500" />
     <span className="font-semibold text-neutral-700 text-sm dark:text-neutral-300">{children}</span>
-  </div>
-)
-
-const ParameterRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="flex items-center justify-between gap-4 px-4 py-3">
-    <span className="text-neutral-600 text-sm dark:text-neutral-400">{label}</span>
-    <span className="text-right font-medium text-neutral-900 text-sm dark:text-neutral-50">
-      {children}
-    </span>
   </div>
 )
 
@@ -72,52 +59,29 @@ const AddressRow = ({ label, address }: { label: string; address: string }) => {
   )
 }
 
-/** Header icon button opening the badge contract and parameters dialog. */
-export function ContractsDialog({ badgeholderCount }: { badgeholderCount: number }) {
+/**
+ * Header icon button opening the badge contract dialog. It names only the on-chain contract,
+ * with an Etherscan link; it deliberately says nothing about how the badgeholder list is fetched.
+ */
+export function ContractsDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <IconButton aria-label="Badge contract and parameters">
+        <IconButton aria-label="Badge contract">
           <FileText className="size-6" />
         </IconButton>
       </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Badge contract and parameters</DialogTitle>
+          <DialogTitle>Badge contract</DialogTitle>
           <DialogDescription>
-            Where the badgeholder list and its ENS data come from.
+            The ETHSecurity Badge (BADGE) ERC-721 contract on Ethereum mainnet.
           </DialogDescription>
         </DialogHeader>
 
         <section className="flex flex-col gap-3">
-          <SectionTitle icon={SlidersHorizontal}>Parameters</SectionTitle>
-          <div className="divide-y divide-neutral-100 rounded-lg border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
-            <ParameterRow label="Token">ETHSecurity Badge (BADGE)</ParameterRow>
-            <ParameterRow label="Standard">ERC-721 behind an EIP-1967 proxy</ParameterRow>
-            <ParameterRow label="Badgeholders">{badgeholderCount}</ParameterRow>
-            <ParameterRow label="Badgeholder list">
-              <a
-                href={`https://dune.com/queries/${BADGEHOLDERS_DUNE_QUERY_ID}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 hover:underline"
-              >
-                Dune query {BADGEHOLDERS_DUNE_QUERY_ID}
-                <ExternalLink className="size-3 opacity-50" />
-              </a>
-            </ParameterRow>
-            <ParameterRow label="Refresh">
-              Every {BADGEHOLDERS_CACHE_TTL_SECONDS / 3600} hour
-            </ParameterRow>
-          </div>
-          <p className="text-center text-neutral-400 text-xs dark:text-neutral-500">
-            Badge data comes from Dune; ENS records and attestations from rcrds.xyz.
-          </p>
-        </section>
-
-        <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <SectionTitle icon={FileText}>Contracts</SectionTitle>
+            <SectionTitle icon={FileText}>Contract</SectionTitle>
             <span className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 font-medium text-neutral-600 text-xs dark:border-neutral-700 dark:text-neutral-400">
               <span className="text-base leading-none">⟠</span>
               Ethereum

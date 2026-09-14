@@ -1,9 +1,10 @@
-import { BADGEHOLDERS_CACHE_TTL_SECONDS, BADGEHOLDERS_DUNE_QUERY_ID } from '@/lib/constants'
+import { BADGEHOLDERS_CACHE_TTL_SECONDS } from '@/lib/constants'
+import { badgeholdersDuneQueryId } from '@/lib/env'
 import type { Badgeholder } from '@/lib/types'
 import { DuneClient } from '@duneanalytics/client-sdk'
 import { unstable_cache } from 'next/cache'
 
-/** The columns query 8607855 returns. See `BADGEHOLDERS_DUNE_QUERY_ID`. */
+/** The columns the badgeholder query returns. See `DEFAULT_BADGEHOLDERS_DUNE_QUERY_ID`. */
 const COLUMNS = ['owner', 'tokenId', 'issuedAt'] as const
 
 type DuneRow = Record<string, unknown>
@@ -16,13 +17,13 @@ const toIsoTimestamp = (value: string) => value.replace(' ', 'T').replace(' UTC'
  * the expected columns are missing, so a schema change takes the same uncached path as an
  * outage instead of pinning an empty list for the whole TTL.
  */
-const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
+const toBadgeholders = (queryId: number, rows: DuneRow[]): Badgeholder[] => {
   if (rows.length === 0) return []
 
   const missing = COLUMNS.filter((column) => !(column in rows[0]))
   if (missing.length > 0) {
     throw new Error(
-      `Dune query ${BADGEHOLDERS_DUNE_QUERY_ID} is missing column(s) [${missing.join(', ')}]. Saw [${Object.keys(
+      `Dune query ${queryId} is missing column(s) [${missing.join(', ')}]. Saw [${Object.keys(
         rows[0],
       ).join(', ')}].`,
     )
@@ -48,33 +49,23 @@ const toBadgeholders = (rows: DuneRow[]): Badgeholder[] => {
 }
 
 /**
- * Reads the last stored execution of the badgeholder query. Wrapped in `unstable_cache` so a
- * second call inside the TTL is served from Next's data cache without a second Dune request;
- * a throw is not cached, so neither an outage nor a schema mismatch pins an empty list for the
- * whole TTL.
+ * Reads the last stored execution of query `queryId`. Wrapped in `unstable_cache` so a second
+ * call inside the TTL is served from Next's data cache without a second Dune request; a throw
+ * is not cached, so neither an outage nor a schema mismatch pins an empty list for the whole
+ * TTL. `unstable_cache` folds the arguments into the cache key, so changing
+ * `DUNE_BADGELIST_QUERY_ID` never serves the previous query's list.
  */
 const loadBadgeholders = unstable_cache(
-  async (): Promise<Badgeholder[]> => {
+  async (queryId: number): Promise<Badgeholder[]> => {
     const apiKey = process.env.DUNE_API_KEY
     if (!apiKey) throw new Error('DUNE_API_KEY is not set')
     const dune = new DuneClient(apiKey)
-    const response = await dune.getLatestResult({ queryId: BADGEHOLDERS_DUNE_QUERY_ID })
+    const response = await dune.getLatestResult({ queryId })
     if (response.error) {
       throw new Error(`Dune returned an error: ${JSON.stringify(response.error)}`)
     }
 
-    // return toBadgeholders(response.result?.rows ?? [])
-
-    // Temporarily added, for testing purposes.
-    const rowsForBadgeholders: DuneRow[] = [
-      ...(response.result?.rows ?? []),
-      {
-        owner: '0x7c80435964Bde8071e1D3Df76Da870C2F03b44F2',
-        tokenId: 'manual',
-        issuedAt: '1970-01-01 00:00:00.000 UTC',
-      },
-    ]
-    return toBadgeholders(rowsForBadgeholders)
+    return toBadgeholders(queryId, response.result?.rows ?? [])
   },
   ['ethsecurity-badgeholders'],
   { revalidate: BADGEHOLDERS_CACHE_TTL_SECONDS },
@@ -82,17 +73,16 @@ const loadBadgeholders = unstable_cache(
 
 /**
  * The current ETHSecurity badgeholders, lowercased and de-duplicated. Server-only: it reads
- * `DUNE_API_KEY`. A Dune outage or an unrecognised result schema yields an empty list and a
- * logged error rather than a throw, so callers decide how to present it.
+ * `DUNE_API_KEY` and `DUNE_BADGELIST_QUERY_ID`. A Dune outage or an unrecognised result schema
+ * yields an empty list and a logged error rather than a throw, so callers decide how to
+ * present it.
  */
 export async function fetchBadgeholders(): Promise<Badgeholder[]> {
+  const queryId = badgeholdersDuneQueryId()
   try {
-    return await loadBadgeholders()
+    return await loadBadgeholders(queryId)
   } catch (error) {
-    console.error(
-      `Failed to fetch ETHSecurity badgeholders from Dune query ${BADGEHOLDERS_DUNE_QUERY_ID}`,
-      error,
-    )
+    console.error(`Failed to fetch ETHSecurity badgeholders from Dune query ${queryId}`, error)
     return []
   }
 }

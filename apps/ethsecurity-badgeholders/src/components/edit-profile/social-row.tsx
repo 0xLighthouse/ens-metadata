@@ -7,7 +7,7 @@ import type { OnChainSocial } from '@/hooks/use-profile-records'
 import type { SocialDraft } from '@/lib/profile-records'
 import { PLATFORM_LABELS, type SocialPlatform, X_PLATFORM } from '@/lib/social'
 import { cn } from '@/lib/utils'
-import { BadgeCheck, Loader2, TriangleAlert } from 'lucide-react'
+import { BadgeCheck, Loader2 } from 'lucide-react'
 
 const PILL =
   'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wide'
@@ -102,7 +102,6 @@ export function SocialRow({
               'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
             )}
           >
-            <TriangleAlert className="size-3" aria-hidden="true" />
             Unverified
           </span>
         )}

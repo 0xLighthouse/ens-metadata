@@ -7,6 +7,7 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+  --color-verified: var(--verified);
 }
 
 @layer base {
@@ -16,6 +17,9 @@
 
     --radius: 0.5rem;
 
+    /* Attested handles */
+    --verified: #059669;
+
     /* Line colors */
     --line: 0 0% 92%;
     --line-strong: 0 0% 88%;
@@ -24,6 +28,9 @@
   .dark {
     --background: #202020;
     --foreground: #ededed;
+
+    /* Attested handles */
+    --verified: #34d399;
 
     /* Line colors */
     --line: 240 3.7% 25%;

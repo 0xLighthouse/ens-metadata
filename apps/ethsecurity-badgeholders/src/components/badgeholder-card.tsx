@@ -17,10 +17,8 @@ const Pills = ({ row, className }: { row: BadgeholderRow; className?: string }) 
   return (
     <div className={cn('relative z-10 flex flex-wrap items-center gap-1.5 sm:shrink-0', className)}>
       {email.state !== 'empty' && <HandlePill platform="email" field={email} />}
-      {x.state !== 'empty' && <HandlePill platform="x" field={x} warning="triangle" />}
-      {telegram.state !== 'empty' && (
-        <HandlePill platform="telegram" field={telegram} warning="triangle" />
-      )}
+      {x.state !== 'empty' && <HandlePill platform="x" field={x} />}
+      {telegram.state !== 'empty' && <HandlePill platform="telegram" field={telegram} />}
       <HandlePill platform="badge" field={{ state: 'unverifiable', handle: row.tokenId }} />
     </div>
   )

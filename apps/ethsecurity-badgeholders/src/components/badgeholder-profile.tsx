@@ -2,10 +2,8 @@ import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { CopyButton } from '@/components/copy-button'
 import { EditProfileButton } from '@/components/edit-profile/edit-profile-button'
 import { HandlePill } from '@/components/handle-pill'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { isAddressOnly, rowLabel } from '@/lib/identity'
-import type { BadgeholderRow, HandleField } from '@/lib/types'
-import { TriangleAlert } from 'lucide-react'
+import type { BadgeholderRow } from '@/lib/types'
 
 const CARD =
   'rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'
@@ -25,33 +23,6 @@ const Value = ({ value }: { value: string | null }) =>
   ) : (
     <span className="text-neutral-400 text-sm italic dark:text-neutral-500">Not set</span>
   )
-
-/**
- * A social handle's value, marked with a triangle when it is unattested. The `sr-only` text
- * repeats what the tooltip says, since Radix only wires up `aria-describedby` while it is open.
- */
-const HandleValue = ({ name, field }: { name: string; field: HandleField }) => {
-  if (field.state === 'empty') return <Value value={null} />
-  if (field.state === 'attested') return <Value value={field.handle} />
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-neutral-900 text-sm dark:text-neutral-50">
-            {field.handle}
-          </span>
-          <TriangleAlert
-            className="size-3.5 shrink-0 text-orange-500 dark:text-orange-400"
-            aria-hidden="true"
-          />
-          <span className="sr-only">, unverified</span>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="text-xs">{`This ${name} handle is unverified`}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 /**
  * One badgeholder's profile: who they are, then everything they have published. `editEnabled`
@@ -112,10 +83,18 @@ export function BadgeholderProfile({
             <Value value={records.email.state === 'empty' ? null : records.email.handle} />
           </Row>
           <Row label="X account">
-            <HandleValue name="X" field={records.x} />
+            {records.x.state === 'empty' ? (
+              <Value value={null} />
+            ) : (
+              <HandlePill platform="x" field={records.x} />
+            )}
           </Row>
           <Row label="Telegram account">
-            <HandleValue name="Telegram" field={records.telegram} />
+            {records.telegram.state === 'empty' ? (
+              <Value value={null} />
+            ) : (
+              <HandlePill platform="telegram" field={records.telegram} />
+            )}
           </Row>
         </div>
       </div>

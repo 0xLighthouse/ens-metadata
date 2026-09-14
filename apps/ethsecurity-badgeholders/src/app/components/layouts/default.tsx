@@ -9,11 +9,9 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 export default function DefaultLayout({
   children,
   walletEnabled,
-  badgeholderCount,
 }: {
   children: React.ReactNode
   walletEnabled: boolean
-  badgeholderCount: number
 }) {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-50">
@@ -31,7 +29,7 @@ export default function DefaultLayout({
             <span className="text-sm font-medium">ETHSecurity Badgeholders</span>
           </div>
           <div className="flex items-center gap-2">
-            <ContractsDialog badgeholderCount={badgeholderCount} />
+            <ContractsDialog />
             <ThemeToggle />
             {walletEnabled && <ConnectButton compact />}
           </div>
@@ -42,7 +40,7 @@ export default function DefaultLayout({
           <PageBreadcrumbs />
         </div>
         <div className="hidden flex-1 items-center justify-end gap-2 sm:flex">
-          <ContractsDialog badgeholderCount={badgeholderCount} />
+          <ContractsDialog />
           <ThemeToggle />
           {walletEnabled && <ConnectButton />}
         </div>

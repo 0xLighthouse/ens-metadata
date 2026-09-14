@@ -29,8 +29,11 @@ const cacheCall = unstableCache.mock.calls[0]
 
 beforeEach(() => {
   vi.stubEnv('DUNE_API_KEY', 'test-key')
+  // Blank out any value exported in the developer's shell, so the default query id applies.
+  vi.stubEnv('DUNE_BADGELIST_QUERY_ID', '')
   getLatestResult.mockReset()
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
 afterEach(() => {
@@ -48,6 +51,36 @@ describe('fetchBadgeholders', () => {
     expect(getLatestResult).toHaveBeenCalledWith({ queryId: 8607855 })
   })
 
+  it('reads the query named by DUNE_BADGELIST_QUERY_ID instead of the default', async () => {
+    vi.stubEnv('DUNE_BADGELIST_QUERY_ID', '1234567')
+    getLatestResult.mockResolvedValue(resultWith([]))
+
+    await fetchBadgeholders()
+    expect(getLatestResult).toHaveBeenCalledWith({ queryId: 1234567 })
+  })
+
+  it('falls back to query 8607855 and warns when DUNE_BADGELIST_QUERY_ID is not numeric', async () => {
+    vi.stubEnv('DUNE_BADGELIST_QUERY_ID', 'https://dune.com/queries/1234567')
+    getLatestResult.mockResolvedValue(resultWith([]))
+
+    await fetchBadgeholders()
+    expect(getLatestResult).toHaveBeenCalledWith({ queryId: 8607855 })
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('DUNE_BADGELIST_QUERY_ID'))
+  })
+
+  it('names the configured query when the fetch fails', async () => {
+    vi.stubEnv('DUNE_BADGELIST_QUERY_ID', '1234567')
+    getLatestResult.mockRejectedValue(new Error('503 Service Unavailable'))
+
+    await expect(fetchBadgeholders()).resolves.toEqual([])
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to fetch ETHSecurity badgeholders from Dune query 1234567',
+      expect.any(Error),
+    )
+  })
+
+  // The query id is an argument to the cached loader, and `unstable_cache` keys on its
+  // arguments, so the static key parts stay stable across query ids.
   it('caches the loader under a stable key for one hour', () => {
     expect(cacheCall).toEqual([
       expect.any(Function),
