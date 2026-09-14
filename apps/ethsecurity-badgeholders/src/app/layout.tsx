@@ -3,8 +3,10 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { Web3Provider } from '@/components/web3-provider'
 import { fetchBadgeholders } from '@/lib/dune'
+import { isWalletEnabled } from '@/lib/env'
 
 import DefaultLayout from './components/layouts/default'
 
@@ -18,8 +20,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Without a Privy app id the site still renders, just without the wallet button.
-  const privyAppId = process.env.ESB_PRIVY_APP_ID
+  // Without a Privy app id the site still renders, just without the wallet button or editing.
+  const privyAppId = isWalletEnabled() ? process.env.ESB_PRIVY_APP_ID : undefined
   const badgeholderCount = (await fetchBadgeholders()).length
 
   const layout = (
@@ -32,7 +34,9 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {privyAppId ? <Web3Provider appId={privyAppId}>{layout}</Web3Provider> : layout}
+          <TooltipProvider delayDuration={200}>
+            {privyAppId ? <Web3Provider appId={privyAppId}>{layout}</Web3Provider> : layout}
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -62,7 +62,19 @@ const loadBadgeholders = unstable_cache(
     if (response.error) {
       throw new Error(`Dune returned an error: ${JSON.stringify(response.error)}`)
     }
-    return toBadgeholders(response.result?.rows ?? [])
+
+    // return toBadgeholders(response.result?.rows ?? [])
+
+    // Temporarily added, for testing purposes.
+    const rowsForBadgeholders: DuneRow[] = [
+      ...(response.result?.rows ?? []),
+      {
+        owner: '0x7c80435964Bde8071e1D3Df76Da870C2F03b44F2',
+        tokenId: 'manual',
+        issuedAt: '1970-01-01 00:00:00.000 UTC',
+      },
+    ]
+    return toBadgeholders(rowsForBadgeholders)
   },
   ['ethsecurity-badgeholders'],
   { revalidate: BADGEHOLDERS_CACHE_TTL_SECONDS },

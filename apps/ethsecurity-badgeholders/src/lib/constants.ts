@@ -31,3 +31,44 @@ export const RCRDS_BATCH_SIZE = 50
  * handle attestations count as verified. Pinned so verification needs no name resolution.
  */
 export const ATTESTER_ADDRESS = '0xf82A259381f5632A0b12E6720C8C216B7c659783'
+
+/**
+ * Pixels requested from stamp.fyi for every badgeholder avatar. One size for every surface keeps
+ * a single cached image per address; 96 covers the list thumbnails at their rendered 48px and is
+ * upscaled on the profile page, which is an accepted trade for the smaller list payload.
+ *
+ * Must stay within 1..500: stamp resets an out-of-range `s` to 64 rather than clamping it.
+ */
+export const AVATAR_SIZE = 96
+
+/** How long a cached avatar is served before Next revalidates it upstream, in seconds. */
+export const AVATAR_CACHE_TTL_SECONDS = 60 * 60 * 12
+
+/**
+ * How long a browser may reuse an avatar, in seconds. Deliberately short: an on-demand refresh
+ * clears our cache but cannot reach a browser that already holds the image, so this bounds how
+ * long a stale avatar can linger on screen.
+ */
+export const AVATAR_BROWSER_TTL_SECONDS = 5 * 60
+
+/** How long a browser may serve a stale avatar while refetching in the background, in seconds. */
+export const AVATAR_STALE_TTL_SECONDS = 60 * 60 * 24
+
+/** Next data-cache tag on every rcrds.xyz profile batch, so a publish can drop them all at once. */
+export const BADGEHOLDER_PROFILES_CACHE_TAG = 'esb-badgeholder-profiles'
+
+/** Base URL of the attester worker that signs X and Telegram handle attestations. */
+export const ATTESTER_URL = process.env.NEXT_PUBLIC_ATTESTER_URL ?? 'http://localhost:8787'
+
+/** Optional mainnet RPC override for live record reads and publishing. */
+export const MAINNET_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL
+
+/** The `class` record every edited profile carries. */
+export const PERSON_CLASS = 'Person'
+
+/**
+ * The `schema` record every edited profile carries: the latest published Person schema,
+ * from `packages/schemas/published/_latest.json`. `PERSON_SCHEMA` in `@/lib/person-schema`
+ * must be the document this CID resolves to.
+ */
+export const PERSON_SCHEMA_URI = 'ipfs://QmSHkLhbPF96jYwYq52TmmvQNSCFijhZWYziRqgimBQ9Na'

@@ -1,4 +1,4 @@
-import { cn, resolveAvatar, shortenAddress } from '@/lib/utils'
+import { badgeholderAvatarUrl, cn, resolveAvatar, shortenAddress } from '@/lib/utils'
 import { describe, expect, it } from 'vitest'
 
 describe('cn', () => {
@@ -20,9 +20,30 @@ describe('resolveAvatar', () => {
     expect(resolveAvatar()).toBeUndefined()
   })
 
-  it('builds a stamp.fyi url with an optional size', () => {
-    expect(resolveAvatar('0xabc')).toBe('https://cdn.stamp.fyi/avatar/0xabc')
-    expect(resolveAvatar('0xabc', 64)).toBe('https://cdn.stamp.fyi/avatar/0xabc?s=64')
+  // `cb` is not decoration: without it stamp serves a cached image from any resolver and the
+  // `resolver=ens` restriction is silently lost.
+  it('pins the ens resolver behind its own cache namespace', () => {
+    expect(resolveAvatar('0xabc')).toBe(
+      'https://cdn.stamp.fyi/avatar/0xabc?resolver=ens&cb=esb-ens',
+    )
+  })
+
+  it('adds an optional size', () => {
+    expect(resolveAvatar('0xabc', 64)).toBe(
+      'https://cdn.stamp.fyi/avatar/0xabc?resolver=ens&cb=esb-ens&s=64',
+    )
+  })
+})
+
+describe('badgeholderAvatarUrl', () => {
+  // Lives in utils, not avatars: it is reached from under a 'use client' boundary, and
+  // @/lib/avatars imports revalidateTag, which cannot be bundled for the client.
+  it('points at our own cached route, not stamp.fyi', () => {
+    expect(badgeholderAvatarUrl('0xabc')).toBe('/api/avatar/0xabc')
+  })
+
+  it('lowercases so one avatar has one url', () => {
+    expect(badgeholderAvatarUrl('0xAbC')).toBe('/api/avatar/0xabc')
   })
 })
 

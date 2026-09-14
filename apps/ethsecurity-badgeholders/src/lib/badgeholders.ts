@@ -5,8 +5,8 @@ import type { BadgeholderRow } from '@/lib/types'
 const ADDRESS = /^0x[0-9a-f]{40}$/i
 
 /**
- * Every badgeholder joined with its rcrds.xyz profile. Server-only. A Dune outage yields an
- * empty list; an rcrds.xyz outage yields rows with empty profiles. Never throws.
+ * Every badgeholder joined with its rcrds.xyz profile. A Dune outage yields an
+ * empty list; an rcrds.xyz outage yields rows with empty profiles.
  */
 export async function loadBadgeholderRows(): Promise<BadgeholderRow[]> {
   const badgeholders = await fetchBadgeholders()
@@ -16,6 +16,15 @@ export async function loadBadgeholderRows(): Promise<BadgeholderRow[]> {
     ...badgeholder,
     ...(profiles.get(badgeholder.address) ?? EMPTY_PROFILE),
   }))
+}
+
+/**
+ * Returns whether `address` is in the badgeholder list, so we can reject requests for other addresses.
+ */
+export async function isBadgeholder(address: string): Promise<boolean> {
+  if (!ADDRESS.test(address)) return false
+  const needle = address.toLowerCase()
+  return (await fetchBadgeholders()).some((badgeholder) => badgeholder.address === needle)
 }
 
 /**

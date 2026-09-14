@@ -17,11 +17,15 @@ export type HandleField =
   | { state: 'unattested'; handle: string }
   | { state: 'attested'; handle: string }
 
-/** The five tracked text records. Text fields are `null` when unset or whitespace-only. */
+/** An unverifiable record. */
+export type PlainField = { state: 'empty' } | { state: 'unverifiable'; handle: string }
+
+/** The six tracked text records. Text fields are `null` when unset or whitespace-only. */
 export type BadgeholderRecords = {
-  name: string | null
+  alias: string | null
   description: string | null
   avatar: string | null
+  email: PlainField
   x: HandleField
   telegram: HandleField
 }
