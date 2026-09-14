@@ -1,5 +1,6 @@
 import { BadgeholderProfile } from '@/components/badgeholder-profile'
 import { findBadgeholderRow } from '@/lib/badgeholders'
+import { isWalletEnabled } from '@/lib/env'
 import { rowLabel } from '@/lib/identity'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
@@ -23,8 +24,8 @@ export default async function BadgeholderPage({ params }: Props) {
   if (!row) notFound()
 
   return (
-    <PageInset>
-      <BadgeholderProfile row={row} />
+    <PageInset className="max-w-[45rem]">
+      <BadgeholderProfile row={row} editEnabled={isWalletEnabled()} />
     </PageInset>
   )
 }

@@ -53,3 +53,22 @@ export const AVATAR_BROWSER_TTL_SECONDS = 5 * 60
 
 /** How long a browser may serve a stale avatar while refetching in the background, in seconds. */
 export const AVATAR_STALE_TTL_SECONDS = 60 * 60 * 24
+
+/** Next data-cache tag on every rcrds.xyz profile batch, so a publish can drop them all at once. */
+export const BADGEHOLDER_PROFILES_CACHE_TAG = 'esb-badgeholder-profiles'
+
+/** Base URL of the attester worker that signs X and Telegram handle attestations. */
+export const ATTESTER_URL = process.env.NEXT_PUBLIC_ATTESTER_URL ?? 'http://localhost:8787'
+
+/** Optional mainnet RPC override for live record reads and publishing. */
+export const MAINNET_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL
+
+/** The `class` record every edited profile carries. */
+export const PERSON_CLASS = 'Person'
+
+/**
+ * The `schema` record every edited profile carries: the latest published Person schema,
+ * from `packages/schemas/published/_latest.json`. `PERSON_SCHEMA` in `@/lib/person-schema`
+ * must be the document this CID resolves to.
+ */
+export const PERSON_SCHEMA_URI = 'ipfs://QmSHkLhbPF96jYwYq52TmmvQNSCFijhZWYziRqgimBQ9Na'

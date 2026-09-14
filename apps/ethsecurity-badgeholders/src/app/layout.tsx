@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Web3Provider } from '@/components/web3-provider'
 import { fetchBadgeholders } from '@/lib/dune'
+import { isWalletEnabled } from '@/lib/env'
 
 import DefaultLayout from './components/layouts/default'
 
@@ -19,8 +20,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Without a Privy app id the site still renders, just without the wallet button.
-  const privyAppId = process.env.ESB_PRIVY_APP_ID
+  // Without a Privy app id the site still renders, just without the wallet button or editing.
+  const privyAppId = isWalletEnabled() ? process.env.ESB_PRIVY_APP_ID : undefined
   const badgeholderCount = (await fetchBadgeholders()).length
 
   const layout = (

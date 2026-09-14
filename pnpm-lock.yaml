@@ -111,9 +111,15 @@ importers:
       '@duneanalytics/client-sdk':
         specifier: ^0.3.5
         version: 0.3.5
+      '@ensdomains/ensjs':
+        specifier: ^4.2.2
+        version: 4.2.2(typescript@5.8.3)(viem@2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(zod@3.25.76))(zod@3.25.76)
       '@ensmetadata/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@ensmetadata/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@privy-io/react-auth':
         specifier: ^2.25.0
         version: 2.25.0(@solana/web3.js@1.98.2(bufferutil@4.1.0)(encoding@0.1.13)(typescript@5.8.3)(utf-8-validate@6.0.6))(@types/react@18.3.23)(bs58@6.0.0)(bufferutil@4.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)(use-sync-external-store@1.5.0(react@18.3.1))(utf-8-validate@6.0.6)(zod@3.25.76)
@@ -156,6 +162,9 @@ importers:
       tailwindcss:
         specifier: ^4.0.16
         version: 4.1.15
+      vaul:
+        specifier: ^1.1.2
+        version: 1.1.2(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       viem:
         specifier: 2.47.6
         version: 2.47.6(bufferutil@4.1.0)(typescript@5.8.3)(utf-8-validate@6.0.6)(zod@3.25.76)
@@ -15826,7 +15835,7 @@ snapshots:
     dependencies:
       ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  isows@1.0.6(ws@8.18.0(bufferutil@4.1.0)):
+  isows@1.0.6(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
@@ -18875,7 +18884,7 @@ snapshots:
       '@scure/bip32': 1.6.2
       '@scure/bip39': 1.5.4
       abitype: 1.0.8(typescript@5.8.3)(zod@3.25.76)
-      isows: 1.0.6(ws@8.18.0(bufferutil@4.1.0))
+      isows: 1.0.6(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       ox: 0.6.7(typescript@5.8.3)(zod@3.25.76)
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:

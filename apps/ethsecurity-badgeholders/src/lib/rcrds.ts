@@ -1,19 +1,14 @@
+import { isHandleAttested } from '@/lib/attestation-state'
 import {
-  ATTESTER_ADDRESS,
   BADGEHOLDERS_CACHE_TTL_SECONDS,
+  BADGEHOLDER_PROFILES_CACHE_TAG,
   RCRDS_API_URL,
   RCRDS_BATCH_SIZE,
 } from '@/lib/constants'
 import type { BadgeholderProfile, BadgeholderRecords, HandleField, PlainField } from '@/lib/types'
 import { isValidEmail, isValidTelegramHandle, isValidXHandle } from '@/lib/validation'
-import {
-  DEFAULT_ATTESTER_ENS,
-  decodeEnvelope,
-  handleAttestationRecordKey,
-  verifyHandleClaim,
-} from '@ensmetadata/sdk'
 import { unstable_cache } from 'next/cache'
-import { type Address, type Hex, hexToBytes } from 'viem'
+import type { Address } from 'viem'
 
 /**
  * One row of `POST /v1/names`: the flat envelope the single-name endpoints return. For an
@@ -46,9 +41,8 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 }
 
 /**
- * A handle's attestation state. The record `attestations[<platform>][<attester>]` holds a hex
- * CBOR envelope signed over `{ platform, handle, name, addr }`; it counts only when the
- * signature recovers to `ATTESTER_ADDRESS`. Any decode or verification failure is "unattested".
+ * A handle's attestation state: unset, set, or set and backed by a valid attestation from the
+ * trusted attester (see `isHandleAttested`).
  */
 const toHandleField = async (
   platform: string,
@@ -58,23 +52,8 @@ const toHandleField = async (
   records: Record<string, string>,
 ): Promise<HandleField> => {
   if (handle === null) return { state: 'empty' }
-
-  const envelopeHex = records[handleAttestationRecordKey(platform, DEFAULT_ATTESTER_ENS)]
-  if (!envelopeHex) return { state: 'unattested', handle }
-
-  try {
-    const envelope = decodeEnvelope(hexToBytes(envelopeHex as Hex))
-    const result = await verifyHandleClaim(envelope, {
-      trustedAttester: ATTESTER_ADDRESS,
-      owner,
-      name: ensName,
-      platform,
-      handle,
-    })
-    return { state: result.valid ? 'attested' : 'unattested', handle }
-  } catch {
-    return { state: 'unattested', handle }
-  }
+  const attested = await isHandleAttested({ platform, handle, ensName, owner, records })
+  return { state: attested ? 'attested' : 'unattested', handle }
 }
 
 const toPlainField = (value: string | null): PlainField =>
@@ -152,7 +131,7 @@ const loadBatch = unstable_cache(
     return profiles
   },
   ['ethsecurity-badgeholder-profiles'],
-  { revalidate: BADGEHOLDERS_CACHE_TTL_SECONDS },
+  { revalidate: BADGEHOLDERS_CACHE_TTL_SECONDS, tags: [BADGEHOLDER_PROFILES_CACHE_TAG] },
 )
 
 /**

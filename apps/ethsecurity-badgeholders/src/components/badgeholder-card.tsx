@@ -2,22 +2,29 @@ import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { HandlePill } from '@/components/handle-pill'
 import { isAddressOnly, rowLabel } from '@/lib/identity'
 import type { BadgeholderRow } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
 export type ListView = 'list' | 'grid'
 
 /**
- * The card's email/X/Telegram/badge pills. A set pill must sit
- * above the card's stretched overlay link (`relative z-10`) to stay clickable.
+ * The card's email/X/Telegram/badge pills. A set pill must sit above the card's stretched overlay
+ * link (`relative z-10`) to stay clickable. An unset record is omitted rather than shown as a
+ * placeholder; the badge is always set, so every card carries at least that one.
  */
-const Pills = ({ row }: { row: BadgeholderRow }) => (
-  <div className="relative z-10 flex flex-wrap items-center gap-1.5 sm:shrink-0">
-    <HandlePill platform="email" field={row.records.email} />
-    <HandlePill platform="x" field={row.records.x} />
-    <HandlePill platform="telegram" field={row.records.telegram} />
-    <HandlePill platform="badge" field={{ state: 'unverifiable', handle: row.tokenId }} />
-  </div>
-)
+const Pills = ({ row, className }: { row: BadgeholderRow; className?: string }) => {
+  const { email, x, telegram } = row.records
+  return (
+    <div className={cn('relative z-10 flex flex-wrap items-center gap-1.5 sm:shrink-0', className)}>
+      {email.state !== 'empty' && <HandlePill platform="email" field={email} />}
+      {x.state !== 'empty' && <HandlePill platform="x" field={x} warning="triangle" />}
+      {telegram.state !== 'empty' && (
+        <HandlePill platform="telegram" field={telegram} warning="triangle" />
+      )}
+      <HandlePill platform="badge" field={{ state: 'unverifiable', handle: row.tokenId }} />
+    </div>
+  )
+}
 
 const EnsName = ({ name }: { name: string }) => (
   <span className="font-normal text-neutral-500 dark:text-neutral-400"> ({name})</span>
@@ -59,7 +66,7 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
         <p className="line-clamp-2 min-h-[40px] text-neutral-500 text-sm dark:text-neutral-400">
           {description}
         </p>
-        <Pills row={row} />
+        <Pills row={row} className="justify-end" />
       </div>
     )
   }

@@ -23,7 +23,7 @@ export async function fetchBadgeholderAvatar(address: string): Promise<Badgehold
   if (!url) throw new Error('Cannot resolve an avatar without an address')
 
   const response = await fetch(url, {
-    // The route that calls this is `force-dynamic`, and Next treats a fetch on such a route 
+    // The route that calls this is `force-dynamic`, and Next treats a fetch on such a route
     // as uncacheable unless it carries an explicit `cache` or `next.revalidate`.
     next: { revalidate: AVATAR_CACHE_TTL_SECONDS, tags: [avatarCacheTag(address)] },
   })
@@ -42,7 +42,7 @@ export async function fetchBadgeholderAvatar(address: string): Promise<Badgehold
 
 /**
  * Drops the cached avatar for one address, so the next request refetches it.
- * 
+ *
  * This clears our copy only. A browser already holding the image keeps it for up to
  * `AVATAR_BROWSER_TTL_SECONDS`, so a refresh is visible within minutes rather than instantly.
  */
