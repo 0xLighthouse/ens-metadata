@@ -20,7 +20,10 @@ const PLATFORMS: Record<
     icon: ComponentType<SVGProps<SVGSVGElement>>
     base: string
     prefix: string
-    /** Whether the platform can carry an attestation, which drives the tooltip and screen-reader suffix. */
+    /**
+     * Whether the platform can carry an attestation, which gates the tooltip and screen-reader suffix.
+     * The verified dot needs no gate: only verifiable platforms can reach the `attested` state.
+     */
     verifiable: boolean
   }
 > = {
@@ -43,18 +46,14 @@ const PLATFORMS: Record<
   },
 }
 
-const FILL = 'bg-neutral-50 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-
-const SET = `border-neutral-200 dark:border-neutral-700 ${FILL}`
-
-/** Spelled out rather than appended to `SET`, so no neutral border (light or dark) survives. */
-const ATTESTED = `border-verified ${FILL}`
+const SET =
+  'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
 
 const STYLES: Record<PillField['state'], string> = {
   empty:
     'border-dashed border-neutral-300 text-neutral-400 dark:border-neutral-700 dark:text-neutral-500',
   unattested: SET,
-  attested: ATTESTED,
+  attested: SET,
   unverifiable: SET,
 }
 
@@ -70,7 +69,7 @@ const SR_SUFFIXES: Record<PillField['state'], string> = {
   unverifiable: '',
 }
 
-/** A platform handle as a link pill; attested handles are outlined in the verified colour. */
+/** A platform handle as a link pill; attested handles get a dot in the verified colour. */
 export function HandlePill({
   platform,
   field,
@@ -101,6 +100,10 @@ export function HandlePill({
       {!prefix.includes(label) && <span className="sr-only">{`${label}: `}</span>}
       {/* Only the handle gives ground when the row runs out of width. */}
       <span className="min-w-0 truncate">{handle === null ? 'Unknown' : `${prefix}${handle}`}</span>
+      {/* `shrink-0` keeps the dot visible when the handle truncates; the state is voiced by the suffix. */}
+      {field.state === 'attested' && (
+        <span className="size-1.5 shrink-0 rounded-full bg-verified" aria-hidden="true" />
+      )}
       {/* Radix only wires `aria-describedby` while the tooltip is open, so state is repeated here. */}
       {suffix && <span className="sr-only">{suffix}</span>}
     </>

@@ -2,8 +2,10 @@ import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { CopyButton } from '@/components/copy-button'
 import { EditProfileButton } from '@/components/edit-profile/edit-profile-button'
 import { HandlePill } from '@/components/handle-pill'
+import { VerifiedMark } from '@/components/verified-mark'
 import { isAddressOnly, rowLabel } from '@/lib/identity'
 import type { BadgeholderRow } from '@/lib/types'
+import { isProfileVerified } from '@/lib/verification'
 
 const CARD =
   'rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900'
@@ -40,19 +42,23 @@ export function BadgeholderProfile({
       <div className={`${CARD} flex gap-5 p-5`}>
         <BadgeholderAvatar row={row} className="size-32 rounded-xl" />
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* An address-only row has no ENS name and so can't carry attestations; no mark here. */}
           {isAddressOnly(row) ? (
             <h1 className="truncate font-bold text-3xl text-neutral-400 italic dark:text-neutral-500">
               Name unspecified
             </h1>
           ) : (
-            <h1 className="truncate font-bold text-3xl text-neutral-900 dark:text-neutral-50">
-              {primary}
-              {secondary && (
-                <span className="font-normal text-neutral-500 dark:text-neutral-400">
-                  {' '}
-                  ({secondary})
-                </span>
-              )}
+            <h1 className="flex min-w-0 items-center gap-2 font-bold text-3xl text-neutral-900 dark:text-neutral-50">
+              <span className="min-w-0 truncate">
+                {primary}
+                {secondary && (
+                  <span className="font-normal text-neutral-500 dark:text-neutral-400">
+                    {' '}
+                    ({secondary})
+                  </span>
+                )}
+              </span>
+              {isProfileVerified(row) && <VerifiedMark className="size-7" />}
             </h1>
           )}
           <div className="mt-2 flex items-center gap-2">

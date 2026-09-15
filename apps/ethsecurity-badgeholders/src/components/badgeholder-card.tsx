@@ -1,8 +1,10 @@
 import { BadgeholderAvatar } from '@/components/badgeholder-avatar'
 import { HandlePill } from '@/components/handle-pill'
+import { VerifiedMark } from '@/components/verified-mark'
 import { isAddressOnly, rowLabel } from '@/lib/identity'
 import type { BadgeholderRow } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { isProfileVerified } from '@/lib/verification'
 import Link from 'next/link'
 
 export type ListView = 'list' | 'grid'
@@ -32,8 +34,11 @@ const EnsName = ({ name }: { name: string }) => (
 export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: ListView }) {
   const { primary, secondary } = rowLabel(row)
   const description = row.records.description ?? 'No description provided'
+  // No `relative z-10` on the mark: it has no tooltip, so clicks fall through to the overlay link.
+  const verified = isProfileVerified(row)
 
   if (view === 'grid') {
+    // An address-only row has no ENS name and so can't carry attestations; its placeholder skips the mark.
     const unnamed = isAddressOnly(row)
 
     return (
@@ -51,9 +56,12 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
                 No name specified
               </p>
             ) : (
-              <p className="truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
-                {primary}
-                {secondary && <EnsName name={secondary} />}
+              <p className="flex min-w-0 items-center gap-1 font-semibold text-neutral-900 text-sm dark:text-neutral-50">
+                <span className="min-w-0 truncate">
+                  {primary}
+                  {secondary && <EnsName name={secondary} />}
+                </span>
+                {verified && <VerifiedMark className="size-3.5" />}
               </p>
             )}
             <p className="break-all font-mono text-neutral-400 text-xs dark:text-neutral-500">
@@ -79,9 +87,12 @@ export function BadgeholderCard({ row, view }: { row: BadgeholderRow; view: List
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <BadgeholderAvatar row={row} className="size-12" />
         <div className="min-w-0 flex-1">
-          <p className="mb-0.5 truncate font-semibold text-neutral-900 text-sm dark:text-neutral-50">
-            {primary}
-            {secondary && <EnsName name={secondary} />}
+          <p className="mb-0.5 flex min-w-0 items-center gap-1 font-semibold text-neutral-900 text-sm dark:text-neutral-50">
+            <span className="min-w-0 truncate">
+              {primary}
+              {secondary && <EnsName name={secondary} />}
+            </span>
+            {verified && <VerifiedMark className="size-3.5" />}
           </p>
           <p className="truncate text-neutral-500 text-xs dark:text-neutral-400">{description}</p>
         </div>
